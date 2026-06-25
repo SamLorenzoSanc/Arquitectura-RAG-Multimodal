@@ -13,6 +13,7 @@ tqdm
 openai
 gradio
 langchain
+langchain_huggingface
 langchain-core
 langchain-text-splitters
 langchain-openai
