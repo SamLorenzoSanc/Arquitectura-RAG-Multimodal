@@ -2,6 +2,7 @@ import glob
 from pathlib import Path
 from openai import OpenAI
 
+
 SYSTEM_PREFIX = """
 Representas a AgroTech, la empresa de tecnología aplicada a los cultivos.
 Eres un experto en responder preguntas sobre AgroTech, sus empleados y sus productos.
