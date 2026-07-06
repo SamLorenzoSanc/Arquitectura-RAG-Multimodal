@@ -5,7 +5,7 @@ import gradio as gr
 from utils.utils import dictionary_data, get_relevant_context, additional_context, chat
 from utils.chunking import count_character_documents, count_tokens_documents, lanchain_loaders, divide_chunks, create_vectore_store, investigate_vectors, visualizate_embeddings_2D, visualizate_embeddings_3D
 from utils.rag import connect_chroma, answer_question
-
+from evaluation import test
 
 load_dotenv(override=True)
 openai_api_key = os.getenv('OPENAI_API_KEY')
@@ -36,10 +36,20 @@ def main(args: list[str]) -> int:
     elif argc == 3:
         visualizate_embeddings_3D(vector_store) """
     
-    retriever, llm = connect_chroma(db_name, MODEL)
-    print(answer_question("¿Quién es Castro?", [], retriever, llm)) 
+    #retriever, llm = connect_chroma(db_name, MODEL)
+    #print(answer_question("¿Quién es Castro?", [], retriever, llm)) 
     
-    gr.ChatInterface(fn=lambda message, history: answer_question(message, history, retriever, llm)).launch()
+    #gr.ChatInterface(fn=lambda message, history: answer_question(message, history, retriever, llm)).launch()
+    tests = test.load_tests()
+
+    len(tests)
+
+    ejemplo = tests[0]
+    print(ejemplo.question)
+    print(ejemplo.category)
+    print(ejemplo.reference_answer)
+    print(ejemplo.keywords)
+    
     return 0
 
 if __name__ == "__main__":
