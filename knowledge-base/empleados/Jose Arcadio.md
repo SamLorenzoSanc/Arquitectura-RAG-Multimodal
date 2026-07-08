@@ -18,7 +18,7 @@
 
 -   **Campaña 2023:** - **Volumen Total Entregado:** 142.500 Kg de fruta.
 -   **Distribución de Calidad:** 75% Categoría Extra, 20% Primera, 5% Segunda/Mermas.
--  **Hito Técnico:** Cooperó con el Ingeniero Agrónomo de la cooperativa (**Tomás Benítez**) para monitorizar el estrés hídrico de la parcela de Tazacorte, logrando mantener el calibre comercial (Extra) a pesar de las restricciones de agua en verano.
+-  **Hito Técnico:** Cooperó con el Ingeniero Agrónomo de la cooperativa (**Covalle**) para monitorizar el estrés hídrico de la parcela de Tazacorte, logrando mantener el calibre comercial (Extra) a pesar de las restricciones de agua en verano.
 -   **Campaña 2022:** - **Volumen Total Entregado:** 98.000 Kg (Afectado parcialmente por la caída de ceniza del volcán que dañó el aspecto estético de la piel en el corte de invierno).
 
 ## Notas de Interacción y Gestión Digital

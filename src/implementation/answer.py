@@ -1,5 +1,6 @@
 from pathlib import Path
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+
+from langchain_ollama import ChatOllama
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.messages import SystemMessage, HumanMessage, convert_to_messages
@@ -10,25 +11,26 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-MODEL = "gpt-4.1-nano"
+MODEL = "llama3"
 DB_NAME = str(Path(__file__).parent.parent.parent / "vector_db")
 
-# embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
-RETRIEVAL_K = 10
+embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+#embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+RETRIEVAL_K = 10 # Cuantos chunks como máximo devuelven el recuperador k
 
 SYSTEM_PROMPT = """
-You are a knowledgeable, friendly assistant representing the company Insurellm.
-You are chatting with a user about Insurellm.
-If relevant, use the given context to answer any question.
-If you don't know the answer, say so.
-Context:
+Eres un asistente experto y amable que representa a la empresa Insurellm.
+Estás chateando con un usuario sobre Insurellm.
+Si es pertinente, utiliza el contexto proporcionado para responder a cualquier pregunta.
+Si no sabes la respuesta, dilo.
+Contexto:
 {context}
 """
 
 vectorstore = Chroma(persist_directory=DB_NAME, embedding_function=embeddings)
 retriever = vectorstore.as_retriever()
-llm = ChatOpenAI(temperature=0, model=MODEL)
+llm = ChatOllama(temperature=0, model=MODEL)
 
 
 def fetch_context(question: str) -> list[Document]:
