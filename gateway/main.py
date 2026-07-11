@@ -1,34 +1,26 @@
 import uvicorn
-# Esta función es una aplicación ASGI básica.
-# Los servidores ASGI (como Uvicorn) esperan exactamente estos tres parámetros:
-# - scope: Un diccionario con los datos de la petición (método HTTP, ruta, cabeceras, etc.)
-# - receive: Una función asíncrona para recibir datos del cliente (ej. el cuerpo de un POST).
-# - send: Una función asíncrona para enviar datos de vuelta al cliente.
-async def app(scope, receive, send):
-    body = "Hello, world!"
-    # Convertimos el texto a bytes primero para asegurarnos de medir su tamaño real en bytes
-    body_bytes = body.encode("utf-8")
-    # Convertimos el número de la longitud a bytes (ej: 13 -> b"13")
-    content_length = str(len(body_bytes)).encode("utf-8")
-    await send(
-        {
-            "type": "http.response.start",
-            "status": 200,
-            "headers": [
-                [b"content-type", b"text/plain"],
-                [b"content-length",content_length],
-            ],
-        }
-    )
-    await send(
-        {
-            "type": "http.response.body",
-            "body": body_bytes,
-        }
-    )
+from fastapi import FastAPI
+from routes.chat import router as chat_router
+from routes.documents import router as document_router
+from routes.health import router as health_router
+from routes.models import router as model_router
+from routes.metrics import router as metrics_router
+from routes.auth import router as auth_router
+
+app = FastAPI(
+    title="AgroRAG Gateway",
+    version="1.0.0"
+)
+
+app.include_router(chat_router, prefix="/api/v1")
+app.include_router(document_router, prefix="/api/v1")
+app.include_router(model_router, prefix="/api/v1")
+app.include_router(metrics_router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(health_router, prefix="/api/v1")
 
 def main():
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 if __name__ == "__main__":

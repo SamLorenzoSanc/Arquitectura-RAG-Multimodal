@@ -1,19 +1,31 @@
-import './App.css'
+import { Routes, Route } from "react-router-dom";
 
-function MyButton() {
-  return (
-    <button>I'm a button</button>
-  );
-}
+import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
+import Register from "@/pages/Register";
+import Dashboard from "@/pages/Dashboard";
 
 function App() {
-
-  return (
-    <div>
-      <h1>Plataforma de gestión de operaciones</h1>
-      <MyButton />
-    </div>
-  );
+    return (
+        <Routes>
+            <Route
+                path="/"
+                element={<Landing />}
+            />
+            <Route
+                path="/login"
+                element={<Login />}
+            />
+            <Route
+                path="/register"
+                element={<Register />}
+            />
+            <Route
+              path="/dashboard"
+              element={<Dashboard />}
+            />
+        </Routes>
+    );
 }
 
-export default App
+export default App;

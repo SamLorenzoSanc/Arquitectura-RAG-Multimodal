@@ -14,12 +14,6 @@ services:
     environment:
       - UVICORN=reload
 
-  rag:
-    build: ./services/rag-service
-
-  ingestion:
-    build: ./services/ingestion-service
-
   chromadb:
     image: chromadb/chroma
     ports:
