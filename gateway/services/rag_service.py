@@ -2,10 +2,11 @@ from pathlib import Path
 
 from chromadb import PersistentClient
 from dotenv import load_dotenv
-from litellm import completion
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from schemas.chat import RankOrder, Result
 from tenacity import retry, wait_exponential
+from traceback import print_exc
 
 load_dotenv(override=True)
 
@@ -15,31 +16,21 @@ WAIT_POLICY = wait_exponential(
     max=240,
 )
 
-class Result(BaseModel):
-    page_content: str
-    metadata: dict
-
-
-class RankOrder(BaseModel):
-    order: list[int] = Field(
-        description="Orden de relevancia de los fragmentos"
-    )
-
-
 class RAGService:
 
     SYSTEM_PROMPT = """
     Eres un asistente experto y amable que representa a la empresa Insurellm.
 
+    REGLA CRÍTICA DE IDIOMA: Debe responder SIEMPRE en español, independientemente del idioma en el que estén escritos los fragmentos del contexto o la pregunta del usuario. Si los fragmentos contienen términos en inglés, tradúcelos o explícalos en español.
     Contexto:
     {context}
     """
 
-    def __init__(self, model: str = "ollama/llama3", embedding_model: str = "text-embedding-3-large", db_path: str | None = None, collection_name: str = "docs", retrieval_k: int = 20, final_k: int = 10):
+    def __init__(self, model: str = "llama3", embedding_model: str = "qwen3-embedding:8b", db_path: str | None = None, collection_name: str = "docs", retrieval_k: int = 20, final_k: int = 10):
 
         if db_path is None:
             db_path = str( Path(__file__).parent.parent.parent / "notebooks/preprocessed_db")
-
+        
         self.model = model
         self.embedding_model = embedding_model
 
@@ -52,7 +43,10 @@ class RAGService:
             max=240,
         )
 
-        self.openai = OpenAI(api_key="ollama")
+        self.client = OpenAI(
+            base_url="http://localhost:11434/v1",
+            api_key="ollama"
+        )
 
         self.chroma = PersistentClient(path=db_path)
 
@@ -60,39 +54,37 @@ class RAGService:
             collection_name
         )
 
-    @retry(wait=WAIT_POLICY)
     def rewrite_query(self, question, history=None):
 
-        if history is None:
-            history = []
+        history = history or []
 
         prompt = f"""
-        Historial:
+            Historial:
 
-        {history}
+            {history}
 
-        Pregunta:
+            Pregunta:
 
-        {question}
-
-        Reescribe únicamente la consulta.
+            {question}
+            Respuesta en español
+            Reescribe únicamente la consulta.
         """
 
-        response = completion(
-            model=self.model,
+        response = self.client.chat.completions.create(
+            model="llama3",
             messages=[
                 {
                     "role": "system",
                     "content": prompt
                 }
-            ],
+            ]
         )
 
         return response.choices[0].message.content
     
     def retrieve(self, question: str) -> list[Result]:
 
-        embedding = self.openai.embeddings.create(
+        embedding = self.client.embeddings.create(
             model=self.embedding_model,
             input=[question],
         ).data[0].embedding
@@ -129,11 +121,13 @@ class RAGService:
                 merged.append(chunk)
 
         return merged
-    
-    @retry(wait=WAIT_POLICY)
+
+
     def rerank(self, question, chunks):
         system_prompt = """
             Eres un sistema de reordenación de documentos.
+
+            REGLA CRÍTICA DE IDIOMA: Debe responder SIEMPRE en español, independientemente del idioma en el que estén escritos los fragmentos del contexto o la pregunta del usuario. Si los fragmentos contienen términos en inglés, tradúcelos o explícalos en español.
             Se te proporciona una pregunta y una lista de fragmentos de texto relevantes extraídos de una consulta a una base de conocimientos.
             Los fragmentos se proporcionan en el orden en que se han recuperado; este orden debería estar aproximadamente ordenado por relevancia, pero es posible que puedas mejorarlo.
             Debes clasificar los fragmentos proporcionados por orden de relevancia respecto a la pregunta, colocando el más relevante en primer lugar.
@@ -148,52 +142,52 @@ class RAGService:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ]
-        response = completion(model=self.model, messages=messages, response_format=RankOrder)
+        response = self.client.chat.completions.create(model=self.model, messages=messages, response_format=RankOrder)
         reply = response.choices[0].message.content
         order = RankOrder.model_validate_json(reply).order
         return [chunks[i - 1] for i in order]
     
     def build_prompt(self, question, history, chunks):
 
-        context = "\n\n".join(f"Extract from {c.metadata['source']}:\n{c.page_content}" for c in chunks)
-
+        context = "\n\n".join(f"Extrae de {c.metadata['source']}:\n{c.page_content}" for c in chunks)
+        print("Prompt 1", context)
         return (
             [{"role": "system", "content": self.SYSTEM_PROMPT.format(context=context)}] + history + [{"role": "user", "content": question}]
         )
-    def fetch_context(self, question):
-        print("Fetch 1")
+
+    def fetch_context_simple(self, question):
+        print("1")
         rewritten = self.rewrite_query(question)
-
-        print("Fetch 2")
+        print("2")
         original = self.retrieve(question)
-
-        print("Fetch 3")
+        print("3")
         rewritten_chunks = self.retrieve(rewritten)
-
-        print("Fetch 4")
+        print("4")
         merged = self.merge_chunks(original, rewritten_chunks)
 
-        print("Fetch 5")
+        return merged[:self.final_k]
+    
+    def fetch_context(self, question):
+        rewritten = self.rewrite_query(question)
+        original = self.retrieve(question)
+        rewritten_chunks = self.retrieve(rewritten)
+        merged = self.merge_chunks(original, rewritten_chunks)
         reranked = self.rerank(question, merged)
-
-        print("Fetch 6")
 
 
         return reranked[: self.final_k]
-    
-    @retry(wait=WAIT_POLICY)
+
     def answer(self,question,history=None):
 
         if history is None:
             history = []
-        print("1")
-        chunks = self.fetch_context(question)
 
-        print("2")
+
+        chunks = self.fetch_context_simple(question)
+
         messages = self.build_prompt(question, history, chunks)
-        print("3")
 
-        response = completion(model=self.model, messages=messages)
+        response = self.client.chat.completions.create(model=self.model,  messages=messages)
 
         return (
             response.choices[0].message.content,

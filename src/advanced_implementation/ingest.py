@@ -15,7 +15,7 @@ MODEL = "ollama/llama3"
 
 DB_NAME = str(Path(__file__).parent.parent.parent / "notebooks/preprocessed_db")
 collection_name = "docs"
-embedding_model = "text-embedding-3-large"
+embedding_model = "qwen3-embedding:latest"
 KNOWLEDGE_BASE_PATH = Path(__file__).parent.parent.parent / "knowledge-base"
 AVERAGE_CHUNK_SIZE = 100
 wait = wait_exponential(multiplier=1, min=10, max=240)
@@ -23,7 +23,10 @@ wait = wait_exponential(multiplier=1, min=10, max=240)
 
 WORKERS = 3
 
-openai = OpenAI()
+openai = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama",
+)
 
 
 class Result(BaseModel):
@@ -74,7 +77,7 @@ def make_prompt(document):
     return f"""
         Tomas un documento y lo divides en fragmentos superpuestos para una base de conocimientos.
 
-        El documento procede de la unidad compartida de una empresa llamada Insurellm.
+        El documento procede de la unidad compartida de una empresa llamada AgroTech.
         El documento es de tipo: {document["type"]}
         El documento se ha obtenido de: {document["source"]}
 

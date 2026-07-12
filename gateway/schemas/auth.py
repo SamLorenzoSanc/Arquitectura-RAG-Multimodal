@@ -7,17 +7,13 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    username: str
     email: EmailStr
     password: str
+    name: str
 
 
-class TokenResponse(BaseModel):
+class LoginResponse(BaseModel):
     access_token: str
-    token_type: str = "bearer"
-
-
-class UserResponse(BaseModel):
-    id: str
-    username: str
-    email: EmailStr
+    token_type: str = "Bearer"
+    expires_in: int
+    
