@@ -17,3 +17,4 @@ EXPOSE 7860
 EXPOSE 7861
 
 CMD ["python", "app.py"]
+

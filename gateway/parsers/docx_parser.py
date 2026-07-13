@@ -4,8 +4,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from marker.converters.document import DocumentConverter
-from marker.models import create_model_dict
+from docling.document_converter import DocumentConverter
 
 from .base import FileParser
 from .parsed_document import ParsedDocument
@@ -14,23 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class DocxParser(FileParser):
-    """
-    Parser de documentos DOCX utilizando Marker.
-
-    Convierte el documento a Markdown preservando:
-
-    - Encabezados
-    - Tablas
-    - Listas
-    - Imágenes
-    - Hipervínculos
-    """
 
     def __init__(self):
 
-        self.converter = DocumentConverter(
-            artifact_dict=create_model_dict()
-        )
+        self.converter = DocumentConverter()
 
     async def parse(
         self,
@@ -51,17 +37,13 @@ class DocxParser(FileParser):
         )
 
         return ParsedDocument(
-
             filename=file.name,
-
             extension=file.suffix.lower(),
-
             markdown=markdown,
-
             metadata={
                 "source": str(file),
                 "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                "parser": "marker",
+                "parser": "docling",
             },
         )
 
@@ -70,6 +52,6 @@ class DocxParser(FileParser):
         file: Path,
     ) -> str:
 
-        rendered = self.converter(file)
+        result = self.converter.convert(file)
 
-        return rendered.markdown
+        return result.document.export_to_markdown()

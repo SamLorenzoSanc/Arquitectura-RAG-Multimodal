@@ -1,92 +1,57 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import time
 import psutil
 
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from services.database import get_db
 
-router = APIRouter(
-    prefix="/metrics",
-    tags=["Metrics"]
-)
+router = APIRouter(prefix="/metrics", tags=["Metrics"])
 
 START_TIME = time.time()
 
+
 @router.get("/")
-async def metrics(db: Session = Depends(get_db)):
+async def metrics(db: AsyncSession = Depends(get_db)):
+    # Conteos base (una query por tabla)
+    users = await db.scalar(text("SELECT COUNT(*) FROM users"))
+    documents = await db.scalar(text("SELECT COUNT(*) FROM documents"))
+    conversations = await db.scalar(text("SELECT COUNT(*) FROM conversations"))
+    messages = await db.scalar(text("SELECT COUNT(*) FROM messages"))
 
-    users = db.execute(
-        text("SELECT COUNT(*) FROM users")
-    ).scalar()
-
-    documents = db.execute(
-        text("SELECT COUNT(*) FROM documents")
-    ).scalar()
-
-    conversations = db.execute(
-        text("SELECT COUNT(*) FROM conversations")
-    ).scalar()
-
-    messages = db.execute(
-        text("SELECT COUNT(*) FROM messages")
-    ).scalar()
-
-    pending_jobs = db.execute(
-        text("""
-            SELECT COUNT(*)
+    # Los 4 estados de jobs en UNA sola query con FILTER
+    jobs = (
+        await db.execute(
+            text("""
+            SELECT
+                COUNT(*) FILTER (WHERE status = 'PENDING')    AS pending,
+                COUNT(*) FILTER (WHERE status = 'PROCESSING') AS processing,
+                COUNT(*) FILTER (WHERE status = 'COMPLETED')  AS completed,
+                COUNT(*) FILTER (WHERE status = 'FAILED')     AS failed
             FROM processing_jobs
-            WHERE status='PENDING'
-        """)
-    ).scalar()
-
-    processing_jobs = db.execute(
-        text("""
-            SELECT COUNT(*)
-            FROM processing_jobs
-            WHERE status='PROCESSING'
-        """)
-    ).scalar()
-
-    completed_jobs = db.execute(
-        text("""
-            SELECT COUNT(*)
-            FROM processing_jobs
-            WHERE status='COMPLETED'
-        """)
-    ).scalar()
-
-    failed_jobs = db.execute(
-        text("""
-            SELECT COUNT(*)
-            FROM processing_jobs
-            WHERE status='FAILED'
-        """)
-    ).scalar()
+            """)
+        )
+    ).mappings().first()
 
     return {
-
         "server": {
             "uptime_seconds": round(time.time() - START_TIME),
-            "timestamp": datetime.now(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "cpu_percent": psutil.cpu_percent(),
-            "memory_percent": psutil.virtual_memory().percent
+            "memory_percent": psutil.virtual_memory().percent,
         },
-
         "database": {
             "users": users,
             "documents": documents,
             "conversations": conversations,
-            "messages": messages
+            "messages": messages,
         },
-
         "processing": {
-            "pending": pending_jobs,
-            "processing": processing_jobs,
-            "completed": completed_jobs,
-            "failed": failed_jobs
-        }
-
+            "pending": jobs["pending"],
+            "processing": jobs["processing"],
+            "completed": jobs["completed"],
+            "failed": jobs["failed"],
+        },
     }

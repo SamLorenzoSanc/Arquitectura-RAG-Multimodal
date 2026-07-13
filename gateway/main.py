@@ -11,7 +11,8 @@ from routes.user import router as user_router
 from routes.tenant import router as tenant_router
 from routes.knowledge import router as knowledge_router
 from routes.organization import router as organization_router
-
+from routes.department import router as department_router
+import models
 app = FastAPI(
     title="AgroRAG Gateway",
     version="1.0.0"
@@ -28,6 +29,7 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(tenant_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
 app.include_router(organization_router, prefix="/api/v1")
+app.include_router(department_router, prefix="/api/v1")
 
 def main():
     uvicorn.run(app, host="0.0.0.0", port=8000)

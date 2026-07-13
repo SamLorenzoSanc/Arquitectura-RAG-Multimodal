@@ -1,34 +1,22 @@
-import Sidebar from "@/components/Sidebar";
-import Topbar from "@/components/Topbar";
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+import Header from "./Header";
+import { OrganizationProvider } from "@/context/OrganizationContext";
 
-import type { ReactNode } from "react";
-
-interface Props {
-    children: ReactNode;
-}
-
-export default function DashboardLayout({ children }: Props) {
-
+export default function DashboardLayout() {
     return (
+        <OrganizationProvider>
+            <div className="h-screen bg-gray-100 flex">
+                <Sidebar />
 
-        <div className="flex h-screen bg-slate-100">
+                <div className="flex-1 flex flex-col">
+                    <Header />
 
-            <Sidebar />
-
-            <div className="flex flex-col flex-1 overflow-hidden">
-
-                <Topbar />
-
-                <main className="flex-1 overflow-y-auto p-8">
-
-                    {children}
-
-                </main>
-
+                    <main className="flex-1 overflow-auto p-8">
+                        <Outlet />
+                    </main>
+                </div>
             </div>
-
-        </div>
-
+        </OrganizationProvider>
     );
-
 }
