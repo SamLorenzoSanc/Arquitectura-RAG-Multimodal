@@ -1,13 +1,11 @@
-from __future__ import annotations
-
-from pathlib import Path
-
 from pydantic import BaseModel, Field
 
-
 class ParsedDocument(BaseModel):
+
     filename: str
+
     extension: str
+
     markdown: str
 
     metadata: dict = Field(default_factory=dict)

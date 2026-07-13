@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "argon2-cffi>=25.1.0",
+    "asyncpg>=0.31.0",
     "chromadb>=1.5.9",
+    "docling>=2.112.0",
     "email-validator>=2.3.0",
     "fastapi>=0.139.0",
     "httpx>=0.28.1",
@@ -14,6 +16,7 @@ dependencies = [
     "logging>=0.4.9.6",
     "marker-pdf>=1.6.1",
     "minio>=7.2.20",
+    "neo4j>=6.2.0",
     "passlib>=1.7.4",
     "psutil>=7.2.2",
     "psycopg2>=2.9.12",

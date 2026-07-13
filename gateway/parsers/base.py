@@ -12,6 +12,6 @@ class FileParser(ABC):
         file: Path,
     ) -> ParsedDocument:
         """
-        Convierte cualquier documento en un ParsedDocument.
+        Convierte cualquier documento a un ParsedDocument.
         """
         pass

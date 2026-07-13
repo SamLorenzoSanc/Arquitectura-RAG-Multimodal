@@ -6,7 +6,6 @@ from typing import Optional
 class KnowledgeBaseBase(BaseModel):
     name: str
     description: Optional[str] = None
-    chroma_collection: str
 
 class KnowledgeBaseCreate(KnowledgeBaseBase):
     tenant_id: UUID
@@ -14,7 +13,6 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
 class KnowledgeBaseUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    chroma_collection: Optional[str] = None
 
 class KnowledgeBase(KnowledgeBaseBase):
     id: UUID
@@ -24,3 +22,4 @@ class KnowledgeBase(KnowledgeBaseBase):
 
     class Config:
         from_attributes = True
+        

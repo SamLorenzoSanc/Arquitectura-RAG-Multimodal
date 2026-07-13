@@ -15,10 +15,8 @@ class OrganizationCreateRequest(OrganizationBase):
     pass
 
 class OrganizationUpdateRequest(BaseModel):
-    name: str | None = Field(default=None, max_length=200)
+    name: str
     description: str | None = None
-    logo: str | None = None
-    active: bool | None = None
 
 class OrganizationResponse(OrganizationBase):
     id: UUID

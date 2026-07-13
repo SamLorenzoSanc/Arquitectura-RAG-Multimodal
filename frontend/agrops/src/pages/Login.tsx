@@ -1,8 +1,8 @@
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { Leaf, Mail, Lock } from "lucide-react";
-import api from "@/api";
 import bgFarm from "@/assets/login-bg.png"; 
+import { useAuth } from "@/context/AuthContext";
 
 interface LoginForm {
     email: string;
@@ -11,6 +11,7 @@ interface LoginForm {
 
 export default function Login() {
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     const {
         register,
@@ -19,10 +20,12 @@ export default function Login() {
     } = useForm<LoginForm>();
 
     const onSubmit = async (data: LoginForm) => {
-        console.log(data);
-        const response = await api.post("/auth/login", data);
-        localStorage.setItem("token", response.data.access_token);
-        navigate("/dashboard");
+        try {
+            await login(data.email, data.password);
+            navigate("/dashboard", { replace: true });
+        } catch (error) {
+            console.error("Error al iniciar sesión", error);
+        }
     };
 
     return (

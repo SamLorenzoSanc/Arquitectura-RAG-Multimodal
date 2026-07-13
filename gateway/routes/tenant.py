@@ -1,84 +1,95 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from schemas.tenant import TenantCreate, AssignTenantRequest
 from uuid import uuid4
+
+from schemas.tenant import TenantCreate, AssignTenantRequest
 from services.database import get_db
-from .auth import get_current_user 
+from .auth import get_current_user
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
 
-
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_tenant(tenant: TenantCreate, db: Session = Depends(get_db)):
-    """Crea una nueva empresa o Tenant usando una organización por defecto existente."""
+async def create_tenant(tenant: TenantCreate, db: AsyncSession = Depends(get_db)):
+    """Crea un nuevo Tenant sobre la organización por defecto existente."""
     tenant_id = str(uuid4())
-    
     try:
-        # 1. Buscamos la organización por defecto existente
-        org = db.execute(
+        organization_id = await db.scalar(
             text("SELECT id FROM organizations LIMIT 1")
-        ).mappings().first()
-        
-        if not org:
+        )
+        if not organization_id:
             raise HTTPException(
-                status_code=400, 
-                detail="No existe ninguna organización en la BD. Crea una primero."
+                status_code=400,
+                detail="No existe ninguna organización en la BD. Crea una primero.",
             )
-            
-        organization_id = org["id"]
 
-        # 2. Insertamos el Tenant solo con las columnas que sí existen
-        db.execute(
+        await db.execute(
             text("""
             INSERT INTO tenants (id, organization_id, name, created_at)
             VALUES (:id, :organization_id, :name, NOW())
             """),
-            {
-                "id": tenant_id, 
-                "organization_id": organization_id, 
-                "name": tenant.name
-            }
+            {"id": tenant_id, "organization_id": organization_id, "name": tenant.name},
         )
-        db.commit()
-        
+        await db.commit()
+
         return {
-            "tenant_id": tenant_id, 
-            "organization_id": organization_id, 
-            "name": tenant.name, 
-            "status": "created"
+            "tenant_id": tenant_id,
+            "organization_id": str(organization_id),
+            "name": tenant.name,
+            "status": "created",
         }
-        
-    except HTTPException as he:
-        raise he
+    except HTTPException:
+        await db.rollback()
+        raise
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al crear el Tenant: {str(e)}")
-    
-    
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al crear el Tenant: {e}")
+
 
 @router.post("/assign")
-async def assign_tenant_to_user(data: AssignTenantRequest, db: Session = Depends(get_db)):
-    tenant_exists = db.execute(
-        text("SELECT id FROM tenants WHERE id = :id"), {"id": data.tenant_id}
-    ).first()
-    
-    if not tenant_exists:
+async def assign_tenant_to_user(
+    data: AssignTenantRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Asigna un usuario a la ORGANIZACIÓN dueña del tenant indicado
+    (vía organization_members). En este esquema el usuario no cuelga
+    de un tenant directamente, sino de la organización.
+    """
+    # 1. El tenant existe -> obtenemos su organización
+    organization_id = await db.scalar(
+        text("SELECT organization_id FROM tenants WHERE id = :id"),
+        {"id": data.tenant_id},
+    )
+    if not organization_id:
         raise HTTPException(status_code=404, detail="El Tenant especificado no existe.")
 
+    # 2. El usuario existe
+    user_exists = await db.scalar(
+        text("SELECT id FROM users WHERE id = :id"), {"id": data.user_id}
+    )
+    if not user_exists:
+        raise HTTPException(status_code=404, detail="El usuario especificado no existe.")
+
     try:
-        result = db.execute(
+        # 3. Alta/actualización de la membresía (idempotente gracias al UNIQUE
+        #    (organization_id, user_id) de tu esquema)
+        await db.execute(
             text("""
-            UPDATE users 
-            SET tenant_id = :tenant_id 
-            WHERE id = :user_id
+            INSERT INTO organization_members (organization_id, user_id, active)
+            VALUES (:org_id, :user_id, true)
+            ON CONFLICT (organization_id, user_id)
+            DO UPDATE SET active = true
             """),
-            {"tenant_id": data.tenant_id, "user_id": data.user_id}
+            {"org_id": organization_id, "user_id": data.user_id},
         )
-        db.commit()
-        
-        return {"status": "success", "message": "Tenant asignado correctamente al usuario."}
+        await db.commit()
+
+        return {
+            "status": "success",
+            "message": "Usuario asignado a la organización del tenant correctamente.",
+        }
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al asignar el Tenant: {str(e)}")
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al asignar el Tenant: {e}")
