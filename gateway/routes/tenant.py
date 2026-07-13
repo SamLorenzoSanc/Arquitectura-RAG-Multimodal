@@ -6,12 +6,31 @@ from uuid import uuid4
 from schemas.tenant import TenantCreate, AssignTenantRequest
 from services.database import get_db
 from .auth import get_current_user
+from models.user import User
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
 
+@router.get("/")
+async def list_tenants(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista todos los tenants accesibles para el usuario."""
+    tenants = (
+        await db.execute(
+            text("""SELECT id, name, description, created_at FROM tenants ORDER BY created_at DESC""")
+        )
+    ).mappings().all()
+    return tenants
+
+
 @router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_tenant(tenant: TenantCreate, db: AsyncSession = Depends(get_db)):
+async def create_tenant(
+    tenant: TenantCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Crea un nuevo Tenant sobre la organización por defecto existente."""
     tenant_id = str(uuid4())
     try:
@@ -50,6 +69,7 @@ async def create_tenant(tenant: TenantCreate, db: AsyncSession = Depends(get_db)
 @router.post("/assign")
 async def assign_tenant_to_user(
     data: AssignTenantRequest,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
