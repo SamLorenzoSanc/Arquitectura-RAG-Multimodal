@@ -9,7 +9,7 @@ export default function Header() {
     const [currentDate, setCurrentDate] = useState("");
     const [currentTime, setCurrentTime] = useState("");
     const [showUserMenu, setShowUserMenu] = useState(false);
-    const [weather, setWeather] = useState({
+    const [weather] = useState({
         temp: 24,
         condition: "Parcialmente nublado",
         icon: "cloud",

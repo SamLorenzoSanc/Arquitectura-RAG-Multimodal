@@ -7,7 +7,7 @@ load_dotenv()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://postgres:postgres@localhost:5432/agrops",
+    "postgresql+asyncpg://postgres:postgres@postgres:5432/agrops",
 )
 
 if DATABASE_URL.startswith("postgresql://"):

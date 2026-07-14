@@ -21,3 +21,6 @@ docker run -p 5432:5432 -e POSTGRES_DB=agrops -e POSTGRES_USER=postgres -e POSTG
 
 # Levantar el contenedor de la interfaz básica con python
 docker build -t agrotech-app .
+
+
+docker compose build
