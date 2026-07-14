@@ -3,12 +3,10 @@ services:
     build:
       context: ./postgres
     image: postgres_db
-    container_name: agrops-postgres
     environment:
-      POSTGRES_DB: agrops
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agrops
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
 
