@@ -104,6 +104,7 @@ export default function OrganizationPage() {
     const [submittingDepartment, setSubmittingDepartment] = useState(false);
     const [submittingMember, setSubmittingMember] = useState(false);
     const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null);
+    const [, setDepartmentMembers] = useState<Record<string, any[]>>({});
 
     useEffect(() => {
         if (organizations.length === 0) {
@@ -288,7 +289,9 @@ export default function OrganizationPage() {
             setSelectedUserId("");
             setSelectedRoleId("");
             setShowMemberModal(false);
-            await loadDepartmentMembers(activeDept.id);
+            if (selectedOrg) {
+                await loadDepartmentMembers(selectedOrg.id, activeDept.id);
+            }
         } catch (error) {
             console.error("Error al añadir el miembro", error);
         } finally {

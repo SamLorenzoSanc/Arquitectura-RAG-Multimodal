@@ -1,49 +1,33 @@
-version: "3.9"
-
 services:
-
-  frontend:
-    build: ./frontend
+  postgres:
+    build:
+      context: ./postgres
+    image: postgres_db
+    container_name: agrops-postgres
+    environment:
+      POSTGRES_DB: agrops
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agrops
     ports:
-      - "3000:3000"
+      - "5432:5432"
 
-  gateway:
-    build: ./gateway
+  api-gateway:
+    build:
+      context: ./gateway
+    image: api-gateway
+    container_name: agrops-api-gateway
+    depends_on:
+      - postgres
     ports:
       - "8000:8000"
-    environment:
-      - UVICORN=reload
 
-  chromadb:
-    image: chromadb/chroma
+  frontend:
+    build:
+      context: ./frontend/agrops
+    image: agrops-frontend
+    container_name: agrops-frontend
+    depends_on:
+      - api-gateway
     ports:
-      - "8001:8000"
-    volumes:
-      - chroma:/chroma
-
-  ollama:
-    image: ollama/ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              capabilities: [gpu]
-
-  minio:
-    image: minio/minio
-    command: server /data
-    environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: 1234
-    ports:
-      - "9000:9000"
-
-volumes:
-
-  chroma:
-  ollama:
+      - "80:80"

@@ -13,12 +13,27 @@ from routes.knowledge import router as knowledge_router
 from routes.organization import router as organization_router
 from routes.department import router as department_router
 import models
+
+
 app = FastAPI(
     title="AgroRAG Gateway",
     version="1.0.0"
 )
 
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+origins = [
+    "http://localhost",
+    "http://localhost:80",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(document_router, prefix="/api/v1")
