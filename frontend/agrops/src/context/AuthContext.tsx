@@ -2,9 +2,10 @@ import {
     createContext,
     useContext,
     useEffect,
-    useState,
-    ReactNode,
+    useState
 } from "react";
+
+import type { ReactNode } from "react"
 
 import { jwtDecode } from "jwt-decode";
 

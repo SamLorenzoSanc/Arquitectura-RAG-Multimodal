@@ -66,7 +66,6 @@ async def get_current_user(
     if not user_id:
         raise HTTPException(status_code=401, detail="Token inválido: falta el identificador de usuario")
 
-    # devuelve el modelo ORM: la ruta de upload espera current_user.id (atributo)
     user = await db.scalar(
         select(User).where(User.id == user_id, User.active.is_(True))
     )
@@ -87,7 +86,24 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
 
         org_id = await db.scalar(text("SELECT id FROM organizations LIMIT 1"))
         if not org_id:
-            raise HTTPException(status_code=500, detail="No existen organizaciones configuradas en el sistema")
+            org_id = "00000000-0000-0000-0000-000000000001"
+            await db.execute(
+                text("""
+                    INSERT INTO organizations (id, name, description, active)
+                    VALUES (
+                        :id,
+                        :name,
+                        :description,
+                        :active
+                    )
+                """),
+                {
+                    "id": org_id,
+                    "name": f"{request.name} Organization",
+                    "description": "Organización por defecto para nuevos usuarios",
+                    "active": True,
+                },
+            )
 
         role_id = await db.scalar(
             text(
