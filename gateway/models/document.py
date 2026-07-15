@@ -26,7 +26,7 @@ class Document(Base):
     storage_path: Mapped[str] = mapped_column(Text, nullable=False)
     size: Mapped[int | None] = mapped_column(BigInteger)
     current_version: Mapped[int] = mapped_column(Integer, default=1)
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),server_default=func.now(),nullable=False)
     tenant: Mapped["Tenant | None"] = relationship(back_populates="documents")
     knowledge_base: Mapped["KnowledgeBase | None"] = relationship(back_populates="documents")
     owner: Mapped["User | None"] = relationship(back_populates="documents")

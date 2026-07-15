@@ -3,10 +3,6 @@ import axios from "axios";
 // 1. Crear la instancia base de Axios
 const api = axios.create({
     baseURL: "http://localhost:8000/api/v1", // Tu URL del backend
-    // Asegúrate de que las cabeceras por defecto acepten JSON
-    headers: {
-        "Content-Type": "application/json",
-    }
 });
 
 // 2. Configurar el Interceptor para incluir el Token Bearer automáticamente

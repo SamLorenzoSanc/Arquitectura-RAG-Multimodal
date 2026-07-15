@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import api from "@/api";
 import { useOrganization } from "@/context/OrganizationContext";
-
+import DepartmentService from "@/services/department.service";
 interface Organization {
     id: string;
     name: string;
@@ -181,23 +181,51 @@ export default function OrganizationPage() {
         }
     };
 
-    const loadDepartmentMembers = async (orgId: string, departmentId: string) => {
-        try {
-            const membersData = await getDepartmentMembers(departmentId);
-            setOrgDetails((prev) => ({
-                ...prev,
-                [orgId]: {
-                    ...(prev[orgId] ?? { departments: [], roles: [], members: [], departmentMembers: {}, activeDeptId: null }),
-                    departmentMembers: {
-                        ...(prev[orgId]?.departmentMembers ?? {}),
-                        [departmentId]: membersData,
-                    },
-                },
-            }));
-        } catch (error) {
-            console.error("Error al cargar miembros del departamento", error);
-        }
-    };
+    const loadDepartmentMembers = async (
+    orgId:string,
+    departmentId:string
+)=>{
+
+    try{
+
+
+        const members =
+        await DepartmentService.members(
+            departmentId
+        );
+    
+    
+        setOrgDetails(prev=>({
+        
+            ...prev,
+        
+            [orgId]:{
+            
+                ...prev[orgId],
+            
+                departmentMembers:{
+                
+                    ...prev[orgId].departmentMembers,
+                
+                    [departmentId]:members
+                
+                }
+            
+            }
+        
+        }));
+    
+    
+    }catch(error){
+    
+        console.error(
+          "Error cargando miembros",
+          error
+        );
+    
+    }
+
+};
 
     const handleSelectDepartmentForOrg = async (org: Organization, dept: Department) => {
         setSelectedOrg(org);

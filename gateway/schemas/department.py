@@ -1,17 +1,17 @@
 from pydantic import BaseModel
-from uuid import UUID
+from typing import Optional
 
 
 class DepartmentCreateRequest(BaseModel):
-    organization_id: UUID
+    organization_id: str
     name: str
-    description: str | None = None
+    description: Optional[str] = None
 
 
 class DepartmentUpdateRequest(BaseModel):
     name: str
-    description: str | None = None
+    description: Optional[str] = None
 
 
 class DepartmentMemberRequest(BaseModel):
-    user_id: UUID
+    user_id: str

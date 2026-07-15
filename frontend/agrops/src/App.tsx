@@ -4,6 +4,7 @@ import OrganizationPage from "@/pages/OrganizationPage";
 import ChatPage from "@/pages/ChatPage";
 import TenantPage from "@/pages/TenantPage";
 import SettingsPage from "@/pages/SettingsPage";
+import KnowledgeGraphPage from "./pages/KnowledgeGraphPage";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import { useAuth } from "@/context/AuthContext";
@@ -37,6 +38,7 @@ export default function App() {
                 <Route path="organization" element={<OrganizationPage />} />
                 <Route path="tenants" element={<TenantPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route path="knowledge-graph" element={<KnowledgeGraphPage />}/>
             </Route>
 
             <Route path="/" element={<Navigate to="/login" replace />} />

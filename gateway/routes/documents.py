@@ -7,7 +7,7 @@ from fastapi import (
     APIRouter, UploadFile, File, Form, HTTPException,
     Depends, BackgroundTasks, status,
 )
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.database import get_db, AsyncSessionLocal
@@ -40,6 +40,57 @@ async def _run_processing(document_id: UUID) -> None:
         except Exception:
             logger.exception("Processing failed for document %s", document_id)
 
+@router.get("")
+async def list_documents(
+    knowledge_base_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # Verificar que la KB existe
+    kb = await db.scalar(
+        select(KnowledgeBase).where(
+            KnowledgeBase.id == knowledge_base_id
+        )
+    )
+
+    if kb is None:
+        raise HTTPException(404, "Knowledge Base not found")
+
+    # Comprobar permisos exactamente igual que en upload
+    member = await db.scalar(
+        select(OrganizationMember)
+        .join(Tenant, Tenant.organization_id == OrganizationMember.organization_id)
+        .where(
+            Tenant.id == kb.tenant_id,
+            OrganizationMember.user_id == current_user.id,
+            OrganizationMember.active.is_(True),
+        )
+    )
+
+    if member is None:
+        raise HTTPException(404, "Knowledge Base not found")
+
+    result = await db.execute(
+        select(Document)
+        .where(Document.knowledge_base_id == knowledge_base_id)
+        .order_by(Document.uploaded_at.desc())
+    )
+
+    documents = result.scalars().all()
+
+    return [
+        {
+            "id": str(doc.id),
+            "filename": doc.filename,
+            "title": doc.title,
+            "description": doc.description,
+            "size": doc.size,
+            "mime_type": doc.mime_type,
+            "current_version": doc.current_version,
+            "created_at": doc.uploaded_at,
+        }
+        for doc in documents
+    ]
 
 @router.post("", response_model=UploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_document(
@@ -103,46 +154,131 @@ async def upload_document(
         logger.exception("Storage failed for %s", file.filename)
         raise HTTPException(status_code=500, detail="Cannot store document")
 
-    document = Document(
-        id=uuid4(),
-        tenant_id=kb.tenant_id,
-        knowledge_base_id=kb.id,
-        owner_id=current_user.id,
-        filename=file.filename,
-        title=title,
-        description=description,
-        mime_type=file.content_type,
-        storage_path=str(saved_path),
-        size=size,
-        current_version=1,
-    )
-    version = DocumentVersion(       
-        document_id=document.id,
-        version=1,
-        filename=file.filename,
-        storage_path=str(saved_path),
-        uploaded_by=current_user.id,
-    )
-    job = ProcessingJob(
-        tenant_id=kb.tenant_id,
-        document_id=document.id,
-        status="PENDING",
+    document_id = str(uuid4())
+
+
+    await db.execute(
+        text("""
+            INSERT INTO documents
+            (
+                id,
+                tenant_id,
+                knowledge_base_id,
+                owner_id,
+                filename,
+                title,
+                description,
+                mime_type,
+                storage_path,
+                size,
+                current_version,
+                uploaded_at
+            )
+            VALUES
+            (
+                :id,
+                :tenant_id,
+                :knowledge_base_id,
+                :owner_id,
+                :filename,
+                :title,
+                :description,
+                :mime_type,
+                :storage_path,
+                :size,
+                :current_version,
+                CURRENT_TIMESTAMP
+            )
+        """),
+        {
+            "id": document_id,
+            "tenant_id": str(kb.tenant_id),
+            "knowledge_base_id": str(kb.id),
+            "owner_id": str(current_user.id),
+            "filename": file.filename,
+            "title": title,
+            "description": description,
+            "mime_type": file.content_type,
+            "storage_path": str(saved_path),
+            "size": size,
+            "current_version": 1,
+        }
     )
 
-    document_id = document.id
-    document_filename = document.filename
+    document_version_id = str(uuid4())
+
+
+    await db.execute(
+        text("""
+            INSERT INTO document_versions
+            (
+                id,
+                document_id,
+                version,
+                filename,
+                storage_path,
+                uploaded_by,
+                uploaded_at
+            )
+            VALUES
+            (
+                :id,
+                :document_id,
+                :version,
+                :filename,
+                :storage_path,
+                :uploaded_by,
+                CURRENT_TIMESTAMP
+            )
+        """),
+        {
+            "id": document_version_id,
+            "document_id": document_id,
+            "version": 1,
+            "filename": file.filename,
+            "storage_path": str(saved_path),
+            "uploaded_by": str(current_user.id),
+        }
+    )
+
+    processing_job_id = str(uuid4())
+
+    await db.execute(
+        text("""
+            INSERT INTO processing_jobs
+            (
+                id,
+                tenant_id,
+                document_id,
+                status,
+                chunks_generated
+            )
+            VALUES
+            (
+                :id,
+                :tenant_id,
+                :document_id,
+                :status,
+                :chunks_generated
+            )
+        """),
+        {
+            "id": processing_job_id,
+            "tenant_id": str(kb.tenant_id),
+            "document_id": document_id,
+            "status": "PENDING",
+            "chunks_generated": 0,
+        }
+    )
 
     try:
-        db.add_all([document, version, job])   # todo en una transacción
         await db.commit()
     except Exception:
         await db.rollback()
         await storage.delete(saved_path)
-        logger.exception("DB commit failed for %s", document_filename)
         raise HTTPException(status_code=500, detail="Cannot register document")
 
-    background_tasks.add_task(_run_processing, document_id)
+    background_tasks.add_task(_run_processing, UUID(document_id))
 
-    logger.info("Document %s uploaded successfully", document_filename)
 
-    return UploadResponse(id=document_id, message="Document uploaded successfully")
+    return UploadResponse(id=UUID(document_id), message="Document uploaded successfully")

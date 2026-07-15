@@ -8,3 +8,7 @@ class TenantCreate(BaseModel):
 class AssignTenantRequest(BaseModel):
     user_id: str
     tenant_id: str
+class TenantUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    active: bool | None = None

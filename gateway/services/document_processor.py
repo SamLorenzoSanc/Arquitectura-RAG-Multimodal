@@ -14,7 +14,7 @@ from models.processing_job import ProcessingJob
 
 from services.chunking_service import ChunkingService
 from services.embedding_service import EmbeddingService
-from services.knowledge_graph_service import KnowledgeGraphService
+from services.knowledge_graph import KnowledgeGraphService
 from services.vectore_store import VectorStore
 
 logger = logging.getLogger(__name__)

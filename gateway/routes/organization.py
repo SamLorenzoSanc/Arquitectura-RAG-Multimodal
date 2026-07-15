@@ -6,7 +6,10 @@ from services.database import get_db
 from schemas.organization import OrganizationCreateRequest
 from routes.auth import get_current_user
 from models.user import User
-
+from schemas.knowledge_base import KnowledgeBaseCreate
+from services.knowledge_graph_service import KnowledgeGraphService
+from services.rag_service import RAGService
+from uuid import UUID
 router = APIRouter(prefix="/organization", tags=["Organization"])
 
 
@@ -226,3 +229,15 @@ async def get_departments(
         {"org_id": organization_id},
     )
     return result.mappings().all()
+
+@router.get("/{organization_id}/knowledge-map")
+async def graph(
+    organization_id: UUID,
+):
+    rag = RAGService()
+
+    graph = KnowledgeGraphService(
+        rag.collection
+    )
+
+    return await graph.build_graph()

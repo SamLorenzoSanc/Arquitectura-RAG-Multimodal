@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.auth import RegisterRequest, LoginResponse, LoginRequest
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-
+import uuid
 from services.database import get_db, AsyncSessionLocal
 from models.user import User
 
@@ -83,28 +83,34 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         )
         if exists:
             raise HTTPException(status_code=400, detail="El usuario ya existe")
-
-        org_id = await db.scalar(text("SELECT id FROM organizations LIMIT 1"))
-        if not org_id:
-            org_id = "00000000-0000-0000-0000-000000000001"
-            await db.execute(
-                text("""
-                    INSERT INTO organizations (id, name, description, active)
-                    VALUES (
-                        :id,
-                        :name,
-                        :description,
-                        :active
-                    )
-                """),
-                {
-                    "id": org_id,
-                    "name": f"{request.name} Organization",
-                    "description": "Organización por defecto para nuevos usuarios",
-                    "active": True,
-                },
-            )
-
+        print(1)
+        org_id = uuid.uuid4()
+        
+        await db.execute(
+            text("""
+                INSERT INTO organizations 
+                (
+                    id,
+                    name,
+                    description,
+                    active
+                )
+                VALUES
+                (
+                    :id,
+                    :name,
+                    :description,
+                    :active
+                )
+            """),
+            {
+                "id": org_id,
+                "name": f"{request.name} Organization",
+                "description": "Organización por defecto para nuevos usuarios",
+                "active": True,
+            },
+        )
+        print(2)
         role_id = await db.scalar(
             text(
                 "SELECT id FROM roles "
@@ -131,9 +137,93 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
             ),
             {"org_id": org_id, "user_id": new_user_id, "role_id": role_id},
         )
+        print(3)
+        tenant_id = str(uuid.uuid4())
+        await db.execute(
+            text("""
+                INSERT INTO tenants
+                (
+                    id, organization_id, name, description, active
+                )
+                VALUES
+                (
+                    :id,
+                    :organization_id,
+                    :name,
+                    :description,
+                    true
+                )
+            """),
+            {
+                "id": tenant_id,
+                "organization_id": org_id,
+                "name": "Default",
+                "description": "Tenant principal",
+            },
+        )
 
+        knowledge_base_id = str(uuid.uuid4())
+        print(4)
+        await db.execute(
+            text("""
+                INSERT INTO knowledge_bases
+                (id, tenant_id, name, description, chroma_collection)
+                VALUES
+                (:id, :tenant_id, :name, :description, :chroma_collection)
+            """),
+            {
+                "id": knowledge_base_id,
+                "tenant_id": tenant_id,
+                "name": "General",
+                "description": "Knowledge Base por defecto",
+                "chroma_collection": 'default_general_collection'
+            },
+        )
+        print(5)
+        role_id = await db.scalar(
+            text("""
+                SELECT id
+                FROM roles
+                WHERE name='admin'
+                LIMIT 1
+            """)
+        )
+
+        if role_id is None:
+            raise HTTPException(
+                status_code=500,
+                detail="No existe el rol admin."
+            )
+        print(6)
+        await db.execute(
+            text("""
+                INSERT INTO organization_members
+                (
+                    organization_id,
+                    user_id,
+                    role_id,
+                    active
+                )
+                VALUES
+                (
+                    :organization_id,
+                    :user_id,
+                    :role_id,
+                    true
+                )
+                ON CONFLICT (organization_id, user_id)
+                DO NOTHING
+            """),
+            {
+                "organization_id": org_id,
+                "user_id": new_user_id,
+                "role_id": role_id,
+            },
+        )
         await db.commit()
-        return {"status": "registered"}
+        return {
+            "status": "registered",
+        }
     except HTTPException:
         await db.rollback()
         raise

@@ -1,5 +1,9 @@
 {
     "python.analysis.extraPaths": [
-        "${workspaceFolder}/src"
+        "./gateway"
+    ],
+    "pylint.args": [
+        "--init-hook",
+        "import sys; sys.path.insert(0, '.')"
     ]
 }

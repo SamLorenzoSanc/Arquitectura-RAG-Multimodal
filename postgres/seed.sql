@@ -295,6 +295,32 @@ CREATE TABLE api_keys (
     last_used_at TIMESTAMP
 );
 
+
+CREATE TABLE department_members (
+    department_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    role_id UUID NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (department_id, user_id),
+
+    CONSTRAINT fk_department
+        FOREIGN KEY (department_id)
+        REFERENCES departments(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT fk_role
+        FOREIGN KEY (role_id)
+        REFERENCES roles(id)
+        ON DELETE SET NULL
+);
+
+   
 -------------------------------------------------------------
 -- ÍNDICES
 -------------------------------------------------------------
@@ -327,3 +353,8 @@ CREATE INDEX idx_logs_user
 ON api_logs(user_id);
 CREATE INDEX idx_permissions_member
 ON knowledge_base_permissions(member_id);
+CREATE INDEX idx_department_members_department
+ON department_members(department_id);
+CREATE INDEX idx_department_members_user
+ON department_members(user_id);
+ 

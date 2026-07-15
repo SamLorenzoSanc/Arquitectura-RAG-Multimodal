@@ -13,6 +13,7 @@ import {
     Tractor,
     LogOut,
     Plus,
+    Network,
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -170,7 +171,9 @@ export default function Sidebar() {
                 <MenuItem to="/dashboard/chat" icon={<MessageSquare size={20} />} text="Chat IA" />
                 <MenuItem to="/dashboard/organization" icon={<Building2 size={20} />} text="Organización" />
                 <MenuItem to="/dashboard/tenants" icon={<Tractor size={20} />} text="Tenants" />
-                <MenuItem to="/dashboard/settings" icon={<Settings size={20} />} text="Configuración" />
+                <MenuItem to="/dashboard/settings" icon={<Settings size={20} />} text="Configuración"    />
+                <MenuItem to="/dashboard/knowledge-graph" icon={<Network size={20} />} text="Base de Conocimiento"/>
+    
             </nav>
 
             {/* Usuario */}

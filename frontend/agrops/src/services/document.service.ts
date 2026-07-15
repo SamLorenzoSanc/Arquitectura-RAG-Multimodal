@@ -1,27 +1,54 @@
 import api from "@/api";
+import type {
+    DocumentItem,
+    UploadDocumentRequest,
+    UploadDocumentResponse,
+} from "@/types/document";
 
-export async function listDocuments() {
+class DocumentService {
 
-    const response = await api.get("/documents");
+    async upload(
+        request: UploadDocumentRequest
+    ): Promise<UploadDocumentResponse> {
 
-    return response.data;
+        const formData = new FormData();
+
+        formData.append("file", request.file);
+        formData.append(
+            "knowledge_base_id",
+            request.knowledge_base_id
+        );
+
+        if (request.title)
+            formData.append("title", request.title);
+
+        if (request.description)
+            formData.append("description", request.description);
+
+        const response = await api.post(
+            "/documents",
+            formData
+        );
+
+        return response.data;
+    }
+
+    async list(
+        knowledgeBaseId: string
+    ): Promise<DocumentItem[]> {
+
+        const response = await api.get<DocumentItem[]>(
+            "/documents",
+            {
+                params: {
+                    knowledge_base_id: knowledgeBaseId,
+                },
+            }
+        );
+
+        return response.data;
+    }
+
 }
 
-export async function uploadDocument(file: File) {
-
-    const form = new FormData();
-
-    form.append("file", file);
-
-    const response = await api.post(
-        "/documents/upload",
-        form,
-        {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-        }
-    );
-
-    return response.data;
-}
+export default new DocumentService();

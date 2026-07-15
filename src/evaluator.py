@@ -176,7 +176,7 @@ def main():
 
     with gr.Blocks(title="RAG Evaluation Dashboard", theme=theme) as app:
         gr.Markdown("# 📊 RAG Evaluation Dashboard")
-        gr.Markdown("Evaluate retrieval and answer quality for the Insurellm RAG system")
+        gr.Markdown("Evaluate retrieval and answer quality for the AgroTech RAG system")
 
         # RETRIEVAL SECTION
         gr.Markdown("## 🔍 Retrieval Evaluation")

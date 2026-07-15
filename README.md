@@ -24,3 +24,9 @@ docker build -t agrotech-app .
 
 
 docker compose build
+
+# Levantar el servidor
+python -m test.test_connection
+
+
+C:\Users\Usuario\Desktop\MasterIA\Asignaturas\Segundo_Cuatrimestre\TFM\Arquitectura-RAG-Multimodal

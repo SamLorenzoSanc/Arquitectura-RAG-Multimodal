@@ -10,6 +10,10 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://postgres:postgres@postgres:5432/agrops",
 )
 
+print("=" * 80)
+print("DATABASE_URL:", DATABASE_URL)
+print("=" * 80)
+
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 

@@ -76,11 +76,15 @@ async def chat(
         await db.commit()
 
         # 3. RAG — bloqueante: fuera del event loop
-        answer, chunks = await run_in_threadpool(
+        rag_result = await run_in_threadpool(
             rag_service.answer,
             question=request.question,
-            history=request.history,
+        history=request.history,
         )
+
+        answer = rag_result["answer"]
+        chunks = rag_result["chunks"]
+        retrieval = rag_result["retrieval"]
 
         # 4. Respuesta del asistente
         assistant_message_id = str(uuid4())
@@ -143,6 +147,7 @@ async def chat(
             conversation_id=conversation_id,
             answer=answer,
             context=contextos_validados,
+            retrieval=retrieval,
         )
 
     except HTTPException:

@@ -19,7 +19,7 @@ WAIT_POLICY = wait_exponential(
 class RAGService:
 
     SYSTEM_PROMPT = """
-    Eres un asistente experto y amable que representa a la empresa Insurellm.
+    Eres un asistente experto y amable que representa a la empresa AgroTech.
 
     REGLA CRÍTICA DE IDIOMA: Debe responder SIEMPRE en español, independientemente del idioma en el que estén escritos los fragmentos del contexto o la pregunta del usuario. Si los fragmentos contienen términos en inglés, tradúcelos o explícalos en español.
     Contexto:
@@ -156,16 +156,21 @@ class RAGService:
         )
 
     def fetch_context_simple(self, question):
-        print("1")
         rewritten = self.rewrite_query(question)
-        print("2")
-        original = self.retrieve(question)
-        print("3")
-        rewritten_chunks = self.retrieve(rewritten)
-        print("4")
-        merged = self.merge_chunks(original, rewritten_chunks)
 
-        return merged[:self.final_k]
+        original = self.retrieve(question)
+        rewritten_chunks = self.retrieve(rewritten)
+
+        merged = self.merge_chunks(original, rewritten_chunks)
+        final_chunks = merged[: self.final_k]
+
+        return {
+            "rewritten_query": rewritten,
+            "original": original,
+            "rewritten_chunks": rewritten_chunks,
+            "merged": merged,
+            "chunks": final_chunks,
+        }
     
     def fetch_context(self, question):
         rewritten = self.rewrite_query(question)
@@ -175,21 +180,59 @@ class RAGService:
         reranked = self.rerank(question, merged)
 
 
-        return reranked[: self.final_k]
+        return {
+        "chunks": final_chunks,
+        "retrieval": {
+            "original_query": question,
+            "rewritten_query": rewritten,
+            "retrieved_chunks": len(original),
+            "rewritten_chunks": len(rewritten_chunks),
+            "merged_chunks": len(merged),
+            "final_chunks": len(final_chunks),
+            "retrieval_k": self.retrieval_k,
+            "final_k": self.final_k,
+            "reranking": False,
+        },
+    }
+    def knowledge_graph(self):
 
-    def answer(self,question,history=None):
+        data = self.collection.get(
+            include=[
+                "embeddings",
+                "documents",
+                "metadatas"
+            ]
+        )
+
+        return data
+    def answer(self, question, history=None):
 
         if history is None:
             history = []
 
+        retrieval = self.fetch_context_simple(question)
 
-        chunks = self.fetch_context_simple(question)
+        chunks = retrieval["chunks"]
 
         messages = self.build_prompt(question, history, chunks)
 
-        response = self.client.chat.completions.create(model=self.model,  messages=messages)
-
-        return (
-            response.choices[0].message.content,
-            chunks
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,
         )
+
+        return {
+            "answer": response.choices[0].message.content,
+            "chunks": chunks,
+            "retrieval": {
+                "original_query": question,
+                "rewritten_query": retrieval["rewritten_query"],
+                "retrieved_chunks": len(retrieval["original"]),
+                "rewritten_chunks": len(retrieval["rewritten_chunks"]),
+                "merged_chunks": len(retrieval["merged"]),
+                "final_chunks": len(chunks),
+                "retrieval_k": self.retrieval_k,
+                "final_k": self.final_k,
+                "reranking": False,
+            },
+        }
