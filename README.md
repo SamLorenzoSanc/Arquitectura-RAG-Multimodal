@@ -23,6 +23,7 @@ docker run -p 5432:5432 -e POSTGRES_DB=agrops -e POSTGRES_USER=postgres -e POSTG
 docker build -t agrotech-app .
 
 
+<<<<<<< HEAD
 docker compose build
 
 # Levantar el servidor
@@ -30,3 +31,6 @@ python -m test.test_connection
 
 
 C:\Users\Usuario\Desktop\MasterIA\Asignaturas\Segundo_Cuatrimestre\TFM\Arquitectura-RAG-Multimodal
+=======
+docker compose build
+>>>>>>> a25f1106b515d355a155795d38c4199777a4da5e
