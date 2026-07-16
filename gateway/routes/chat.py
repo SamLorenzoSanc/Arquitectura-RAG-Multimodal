@@ -157,6 +157,40 @@ async def chat(
         await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/conversations")
+async def get_conversations(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+
+    conversations = (
+        await db.execute(
+            text("""
+            SELECT 
+                id,
+                title,
+                created_at,
+                updated_at
+            FROM conversations
+            WHERE user_id = :user_id
+            ORDER BY updated_at DESC
+            """),
+            {
+                "user_id": current_user.id
+            },
+        )
+    ).mappings().all()
+
+
+    return [
+        {
+            "id": str(conv["id"]),
+            "title": conv["title"],
+            "created_at": conv["created_at"],
+            "updated_at": conv["updated_at"],
+        }
+        for conv in conversations
+    ]
 
 @router.get("/{conversation_id}")
 async def get_conversation(

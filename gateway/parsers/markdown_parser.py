@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from .base import FileParser
@@ -10,23 +12,48 @@ logger = logging.getLogger(__name__)
 
 
 class MarkdownParser(FileParser):
+    """
+    Parser para archivos Markdown (.md).
+    """
 
     async def parse(
         self,
         file: Path,
     ) -> ParsedDocument:
 
-        markdown = file.read_text(
-            encoding="utf-8",
-            errors="ignore",
+        if not file.exists():
+            raise FileNotFoundError(file)
+
+        if not file.is_file():
+            raise ValueError(f"{file} is not a valid file")
+
+        logger.info("Parsing markdown file %s", file)
+
+        markdown = (
+            file.read_text(
+                encoding="utf-8",
+                errors="ignore",
+            )
+            .replace("\r\n", "\n")
+            .strip()
         )
+
+        checksum = hashlib.sha256(file.read_bytes()).hexdigest()
 
         return ParsedDocument(
             filename=file.name,
             extension=file.suffix.lower(),
-            markdown=markdown.replace("\r\n", "\n").strip(),
+            title=file.stem,
+            markdown=markdown,
+            language="es",
+            word_count=len(markdown.split()),
+            character_count=len(markdown),
             metadata={
                 "source": str(file),
                 "mime_type": "text/markdown",
+                "parser": "native",
+                "size": file.stat().st_size,
+                "checksum": checksum,
+                "created_at": datetime.utcnow().isoformat(),
             },
         )

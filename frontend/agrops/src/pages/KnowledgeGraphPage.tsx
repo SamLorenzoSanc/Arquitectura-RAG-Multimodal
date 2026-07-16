@@ -1,256 +1,358 @@
-import { useCallback, useEffect, useState } from "react";
-
-import { useOrganization } from "@/context/OrganizationContext";
-import KnowledgeService from "@/services/knowledge.service";
-import type { KnowledgeMap } from "@/types/knowledge";
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 
 import ForceGraph2D from "react-force-graph-2d";
 
-const COLORS = [
-    "#10b981",
-    "#3b82f6",
-    "#f59e0b",
-    "#ef4444",
-    "#8b5cf6",
-    "#14b8a6",
-    "#ec4899",
-    "#6366f1",
-];
+import type { Organization } from "@/types/organization";
+import { useOrganization } from "@/context/OrganizationContext";
+import OrganizationService from "@/services/organization.service";
+import KnowledgeService from "@/services/knowledge.service";
+import type { KnowledgeMap } from "@/types/knowledge";
+
+const NODE_COLORS: Record<string, string> = {
+    document: "#2563eb",
+    chunk: "#10b981",
+    entity: "#f59e0b",
+    concept: "#8b5cf6",
+    relation: "#ef4444",
+};
 
 export default function KnowledgeGraphPage() {
+    const { selectedOrg, setSelectedOrg } = useOrganization();
 
-    const { selectedOrg } = useOrganization();
-
+    const [organizations, setOrganizations] = useState<Organization[]>([]);
+    const [selectedNode, setSelectedNode] = useState<any | null>(null);
     const [graph, setGraph] = useState<KnowledgeMap | null>(null);
-    const [loading, setLoading] = useState(false);
 
-    const load = useCallback(async () => {
+    const [loadingOrganizations, setLoadingOrganizations] = useState(false);
+    const [loadingGraph, setLoadingGraph] = useState(false);
 
-        if (!selectedOrg) return;
+    const graphRef = useRef<any>(null);
 
-        setLoading(true);
+    const containerRef = useRef<HTMLDivElement>(null);
 
-        try {
+    const [size, setSize] = useState({
+        width: 0,
+        height: 0,
+    });
 
-            const data = await KnowledgeService.getMap(
-                selectedOrg.id
-            );
-
-            setGraph(data);
-
-        } catch (err) {
-
-            console.error(err);
-
-        } finally {
-
-            setLoading(false);
-
+   const graphStatistics = useMemo(() => {
+        if (!graph) {
+            return {
+                nodes: 0,
+                edges: 0,
+                documents: 0,
+                chunks: 0,
+            };
         }
 
-    }, [selectedOrg]);
+        return graph.statistics;
+    }, [graph]);
 
+    const organizationName = useMemo(() => {
+        return graph?.organization?.name ?? "";
+    }, [graph]);
+
+    const getFileName = (path?: string) => {
+        if (!path) return "";
+
+        return path.split(/[\/\\]/).pop() ?? "";
+    };
+
+    /*
+    |--------------------------------------------------------------------------
+    | ORGANIZACIONES
+    |--------------------------------------------------------------------------
+    */
+    
     useEffect(() => {
+
+        const load = async () => {
+
+            try {
+
+                setLoadingOrganizations(true);
+
+                const data =
+                    await OrganizationService.getAll();
+
+                setOrganizations(data);
+
+                if (!selectedOrg && data.length) {
+                    setSelectedOrg(data[0]);
+                }
+
+            } catch (error) {
+
+                console.error(error);
+
+            } finally {
+
+                setLoadingOrganizations(false);
+
+            }
+
+        };
 
         void load();
 
-    }, [load]);
+    }, [selectedOrg, setSelectedOrg]);
+     useEffect(() => {
+
+        if (!containerRef.current) return;
+
+        const observer =
+            new ResizeObserver(([entry]) => {
+
+                setSize({
+                    width: entry.contentRect.width,
+                    height: entry.contentRect.height,
+                });
+
+            });
+
+        observer.observe(containerRef.current);
+
+        return () => observer.disconnect();
+
+    }, []);
+
+    const loadGraph = useCallback(async () => {
 
     if (!selectedOrg) {
-        return (
-            <div className="flex h-full items-center justify-center text-lg">
-                Selecciona una organización.
-            </div>
-        );
+        setGraph(null);
+        return;
     }
 
-    if (loading) {
-        return (
-            <div className="flex h-full items-center justify-center">
-                Cargando Knowledge Graph...
-            </div>
+    try {
+
+        setLoadingGraph(true);
+
+        const response =
+            await KnowledgeService.getMap(
+                selectedOrg.id
+            );
+
+        console.log(
+            "KNOWLEDGE GRAPH",
+            response
         );
+
+        setGraph(response);
+
+    }
+    catch (error) {
+
+        console.error(
+            "Knowledge graph error",
+            error
+        );
+
+        setGraph(null);
+
+    }
+    finally {
+
+        setLoadingGraph(false);
+
     }
 
-    if (!graph) return null;
+}, [selectedOrg]);
 
-    // Agrupar documentos por color
-    const groups = Array.from(
-        new Set(graph.nodes.map((n) => n.group))
+useEffect(() => {
+
+    void loadGraph();
+
+}, [loadGraph]);
+
+/*
+|--------------------------------------------------------------------------
+| RESIZE DEL CONTENEDOR
+|--------------------------------------------------------------------------
+*/
+
+useEffect(() => {
+
+    if (!containerRef.current)
+        return;
+
+    const observer =
+        new ResizeObserver(([entry]) => {
+
+            setSize({
+
+                width:
+                    entry.contentRect.width,
+
+                height:
+                    entry.contentRect.height,
+
+            });
+
+        });
+
+    observer.observe(
+        containerRef.current
     );
 
-    const colorMap: Record<string, string> = {};
+    
+    if (!containerRef.current) return;
 
-    groups.forEach((g, i) => {
-        colorMap[g] = COLORS[i % COLORS.length];
+    console.log(
+        containerRef.current.clientWidth,
+        containerRef.current.clientHeight
+    );
+    return () =>
+        observer.disconnect();
+
+}, []);
+
+const graphData = useMemo(() => {
+
+    if (!graph || !graph.graph) {
+
+        return {
+
+            nodes: [],
+            links: [],
+
+        };
+
+    }
+
+    return {
+
+        nodes:
+            graph.graph.nodes.map(node => ({
+
+                ...node,
+
+                color:
+                    NODE_COLORS[node.type] ??
+                    "#64748b",
+
+                val:
+                    node.weight ??
+                    10,
+
+            })),
+
+        links:
+            graph.graph.edges.map(edge => ({
+
+                source:
+                    edge.source,
+
+                target:
+                    edge.target,
+
+                relation:
+                    edge.label ??
+                    "relación",
+
+                value:
+                    edge.weight ??
+                    1,
+
+            }))
+
+    };
+
+}, [graph]);
+console.log(size);
+/*
+|--------------------------------------------------------------------------
+| AJUSTAR ZOOM AL CARGAR
+|--------------------------------------------------------------------------
+*/
+
+useEffect(() => {
+
+    if (!graphRef.current)
+        return;
+
+    if (graphData.nodes.length === 0)
+        return;
+
+    requestAnimationFrame(() => {
+
+        graphRef.current.zoomToFit(
+            400,
+            80
+        );
+
     });
 
-    const graphData = {
+}, [graphData]);
 
-        nodes: graph.nodes.map((node) => ({
-            ...node,
-            color: colorMap[node.group],
-            val: 8,
-        })),
+/*
+|--------------------------------------------------------------------------
+| ESTADOS
+|--------------------------------------------------------------------------
+*/
 
-        links: graph.edges.map((edge) => ({
-            source: edge.source,
-            target: edge.target,
-            value: edge.weight,
-        })),
-    };
+if (!selectedOrg) {
 
     return (
 
-        <div className="flex h-full flex-col bg-slate-50">
+        <div className="flex h-full items-center justify-center">
 
-            <div className="border-b bg-white px-8 py-6 shadow-sm">
+            <div className="rounded-xl bg-white p-8 shadow">
 
-                <h1 className="text-3xl font-bold">
-                    Knowledge Graph
-                </h1>
+                <h2 className="mb-4 text-xl font-bold">
+                    Seleccionar organización
+                </h2>
 
-                <p className="mt-1 text-gray-500">
-                    {selectedOrg.name}
-                </p>
+                {
+                    loadingOrganizations
 
-            </div>
+                        ? <p>Cargando...</p>
 
-            <div className="flex flex-1">
+                        : (
 
-                <div className="w-72 border-r bg-white p-5">
+                            <select
+                                className="rounded border px-4 py-2"
+                                onChange={(e) => {
 
-                    <h2 className="mb-4 text-lg font-semibold">
-                        Leyenda
-                    </h2>
+                                    const org =
+                                        organizations.find(
+                                            o => o.id === e.target.value
+                                        );
 
-                    <div className="space-y-3">
+                                    if (org) {
+                                        setSelectedOrg(org);
+                                    }
 
-                        {groups.map(group => (
-
-                            <div
-                                key={group}
-                                className="flex items-center gap-3"
+                                }}
                             >
 
-                                <div
-                                    className="h-4 w-4 rounded-full"
-                                    style={{
-                                        background: colorMap[group]
-                                    }}
-                                />
+                                <option>
+                                    Selecciona
+                                </option>
 
-                                <span className="truncate text-sm">
-                                    {group}
-                                </span>
+                                {
+                                    organizations.map(org => (
 
-                            </div>
+                                        <option
+                                            key={org.id}
+                                            value={org.id}
+                                        >
+                                            {org.name}
+                                        </option>
 
-                        ))}
+                                    ))
+                                }
 
-                    </div>
+                            </select>
 
-                    <div className="mt-8 rounded-xl bg-slate-50 p-4 text-sm">
+                        )
 
-                        <p className="font-semibold">
-                            Estadísticas
-                        </p>
-
-                        <p className="mt-2">
-                            📄 Documentos:
-                            {" "}
-                            {groups.length}
-                        </p>
-
-                        <p>
-                            🧩 Chunks:
-                            {" "}
-                            {graph.nodes.length}
-                        </p>
-
-                        <p>
-                            🔗 Relaciones:
-                            {" "}
-                            {graph.edges.length}
-                        </p>
-
-                    </div>
-
-                </div>
-
-                <div className="flex-1">
-
-                    <ForceGraph2D
-
-                        graphData={graphData}
-
-                        nodeLabel={(node: any) => `
-${node.label}
-${node.document}
-                        `}
-
-                        nodeColor={(node: any) => node.color}
-
-                        nodeVal={(node: any) => node.val}
-
-                        linkWidth={(link: any) =>
-                            Math.max(1, link.value * 5)
-                        }
-
-                        linkColor={() => "#CBD5E1"}
-
-                        backgroundColor="#ffffff"
-
-                        cooldownTicks={200}
-
-                        enableNodeDrag
-
-                        nodeCanvasObject={(
-                            node: any,
-                            ctx,
-                            globalScale
-                        ) => {
-
-                            const label = node.label;
-
-                            const fontSize =
-                                14 / globalScale;
-
-                            ctx.font =
-                                `${fontSize}px Sans-Serif`;
-
-                            ctx.beginPath();
-
-                            ctx.arc(
-                                node.x,
-                                node.y,
-                                6,
-                                0,
-                                2 * Math.PI
-                            );
-
-                            ctx.fillStyle =
-                                node.color;
-
-                            ctx.fill();
-
-                            if (globalScale > 1.5) {
-
-                                ctx.fillStyle = "#111";
-
-                                ctx.fillText(
-                                    label,
-                                    node.x + 10,
-                                    node.y + 4
-                                );
-
-                            }
-
-                        }}
-
-                    />
-
-                </div>
+                }
 
             </div>
 
@@ -258,4 +360,268 @@ ${node.document}
 
     );
 
+}
+
+if (loadingGraph) {
+
+    return (
+
+        <div className="flex h-full items-center justify-center">
+
+            Generando Knowledge Graph...
+
+        </div>
+
+    );
+
+}
+
+if (!graph) {
+
+    return (
+
+        <div className="p-10">
+
+            No existe información para esta organización.
+
+        </div>
+
+    );
+
+}
+
+return (
+
+    <div
+        className="
+            flex
+            h-full
+            w-full
+            flex-col
+            overflow-hidden
+            bg-slate-100
+        "
+    >
+
+    <header
+        className="
+            flex
+            shrink-0
+            items-center
+            justify-between
+            border-b
+            bg-white
+            px-8
+            py-5
+        "
+    >
+
+        <div
+            className="
+                mt-2
+                flex
+                flex-wrap
+                gap-4
+                text-sm
+            "
+        >
+        
+            <span>
+                Nodes: {graphStatistics.nodes}
+            </span>
+
+            <span>
+                Edges: {graphStatistics.edges}
+            </span>
+
+            <span>
+                Documents: {graphStatistics.documents}
+            </span>
+
+            <span>
+                Chunks: {graphStatistics.chunks}
+            </span>
+
+        </div>
+
+        <select
+
+            className="
+                rounded
+                border
+                px-4
+                py-2
+            "
+
+            value={selectedOrg.id}
+
+            onChange={(e) => {
+
+                const org =
+                    organizations.find(
+                        o => o.id === e.target.value
+                    );
+
+                if (org) {
+                    setSelectedOrg(org);
+                }
+
+            }}
+
+        >
+
+            {
+                organizations.map(org => (
+
+                    <option
+                        key={org.id}
+                        value={org.id}
+                    >
+                        {org.name}
+                    </option>
+
+                ))
+            }
+
+        </select>
+
+    </header>
+
+           <main
+            className="
+                flex
+                flex-1
+                min-h-0
+                overflow-hidden
+            "
+        >
+            <div
+                ref={containerRef}
+                className="
+                    relative
+                    flex-1
+                    min-w-0
+                    overflow-hidden
+                "
+            >
+                {
+                    <ForceGraph2D
+                        ref={graphRef}
+                        width={1200}
+                        height={800}
+                        graphData={graphData}
+                        backgroundColor="#f8fafc"
+                        nodeLabel="label"
+                        nodeColor={(node: any) => node.color}
+                        nodeVal={(node: any) => node.val}
+                        linkWidth={(link: any) => Math.max(1, link.value)}
+                        linkDirectionalParticles={1}
+                        linkDirectionalParticleSpeed={() => 0.002}
+                        cooldownTicks={120}
+                        onNodeClick={(node: any) =>
+                            setSelectedNode(node)
+                        }
+                    />
+                }
+            </div>
+
+            {selectedNode && (
+                <aside
+                    className="
+                        w-96
+                        shrink-0
+                        overflow-y-auto
+                        border-l
+                        bg-white
+                        p-6
+                    "
+                >
+                    <button
+                        className="
+                            float-right
+                            text-xl
+                            text-gray-500
+                            hover:text-black
+                        "
+                        onClick={() => setSelectedNode(null)}
+                    >
+                        ✕
+                    </button>
+
+                    <h2
+                        className="
+                            mb-6
+                            text-xl
+                            font-bold
+                        "
+                    >
+                        {selectedNode.label}
+                    </h2>
+
+                    <div className="space-y-5">
+                        <div>
+                            <strong>Archivo</strong>
+
+                            <p className="break-all">
+                                {getFileName(selectedNode.document)}
+                            </p>
+                        </div>
+
+                        <div>
+                            <strong>Tipo</strong>
+
+                            <p>{selectedNode.type}</p>
+                        </div>
+
+                        {selectedNode.content && (
+                            <div>
+                                <strong>Contenido</strong>
+
+                                <p
+                                    className="
+                                        whitespace-pre-wrap
+                                        break-words
+                                        text-sm
+                                    "
+                                >
+                                    {selectedNode.content}
+                                </p>
+                            </div>
+                        )}
+
+                        {selectedNode.words && (
+                            <div>
+                                <strong>Palabras</strong>
+
+                                <p>{selectedNode.words}</p>
+                            </div>
+                        )}
+
+                        {selectedNode.metadata && (
+                            <div>
+                                <strong>Metadata</strong>
+
+                                <pre
+                                    className="
+                                        overflow-x-auto
+                                        rounded
+                                        bg-gray-100
+                                        p-3
+                                        text-xs
+                                    "
+                                >
+                                    {JSON.stringify(
+                                        selectedNode.metadata,
+                                        null,
+                                        2
+                                    )}
+                                </pre>
+                            </div>
+                        )}
+                    </div>
+                </aside>
+            )}
+        </main>
+    </div>
+);
 }

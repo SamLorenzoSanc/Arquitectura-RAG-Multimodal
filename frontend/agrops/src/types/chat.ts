@@ -5,6 +5,7 @@ export interface ChatRequest {
         role:string;
         content:string;
     }[];
+    knowledge_base_id:string;
 }
 
 export interface Message {
@@ -29,6 +30,13 @@ export interface ChatContext {
         created_at?: string;
         [key: string]: any;
     };
+}
+
+export interface Conversation {
+    id:string;
+    title:string;
+    created_at:string;
+    updated_at:string;
 }
 
 export interface RetrievalInfo {

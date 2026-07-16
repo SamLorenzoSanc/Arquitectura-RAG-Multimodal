@@ -1,0 +1,9 @@
+---
+source: Red PAC España
+url: https://redpac.es/eu/evaluation-monitoring-pepac
+category: PAC
+---
+
+Jarraipen eta ebaluazioaren emaitzek informazio eskerga sortzen dute erakunde publikoentzat, nekazaritzako elikagaien sektorearentzat eta publiko orokorrarentzat. Batetik, jarraipenak NPBren ezarpenari buruzko funtsezko informazioa ematen du , eta, bestetik, ebaluazioak NPBren Plan Estrategikoaren (CSPSP) eragina ebaluatzen du eta Plan osoaren eraginkortasuna, eraginkortasuna eta koherentzia hobetzeko eta bere osagaietako esku-hartzeak hobetzeko erabakiak hartu ahal izateko informazioa ematen du. Gainera, ebaluazioaren emaitzek eta ondorioek oinarri analitiko sendoa eskaintzen dute NPBren etorkizuneko diseinurako.
+Beraz, jarraipenak eta ebaluazioak gastu publikoaren gardentasuna, ikaskuntza eta erantzukizuna hobetzen laguntzen du. NPBaren errendimendu-esparrua indarrean dagoen 2021eko irailaren 2ko 2021/2115 Erregelamenduaren arabera garatu da, zeinak NPB kontrolatzeko eta ebaluatzeko sistema bikoitza ezartzen duen. Jarraipenaren zutabe nagusiak urteko errendimenduaren txostenean , urteko berrikuspen-bileretan eta bi urtean behin egiten den errendimenduaren azterketan oinarritzen dira. Ebaluazioari dagokionez, PEPAC Ebaluazio Plana garatu da, zeinak PEPAC ezartzerakoan aurreikusitako ebaluazio-jarduerak garatzeko jarraibide orokorrak eta 2031n amaituko den ex-post ebaluazioa. Ebaluazio-jarduerak Urte Anitzeko Lan Planean eta dagozkion Urteko Ekintza Programetan zehaztuko dira.
+Nekazaritza Politikaren Plangintzarako Zuzendariordetza Nagusiak, eta PAC Sarearen bitartez, PEPAC Ebaluazio Planaren Laburpena prestatu du, non PEPAC ebaluazioaren alderdi garrantzitsuenak jasotzen dituena (helburuak, gobernantza, ebaluazioen mota eta gaiak, eta emaitzen komunikazioa, besteak beste).

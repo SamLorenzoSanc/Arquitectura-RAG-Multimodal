@@ -7,7 +7,7 @@ from services.database import get_db
 
 from .auth import get_current_user
 from models.user import User
-
+from schemas.knowledge_base import KnowledgeBaseCreate
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 

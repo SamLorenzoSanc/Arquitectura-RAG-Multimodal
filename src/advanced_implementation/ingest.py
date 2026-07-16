@@ -36,13 +36,13 @@ class Result(BaseModel):
 
 class Chunk(BaseModel):
     headline: str = Field(
-        description="A brief heading for this chunk, typically a few words, that is most likely to be surfaced in a query",
+        description="Un título breve para este fragmento, normalmente de unas pocas palabras, que tenga mayor probabilidad de aparecer en una consulta",
     )
     summary: str = Field(
-        description="A few sentences summarizing the content of this chunk to answer common questions"
+        description="Unas pocas frases que resumen el contenido de este fragmento para responder preguntas habituales"
     )
     original_text: str = Field(
-        description="The original text of this chunk from the provided document, exactly as is, not changed in any way"
+        description="El texto original de este fragmento extraído del documento proporcionado, exactamente como aparece, sin modificarlo de ninguna manera"
     )
 
     def as_result(self, document):
@@ -80,16 +80,27 @@ def make_prompt(document):
         El documento procede de la unidad compartida de una empresa llamada AgroTech.
         El documento es de tipo: {document["type"]}
         El documento se ha obtenido de: {document["source"]}
+        - Responde únicamente en español.
+        - No inventes información.
+        - No completes datos que no aparezcan.
+        - No utilices placeholders como:
+            - [Insert...]
+            - TBD
+            - Lorem Ipsum
+            - Example
+            - Si un dato no existe en el documento, simplemente no lo menciones.
+            - Conserva exactamente nombres propios, números y fechas.
+            - El campo original_text debe contener exactamente el texto original.
+            Debes dividir el documento como consideres oportuno, asegurándote de que todo el documento quede incluido en los fragmentos; no omitas nada.
+            Probablemente, este documento debería dividirse en al menos {how_many} fragmentos, pero puedes tener más o menos según convenga, asegurándote de que haya fragmentos individuales para responder a preguntas específicas.
+            Debe haber solapamiento entre los fragmentos según sea necesario; normalmente, un solapamiento de alrededor del 25 % o unas 50 palabras, de modo que el mismo texto aparezca en varios fragmentos para obtener los mejores resultados de recuperación.
+    
+            Para cada fragmento, debes proporcionar un título, un resumen y el texto original del fragmento.
+            En conjunto, tus fragmentos deben representar el documento completo con solapamiento.
+    
+            Aquí está el documento:
 
-        Un chatbot utilizará estos fragmentos para responder a preguntas sobre la empresa.
-        Debes dividir el documento como consideres oportuno, asegurándote de que todo el documento quede incluido en los fragmentos; no omitas nada.
-        Probablemente, este documento debería dividirse en al menos {how_many} fragmentos, pero puedes tener más o menos según convenga, asegurándote de que haya fragmentos individuales para responder a preguntas específicas.
-        Debe haber solapamiento entre los fragmentos según sea necesario; normalmente, un solapamiento de alrededor del 25 % o unas 50 palabras, de modo que el mismo texto aparezca en varios fragmentos para obtener los mejores resultados de recuperación.
-
-        Para cada fragmento, debes proporcionar un título, un resumen y el texto original del fragmento.
-        En conjunto, tus fragmentos deben representar el documento completo con solapamiento.
-
-        Aquí está el documento:
+            {document["text"]}
     """
 
 

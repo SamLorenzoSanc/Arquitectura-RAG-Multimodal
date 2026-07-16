@@ -109,8 +109,6 @@ export default function OrganizationPage() {
     useEffect(() => {
         if (organizations.length === 0) {
             void fetchInitialData();
-        } else if (selectedOrg) {
-            void syncDetails(selectedOrg);
         }
     }, [selectedOrg?.id, organizations.length]);
 
@@ -244,12 +242,16 @@ export default function OrganizationPage() {
     };
 
     const handleToggleOrganization = async (org: Organization) => {
+
         if (expandedOrgId === org.id) {
             setExpandedOrgId(null);
             return;
         }
 
+
         setExpandedOrgId(org.id);
+
+
         if (!orgDetails[org.id]) {
             await syncDetails(org);
         }

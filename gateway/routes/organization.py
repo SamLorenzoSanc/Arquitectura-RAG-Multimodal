@@ -233,11 +233,98 @@ async def get_departments(
 @router.get("/{organization_id}/knowledge-map")
 async def graph(
     organization_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
-    rag = RAGService()
+    organization = await db.execute(
+        text("""
+            SELECT
+                id,
+                name,
+                description
+            FROM organizations
+            WHERE id = :id
+              AND active = true
+        """),
+        {
+            "id": organization_id
+        }
+    )
 
-    graph = KnowledgeGraphService(
+    organization = organization.mappings().first()
+
+    if not organization:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Organización no encontrada"
+        )
+
+    tenant = await db.execute(
+        text("""
+            SELECT
+                id
+            FROM tenants
+            WHERE organization_id = :org_id
+              AND active = true
+            LIMIT 1
+        """),
+        {
+            "org_id": organization_id
+        }
+    )
+
+    tenant = tenant.scalar()
+
+    if not tenant:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Tenant no encontrado"
+        )
+
+    rag = RAGService(
+    )
+
+    graph_service = KnowledgeGraphService(
         rag.collection
     )
 
-    return await graph.build_graph()
+
+    graph = await graph_service.build_graph()
+
+
+    return {
+        "organization": {
+            "id":
+                str(organization["id"]),
+            "name":
+                organization["name"],
+            "description":
+                organization["description"],
+        },
+
+
+        "statistics": {
+            "nodes":
+                len(graph["nodes"]),
+            "edges":
+                len(graph["edges"]),
+            "documents":
+                len(
+                    [
+                        n for n in graph["nodes"]
+                        if n["type"] == "document"
+                    ]
+                ),
+            "chunks":
+                len(
+                    [
+                        n for n in graph["nodes"]
+                        if n["type"] == "chunk"
+                    ]
+                )
+        },
+        "graph": graph
+
+    }

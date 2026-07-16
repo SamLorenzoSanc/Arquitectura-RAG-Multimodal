@@ -26,7 +26,7 @@ class RAGService:
     {context}
     """
 
-    def __init__(self, model: str = "llama3", embedding_model: str = "qwen3-embedding:8b", db_path: str | None = None, collection_name: str = "docs", retrieval_k: int = 20, final_k: int = 10):
+    def __init__(self, model: str = "llama3", embedding_model: str = "qwen3-embedding:latest", db_path: str | None = None, collection_name: str = "docs", retrieval_k: int = 20, final_k: int = 10):
 
         if db_path is None:
             db_path = str( Path(__file__).parent.parent.parent / "notebooks/preprocessed_db")

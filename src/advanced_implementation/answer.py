@@ -15,7 +15,7 @@ DB_NAME = str(Path(__file__).parent.parent.parent / "notebooks/preprocessed_db")
 KNOWLEDGE_BASE_PATH = Path(__file__).parent.parent.parent / "knowledge-base"
 
 collection_name = "docs"
-embedding_model = "text-embedding-3-large"
+embedding_model = "qwen3-embedding:latest"
 wait = wait_exponential(multiplier=1, min=10, max=240)
 
 openai = OpenAI()

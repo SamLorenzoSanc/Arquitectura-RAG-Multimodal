@@ -1,0 +1,354 @@
+---
+source: Comisión Europea - EU Pesticides Database
+url: https://food.ec.europa.eu/food-safety/novel-food/authorisations/summary-applications-and-notifications_en
+category: fitosanitarios
+---
+
+Summary of applications
+Summary of the applications submitted within the meaning of Article 10(1) of Regulation (EU) 2015/2283
+In accordance with the requirements laid down in the Novel Food regulation, the European Commission will make the summary of the application publicly available based on the information concerning the name and address of the applicant, the name and description of the novel food and scientific evidence demonstrating that the novel food does not pose a safety risk to human health.
+The summaries are listed alphabetically, by year:
+Applications - 2018
+- 2'-Fucosyllactose - Glycom A/S
+- Mixture of 2'-Fucosyllactose and Difucosyllactose - Glycom A/S
+- Acheta domesticus (house cricket) - Belgian Insect Industry Federation (BiiF)
+- Allanblackia seed oil - Unilever NV /Unilever PLC
+- Allulose\* - CJ-Tereos Sweeteners Europe SAS
+- Allulose - Petiva Europe SA
+- Allulose - Samyang Corp.
+- Antarctic Krill Oil from Euphausia superba - Aker BioMarine A/S
+- Antrodia camphorata mycelia powder - Golden Biotechnology Corp
+- Bacterial cellulose\* - Satisfibre, S.A.
+- Beta-galactosidase from Aspergillus oryzae\* - Takabio
+- Beta-Hydroxybutyrate salts\* - Pruvit Ventures Inc.
+- Betaine\* - DuPont Nutrition Biosciences ApS
+- Black yeast beta-glucan - Glucan Corporation
+- Bovine milk basic whey protein isolate - Armor Protéines S.A.S
+- Brassica Napus (Whole seeds) - Knold & Top ApS
+- Calcidiol\* - DSM Nutritional Products Ltd.
+- Chia seeds in chocolate - SANCHIS MIRA S.A.
+- Chia seeds in chocolate and chocolate products - Naturkost Übelhör GmbH & Co. KG
+- Chia seeds in compotes - Materne SAS
+- Chia seeds in confectionery - Majami Spółka
+- Chia seeds in fruit spreads - JatroSolutions GmbH
+- Chia seeds in a number of foods - The Chia Co
+- Chuta® (non-toxic edible Jatropha curcas kernels)\* - JatroSolutions GmbH
+- Coffee Flour (Defatted Coffee Dietary Fibers) - Kaffe Bueno ApS
+- Coffee husk (Cascara) - the dried husk of the coffee fruit or coffee cherry\* - Panama Varietals GmbH
+- Coriander seed oil from Coriandrum sativum - Ovalie Innovation
+- Egg membrane\* - Biova, LLC
+- EPA-rich oil from Phaeodactylum tricornutum - Simris Alg AB
+- Dried whole cell euglena\* - Kemin Foods L.C.
+- Eurycoma longifolia (Tongkat ali) root extract\* - Biotropics Malaysia Berhad
+- Extract derived from Panax notoginseng and Astragalus membranaceus\* - NuLiv Science
+- Dried Gryllodes sigillatus (crickets)\* - SAS EAP Group
+- Hermetia meal - Enorm Biofactory A/S
+- Honey bee drone brood (Apis mellifera) male pupae - Finnish beekeepers' association
+- Hovenia dulcis fruit extract - Hovenia Dulcis AB
+- Inulin-Propionate Ester - Imperial College Hammersmith Campus
+- Isomaltose oligosaccharide (IMO) - BioNeutra North America Inc.
+- Isomaltulose syrup (dried) - Evonik Creavis GmbH
+- Lactitol - DuPont Nutrition Biosciences ApS
+- lacto-N-tetraose\* - Glycom A/S
+- lacto-N-neotetraose (LNnT)\* - Glycom A/S
+- Laminaria digitata ash - Íslenska Saltbrennslan ehf.
+- Menaquinone-7-diproprionate\* - Kappa Bioscience A.S.
+- Extract of the microalgae Phaeodactylum tricornutum - Microphyt
+- Migratory locust (Locusta migratoria) - Belgian Insect Industry Federation (BiiF)
+- Mineral salt containing potassium and magnesium - BK Guilini GmbH
+- Dried Miracle Berry (Synsepalum dulcificum)\* - Baïa Food Co.
+- Heat-killed Mycobacterium manresensis\* - Laboratorio Reig Jofre, S.A.
+- Nicotinamide Riboside (NR)\* - ChromaDex, Inc.
+- Phenylcapsaicin\* - aXichem AB
+- Polyphenols derived from the lychee fruit (Litchi chinesis) and green tea leaves (Camellia sinensis)\* - Amino Up Chemical Co., Ltd.
+- Schizochytrium ATCC PTA 9695\_extension - DSM Nutritional Products Europe
+- Schizochytrium ATCC PTA 9695\_labelling - DSM Nutritional Products Europe
+- Schizochytrium sp. oil (fruit and vegetable purees) - DSM Nutritional Products Europe
+- Rapeseed powder from Brassica rapa L. and Brassica napus L\* - Avena Nordic Grain Oy
+- Refined Shrimp Peptide\* - Marealis AS
+- Sporopollenin exine capsules - Sporomex Limited
+- Dried Tenebrio molitor (mealworms)\* - SAS EAP Group
+- Urolithin A\* - Amazentis SA
+- Vitamin D2 mushroom powder\* - Oakshire Naturals, LP
+- Water lentil protein concentrate\* - ABC Kroos BV
+- Water lentil powder\* - Parabel Ltd
+- Whey protein isolate obtained from cow's milk - Armor Protéines S.A.S
+- Whole and ground Alphitobius diaperinus (lesser mealworm) larvae products\* - ProtiFarm Holding NV
+- Whole and ground crickets (Acheta domesticus)\* - Fair Insects BV
+- Whole and ground grasshopper (Locusta migratoria)\* - Fair Insects BV
+- Whole and ground mealworm (Tenebrio molitor) larvae\* - Fair Insects BV
+- Xia Powder 125 - Access Business Group International LLC
+- Xia Powder 435 - Access Business Group International LLC
+- Yarrowia lipolytica Chromium-enriched Yeast Biomass - SKOTAN S.A.
+- Yarrowia lipolytica Selenium-enriched Yeast Biomass - SKOTAN S.A.
+- Yarrowia lipolytica Yeast Biomass - SKOTAN S.A.
+- Zeaxanthin - DSM Nutritional Products Europe
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Applications - 2019
+- 2'-Fucosyllactose - Glycom A/S
+- 2'-Fucosyllactose/Difucosyllactose\* - Glycom A/S
+- 3-Fucosyllactose\* - DuPont Nutrition & Biosciences ApS
+- 3'-sialyllactose sodium salt (3'-SL)\* - Glycom A/S,
+- 6'-sialyllactose sodium salt ("6'-SL")\* - Glycom A/S,
+- 7-hydroxymatairesinol potassium acetate complex\* - LINNEA SA
+- Ageratum conyzoides L. aerial parts extract\* - GENCOR PACIFIC Limited
+- Allulose\* - Tate & Lyle Ingredients France SAS
+- Ashitaba sap powder\* - Japan Bio Science Laboratory (JBSL)-USA
+- Aqueous ethanolic standardised extract of Labisia pumila\* - ORCHID LIFE SDN BHD
+- Blend of Tamarindus indica seeds and Curcuma longa rhizome extracts\* - BOHAN & Co SA
+- Calcium fructoborate\* - VDF FutureCeuticals, Inc.
+- Powder of chitosan\* - Cor.Con. International
+- Cistanche tubulosa extract\* - SINPHAR TIAN-LI PHARMACEUTICAL
+- Curcuminoid-containing turmeric extract\* - Naturex S.A.
+- D-glyceric acid\* - Replicon Health Oy
+- Defatted whole cricket (Acheta domesticus) powder\* - Cricket One No., Ltd.
+- Dried biomass of Galdieria sulphuraria\* - Fermentalg
+- Grain from wheatgrass (Thinopyrum intermedium) - Patagonia Provisions, Inc.
+- HelixComplex Snail Mucus (HSM) - HELIXPHARMA SRL
+- Iron Hydroxide Adipate Tartrate (IHAT)\* - Nemysis Limited
+- Lacto-N-Neotetraose - Glycom A/S
+- lacto-N-neotetraose (LNnT) - Jennewein Biotechnologie GmbH
+- Lacto-N-Tetraose\* - Glycom A/S
+- Mealworm (Tenebrio molitor) flour\* - Nutri'Earth
+- Paramylon\* - Kemin Foods L.C.
+- Pasteurised Akkermansia muciniphila\* - A-Mansia Biotech S.A.
+- Pea and rice protein by Shiitake mycelia\* - MycoTechnology, Inc.
+- Phosphopropylsilanetriol stabilized on lactose – PPST-L - IONTEC Sarl
+- Protein extract from pig kidneys - DR Healthcare España, S.L.
+- Protein powder from Alphitobius diaperinus larvae\* - Ynsect NL B.V.
+- Rhamnogalacturonan-I enriched carrot fibre (cRG-I))\* - NutriLeads B.V.
+- Schizochytrium sp. oil - BIOPLUS LIFE SCIENCES
+- Schizochytrium sp. oil - FERMENTALG
+- Schizochytrium sp. oil\* - Progress Biotech BV
+- Schizochytrium sp. oil (infant and follow-on formulae) - FERMENTALG
+- Sugars obtained from the concentrated pulp juice from Theobroma cacao L - Cabosse Naturals NV
+- Synthetic CBD\* - CBDepot, s.r.o.
+- Synthetic CBD\* - Cibdol AG
+- Tenebrio molitor (mealworm) - Belgian Insect Industry Federation (BiiF)
+- Dried Tetraselmis chuii microalgae - Green Sea Bio System One s.l.
+- Tri-betahydroxybutyrin\*
+- Vitamin D2 mushroom powder\* - MBio
+- Vitamin D2 mushroom powder\* - Monterey Mushrooms, Inc.
+- Wolffia globosa powder\* - Hinoman
+- Zinc-L-Carnosine - Hamari Chemicals, Ltd.
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Applications - 2020
+- 2'-Fucosyllactose\* - Advanced Protein Technologies Corp.
+- 2'-Fucosyllactose/Difucosyllactose change in specifications and conditions of use – Glycom A/S
+- 3-Fucosyllactose\* - Chr. Hansen A/S
+- 3'-Siallylactose sodium salt\* - Chr. Hansen A/S
+- 6'-Siallylactose sodium salt\* - Chr. Hansen A/S
+- Allulose\* - SAVANNA Ingredients GmbH
+- Apple fruit cell culture extract -Mibelle Group Biochemistry
+- Arachidonic acid-rich oil from the fungus Mortierella alpina\* - BASF SE
+- Barley rice protein\* - Evergrain, LLC
+- Beta-lactoglobulin (β-lactoglobulin)\* - Arla Foods Ingredients Group P/S,
+- Bovine Milk Osteopontin\* - Arla Foods Ingredients Group P/S
+- Broad Spectrum Hemp Extract 85%\* - SPECTRUMS EUROPE
+- Broad Spectrum Hemp Extract 85%\* - SPECTRUMS EUROPE
+- Cannabidiol (CBD)\* - BSPG Laboratories Ltd.
+- Cannabidiol (CBD) - Pharmahemp d.o.o.
+- Cannabidiol (CBD) Isolate from Cannabis sativa L.\* - EIHA projects GmbH
+- Cannabidiol isolated from Cannabis sativa L. - HEMPOLAND
+- Cannabidiol isolated from the Cannabis sativa L. plant\* - Mile High Labs
+- Cannabis sativa L. extract\* - Linnea SA
+- Cannabis sativa L. extract\* - Pharmahemp d.o.o.
+- CBD Isolate Powder 99%+\* - SPECTRUMS EUROPE
+- Cellobiose\* - SAVANNA Ingredients GmbH
+- Cetylated fatty acids\* - Pharmanutra S.p.A.
+- Choline, succinate (2:1)\* - Mitocholine Ltd.
+- Citicoline\* - Kyowa Hakko Bio Co., Ltd
+- Clary Sage (Salvia Sclarea) Seed Oil\* - Naturesage Ltd.
+- Cricket flour Acheta domesticus\* - Italian Cricket Farm S.r.l
+- Fucoidan extract from Cladosiphon okamuranus - H. Holstein GmbH
+- Fermented soy germ powder \* - Nutrition & Santé SAS
+- Fungal protein-fiber rich biomass\* - The Protein Brewery B.V.
+- Galacto-oligosaccharide (GOS) - Yakult Pharmaceutical Industry Co., Ltd.
+- Iron Milk Proteinate (IMP)\* - Société des Produits Nestlé S.A.
+- L-Fucose\* - Setenta e Três Mil e Cem
+- lacto-N-tetraose\* - Chr. Hansen A/S
+- Lemna minor (and Lemna gibba) - Wageningen Plant Research
+- Melatonin - Pen & Tec Consulting SLU
+- Monosodium salt of L-5-methyltetrahydrofolic acid\* - Merck & Cie
+- Mung Bean Protein - Eat Just, Inc.
+- Natural Pure Cannabidiol\* - Linnea SA
+- Nicotinamide Riboside Chloride\* - ChromaDex, Inc.
+- Refined industrial hemp extract from Cannabis sativa L.\* - Dun Agro Plant Products B.V.
+- Schizochytrium sp. (TKD-1) - ATK Biotech Co., Ltd.
+- Synthetic CBD\* - Chanelle McCoy CBD LTD
+- Synthetic CBD\* - Farmabios S.p.A.
+- Tenebrio molitor protein concentrate - Ynsect
+- Tetrahydrocurcuminoids from turmeric\* - Sabinsa Europe GmbH
+- Tigernut (Cyperus esculentus) Oil - TIGERNUTS TRADERS, S.L.
+- UV-treated baker's yeast (Saccharomyces cerevisiae) - Lallemand Bio-Ingredients Division
+- Vitamin D2 mushroom powder\* - Luxidum GmbH
+- Whole cell heat-killed non-GMM Mycolicibacterium aurum Aogashima DSM33539\* - Aurum Switzerland AG
+- Yarrowia lipolytica Yeast Biomass – extension of use - Skotan S.A.
+- Yarrowia lipolytica Yeast Biomass - extension of use - Skotan S.A.
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Applications - 2021
+- α-cyclodextrin - Meyer science GmbH
+- 2'-Fucosyllactose\* - Amyris, Inc.
+- 2'-Fucosyllactose\* - Kyowa Hakko Bio Co., Ltd
+- 3-Fucosyllactose\* - Glycom A/S
+- 3'-sialyllactose sodium salt\* - Kyowa Hakko Bio Co., Ltd
+- 6'-sialyllactose sodium salt\* - Kyowa Hakko Bio Co., Ltd,
+- Algal meal and oleoresin of Haematococcus pluvialis containing astaxanthin\* - AstaReal AB
+- Anaerobutyricum soehngenii CH106
+- Arachidonic acid oil\* - Roquette Biotech Nutritionals (Wuhan) Co.
+- Beet Leaf protein (Beta vulgaris L.)\* - Cosun Beet Company
+- Cannabidiol isolated from Cannabis sativa L.\* - CBD Industries LLC
+- Clostridium butyricum TO-A\* - TOA Biopharma Co., Ltd.
+- CO2 extract from Cannabis sativa L.\* - Charlotte's Web, Inc.
+- Dried biomass powder of Xanthobacter sp. SoF1\* - Solar Foods Oy, Finland.
+- Dry cacaofruit cascara (Theobroma cacao L.) - Cabosse Naturals N.V.
+- Esterified propoxylated glycerol (EPG) \*
+- Extension of use of 2'-Fucosyllactose\* - Chr. Hansen A/S
+- Fungi protein from Fusarium strain flavolapis\* - Nature's Fynd
+- Glucosyl hesperidin\* - Hayashibara Co., Ltd.
+- Isomalto-oligosaccharide\* - BioNeutra North America Inc.
+- Isopropyl Alcohol extract from Cannabis sativa L.\* - Charlotte's Web, Inc.
+- Krill protein hydrolysate\* - Aker BioMarine Antarctic AS
+- Lacto-N-fucopentaose I / 2'-Fucosyllactose mixture (LNFP-I / 2'-FL)\* - Glycom A/S
+- L. Extract of Cannabis sativa L. extract with Tetrahydrocannabinol (THC) removed\* - Charlotte's Web, Inc.
+- Magnesium L-Threonate\* - AIDP
+- Nicotinamide Riboside Chloride\* - Elysium Health Inc.
+- Oil extract from aerial parts of Cannabis sativa L.\*
+- Olive fruit dry extract standardized in hydroxytyrosol\* - NATAC BIOTECH S.L.
+- Partially defatted chia seed (Salvia hispanica) powder\* - Functional Products Trading Arica S.A.
+- Protein extract from pig kidney change in specifications – Bioiberica S.A.U.
+- Polyphenol extract from water olive mill by-product\* - Extractos y Derivados S.L.
+- Proteins from corn (Zea mays)\* - Cargill R&D Centre Europe BV
+- Schizochytrium sp. (CABIO-A-2) - CABIO Biotech (Wuhan) Co., Ltd.
+- Sclerocarya birrea aqueous bark extract - HERBAFOR S.L.
+- Synthetic Cannabidiol\* - PureForm Global Inc.
+- Trans-Cannabidiol (CBD) from Cannabis sativa L. - CBDepot, s.r.o
+- Vitamin D3 containing UV-treated mealworm oil \*
+- Yellow/orange tomato extract - Lycored Ltd.
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Applications - 2022
+- 2-Fucosyllactose change in conditions of use – Glycom A/S
+- Acheta domesticus spray dried cricket powder \*
+- Angiotensin (1-7) – Farmaricci Since 1905 S.r.l.
+- Astaxanthin-rich oleoresin from Haematococcus pluvialis algae – Natural Algae Astaxanthin Association (NAXA)
+- Coffee leaves infusion - LUIGI LAVAZZA SpA
+- Curcuminoids extracted from Curcuma longa L. rhizomes (Solid lipid curcumin particle (SLCP) preparation)\*
+- D-tagatose - Bonumose
+- Dried C. Reinhardtii algae\* - Triton Algae Innovations Ltd.
+- Oleoresin from Haematococcus pluvialis containing astaxanthin – AstaReal AB
+- Lacto-N-neotetraose change of specifications - Chr. Hansen A/S
+- Lacto-N-neotetraose conditions in conditions of use – Glycom A/S
+- Maslinic rich extract from solid fraction of olives\* - Extractos y Derivados S.L.
+- Nannochloropsis oculata oil
+- Postbiotic protein from bacteria (Clostridium tyrobutyricum) \*
+- Potato protein\* (High molecular weight) - Coöperatie Koninklijke Avebe U.A.
+- Powder from lupine (Lupinus angustifolius) sprouted in iron solution\*
+- Rapeseed protein-fibre concentrate\* - NapiFeryn BioTech Sp. z o.o.
+- Rhamnogalacturonan-I enriched carrot fibre (cRG-I) \*
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Applications - 2023
+- 3'-Sialyllactose sodium salt\*
+- 3'-Siallylactose sodium salt change in conditions of use\* - Chr. Hansen A/S
+- 6’-Siallylactose sodium salt\* - Inbiose
+- Beta-lactoglobulin produced through fermentation by Komagataella phaffi (r-βLG) \*
+- Beta-Nicotinamide mononucleotide (beta-NMN) \*
+- Broad Spectrum CBD Hemp oil (0.0% THC) \* - Folium Biosciences Europe BV
+- Caesalpinia spinosa dried extract \*
+- Chitin-glucan from Aspergillus niger - Kitozyme SA
+- DHA-rich algal oil from Schizochytrium sp. ATCC 20889 (BioDHA)\* - Bioplus Life Sciences
+- Dihydroberberine \*
+- Dried defatted powder of Hermetia Illucens larvae\* – InnovaFeed SAS
+- Extension of use of Akkermansia muciniphila (pasteurised) - the Akkermania company.
+- Hermetia illucens larvae refined fat\* - Protix B.V.
+- Lactitol - H.C. Clover Productos y Servicios, S.L.
+- Lacto-N-Tetraose (LNT)\* - Inbiose N.V
+- L-alpha-glycerylphosphorylcholine (L-alpha-GPC) \*
+- Mixture of sodium, magnesium, and calcium salts of beta-hydroxybutyrate (BHB)\* - Pruvit Ventures Inc. , Melissa, Texas, USA \*
+- Modification of the already authorised novel food Jatropha curcas L. (edible variety) kernels\* - Chuta Nut GmbH
+- Mono- and diesters of beta hydroxybutyrate (DAG/MAG-BHB)\* - Unichem Estense S.r.l.
+- Nonapeptide and Pentapeptide Mixture\* - Caregen Co., Ltd.
+- Oil extract distillate from Cannabis sativa L.\* - ARCO (Groupe ROBERTET)
+- Phytocomplex of Melissa officinalis \*
+- Phytosterols/phytostanols\* - Advanced Organic Materials SA
+- Roasted Dipteryx alata Vogel (Baru nuts). Coopcerrado (Cooperativa mista dos agricultores familiares, extrativistas, pescadores, vazanteiros, assentados e indigenas do Cerrado)
+- S-Acetyl Glutathione\* - Gnosis S.p.A.
+- Schizochytrium sp. oil\* - Fermentalg
+- Serratiopeptidase from Serratia marcescens\* - Advanced Enzyme Technologies, Ltd.
+- Synthetic paraxanthin\* - Ingenious Ingredients, LP
+- Xylose isomerase produced through fermentation - Intoleran Digestive Experts
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Applications - 2024
+- Arachidonic acid oil from the fungus Mortierella alpina - ATK Biotech Co., Ltd.
+- Arachidonic acid-rich oil from the fungus Mortierella alpina - ATK Biotech Co., Ltd.
+- Changes in the conditions of use of the novel food 3-Fucosyllactose produced by a derivative strain of Escherichia coli BL21 (DE3) - Chr. Hansen A/S Boege Alle
+- Dicholine L-5-methyltetrahydrofolate\*
+- Dicholine L-5-MTHF\*
+- Dry biomass of Paecilomyces variotii KCL-24\* - EniferBio Oy
+- Duck cells from cell culture\* - Suprême SAS (Gourmey)
+- Egg membrane hydrolysate - Eggnovo S.L.
+- Human-equivalent Lactoferrin Alpha (heqLFa)\*
+- Hydroethanolic Extract of Sceletium tortuosum and/or Sceletium crassicaule\* - HG&H Pharmaceuticals,
+- Iron-containing yeast biomass\* - Danstar Ferment AG
+- Kynurenic acid\* - Solinea sp.
+- Lacto-N-Triose II (LNT II)\* produced with a derivative of of Kluyveromyces lactis strain DSM 70799 - Shandong Henglu Biotechnology Co
+- LPC-containing oil extract of Antartic krill\* - Aker BioMarine Human Ingredients
+- L-β-Aminoisobutyric Acid\* - Nanjing Nutrabuilding Bio-Tech Co., Ltd
+- L-Theanine\* - Taiyo GmbH
+- Magnesium Orotate Dihydrate - Gall Pharma GmbH
+- Microbial hydrolysate from V. natriegens\* - MicroHarvest GmbH
+- Mycelium from oyster mushroom - MyForest Foods Co.
+- Nicotinamide Mononucleotide (NMN)\* - SyncoZymes Co., Ld
+- Partially defatted rapeseed powder - Ferm Food ApS
+- Pea protein fermented by shiitake mushroom mycelia\* - MycoTechnology, Inc.
+- Potato Protein\* (Low molecular weight) - Coöperatie Koninklijke Avebe U.A.
+- Schizochytrium sp. (LU310) oil
+- Schizochytrium limacinum (A2) oil\* - Huve Nutraceuticals Ltd
+- Spermidine-3HCl\* - Chrysea Labs, LDA
+- Yellow tomato extract - Lycored Ltd.
+- Zinc L-Carnosine - Hamari Chemicals, Ltd.
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Applications - 2025
+- 2’-Fucosyllactose (2’-FL) (microbial source) to include 2’-FL produced by a derivative strain (CGMCC 7.559) of Corynebacterium glutamicum ATCC 13032\* - Cataya Bio (Shanghai) Co., Ltd.
+- 2′-fucosyllactose (2′-FL)\*, produced via Kluyveromyces lactis KL-FL-6 fermentation
+- 6'-Sialyllactose (6'-SL) sodium salt\*
+- β-Nicotinamide Mononucleotide (β-NMN)\*
+- Biomass produced from Pleurotus pulmonarius mycelia fermented with Chlorella vulgaris\* - Koralo GmbH.
+- Calcifediol\*
+- Chitin-glucan from Aspergillus niger\*
+- Coffee fruit extract\*
+- Defatted passion fruit seed extract - Alidans Srl
+- Galacto-oligosaccharides\* - FrieslandCampina Ingredients B.V.
+- Gamma-Aminobutyric acid\* - Bloomage
+- Jatropha curcas L. (edible variety) kernels\* - Chuta Nut GmbH
+- Pelargonium sidoides DC\* - Frutarom Switzerland Ltd.
+- Quercetin from Dimorphandra mollis Benth
+- Ubiquinol acetate\* - Vita Actives Ltd.
+\* The applicant has applied for data protection in accordance with Article 26 of the novel food regulation
+Summary of notifications
+Summary of the notifications of traditional foods from non-EU countries submitted within the meaning of Article 14 of Regulation (EU) 2015/2283.
+In line with the European Commission's transparency policy, a short summary of the notification from a non EU-country will be published. This summary will include the name and address of the applicant, the name and description of the traditional food and a brief description demonstrating the history of safe food use in the non-EU country.
+The summaries are listed alphabetically, by year:
+Notifications - 2018
+- Digitaria exilis (Fonio) - Obà Food Srl
+- Berries of Lonicera caerulea L. (Haskap) - Soloberry Ltd
+- Sorghum Syrup - Sorghum Zrt.
+Notifications - 2019
+- Cacao fruit pulp - Cabosse Naturals NV
+- Cocoa pulp and products thereof - Nestec York Ltd.
+- Herbal infusion made from coffee leaves - AM Breweries
+- Powder of Maquiberry (Aristotelia chilensis) - South Am Freeze Dry S.A.
+- Leaf powder of Moringa stenopetala - Mrs Laura Manzano Outeiral
+- Roasted sacha inchi seeds - Promperu, Agroindustrias Osho SAC, Amazon Health Products SAC, Comercio Alternativo de Productos No Tradicionales y Desarrollo para Latino América Perú (Candela) and Shanantina SAC
+- Seeds and seed flour of Vigna subterranea (L.) Verdc
+Notifications - 2021
+- Coffee cherry pulp - Societé de Produits Nestle SA
+- Dried Coffee Cherry of Coffea sp. (Cascara) - Luigi Lavazza SpA
+- Dried flowers from Citoria ternatea L. (butterfly pea) - Sensient Technologies Europe GmbH, Tsujiko Co., Ltd
+- Fresh Wolffia - Tsipi Shoham
+- Pili nuts - Domenicodelucia SPA
+- Xuta (edible variety of Jatropha curcas L) roasted and ground seed kernels - Jatropower AG
+Notifications - 2022
+- Dried Kenari Nuts (Canarium Amboinense Hoch) - Kawanasi Sehat Dasacatur, PT
+- Roasted and popped seed kernels of Euryale ferox Salisb (Makhana)\* - Zenko Superfoods Pte. Ltd.
+Notifications - 2023
+- Dried Fronds of Durvillaea incurvata (Cochayuyo) - Buenalimento S.L./ Ramón Cónsul Berzunces

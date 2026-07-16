@@ -1,0 +1,29 @@
+---
+source: FEGA Ayudas PAC
+url: https://www.fega.gob.es/es/pepac-2023-2027/sistemas-gestion-y-control/evaluacion-calidad-sistema-integrado
+category: PAC
+---
+
+El Reglamento (UE) 2021/2116 del Parlamento Europeo y del Consejo, relativo a la financiación, gestión y seguimiento de la política agrícola común 2023-2027 (Reglamento horizontal de la PAC), establece normas relativas a la obligación de los Estados miembros de proteger los intereses financieros de la Unión y de elaborar informes sobre el rendimiento de las políticas.
+El Reglamento Delegado (UE) 2022/1172 de la Comisión Europea, por el que se completa el Reglamento horizontal de la PAC, establece en los artículos 3, 4 y 5 la obligatoriedad y el modo de realizar la evaluación de la calidad de los tres elementos básicos del sistema integrado de gestión y control (SIGC) de ayudas para las intervenciones basadas en superficies: el sistema de monitorización de superficies (SMS), el sistema declarativo geoespacial (SDG) y el sistema de identificación de parcelas agrícolas (LPIS, que en España está contenido dentro del SIGPAC).
+A fin de garantizar el buen funcionamiento del nuevo marco jurídico, el Reglamento de Ejecución (UE) 2022/1173 dicta ciertas normas sobre la realización de evaluaciones de calidad de esos tres elementos (el sistema de identificación de parcelas agrícolas, el sistema de solicitud geoespacial y el sistema de monitorización de superficies) del sistema integrado de gestión y control. Los resultados de estas evaluaciones de calidad deben permitir evaluar la fiabilidad de la información generada por estos elementos del sistema integrado. El contenido de estos informes también debe permitir concluir si está suficientemente garantizada la calidad de la información utilizada en relación con la obligación de los Estados miembros de presentar informes de rendimiento sobre los indicadores de realización y resultados de las intervenciones basadas en la superficie gestionadas en el marco del sistema integrado.
+Con el fin de cumplir su objetivo de proporcionar datos fiables para el informe anual de rendimiento, deben combinarse los resultados de las tres evaluaciones de calidad, especialmente los del sistema de solicitud geoespacial y los del sistema de monitorización de superficies, para estimar el error de superficie de los datos notificados sobre los indicadores de realización y de resultados derivados de deficiencias de los sistemas.
+A nivel nacional, el Capítulo IV del Título II del Real Decreto 1047/2022 establece todas las disposiciones relativas a los tres sistemas de evaluación de calidad, detallando, para cada una de ellas, los principales elementos de aplicación.
+Objetivo de la evaluación de la calidad del sistema integrado
+Los propósitos principales de la evaluación de calidad del SIGC son:
+- Evaluar la correcta implementación de los tres sistemas (SMS, SDG y SIGPAC).
+- Garantizar que el SIGC proporcione información fiable, completa y verificable de los datos en el Informe Anual de Rendimiento (IAR) del Plan Estratégico dirigido a la Comisión Europea (CE). En concreto, el número correcto de hectáreas para los indicadores de productos y resultados. A los efectos de la metodología de evaluación de la calidad del SIGC, solo son relevantes los datos del IAR relacionados con intervenciones basadas en superficie.
+- Brindar información de diagnóstico sobre las fuentes de decisiones incorrectas a nivel de intervenciones y condiciones de elegibilidad, en el caso del sistema de monitorización de superficies (SMS). El diagnóstico será final y concluyente.
+- Desencadenar, si procede, las consiguientes acciones correctoras para mejorar el sistema, siendo necesario para ello, evaluar las acciones correctoras.
+La evaluación de la calidad de los tres sistemas básicos del SIGC es responsabilidad de los Estados miembros.
+La evaluación de la calidad se ejecuta para cada Plan Estratégico (PE) siguiendo la metodología establecida a nivel europeo por la Dirección General de Agricultura (DG AGRI) y el Centro Común de Investigación (JRC, Joint Research Center) de la Comisión Europea.
+La Comisión Europea proporciona a los Estados miembros una serie de imágenes de muy alta resolución (VHR) para su empleo en la medición de superficies, cuando sea necesario, de la evaluación de la calidad del SIGPAC y de la aplicación declarativa geoespacial SDG, aunque también se pueden emplear como apoyo en la evaluación de la calidad de SMS.
+Si durante la evaluación de la calidad se detectan deficiencias, el Estado miembro debe adoptar acciones correctoras y, si no hay progresos en la implementación de estas acciones correctoras en el segundo año tras la evaluación de la calidad, la Comisión podrá solicitar al Estado miembro un plan de acción.
+NORMATIVA
+Legislación aplicable
+Reglamentos comunitarios
+- Reglamento (UE) 2021/2116 del Parlamento Europeo y del Consejo, de 2 de diciembre de 2021 sobre la financiación, la gestión y el seguimiento de la política agrícola común y por el que se deroga el Reglamento (UE) 1306/2013.
+- Reglamento Delegado (UE) 2022/1172 de la Comisión de 4 de mayo de 2022 por el que se completa el Reglamento (UE) 2021/2116 del Parlamento Europeo y del Consejo en lo que respecta al sistema integrado de gestión y control de la política agrícola común y la aplicación y el cálculo de las sanciones administrativas en el marco de la condicionalidad.
+- Reglamento de Ejecución (UE) 2022/1173 de la Comisión de 31 de mayo de 2022 por el que se establecen disposiciones de aplicación del Reglamento (UE) 2021/2116 del Parlamento Europeo y del Consejo en lo que respecta al sistema integrado de gestión y control de la política agrícola común.
+Disposiciones Nacionales
+- Real Decreto 1047/2022, de 27 de diciembre, por el que se regula el sistema de gestión y control de las intervenciones del Plan Estratégico y otras ayudas de la Política Agrícola Común.

@@ -1,0 +1,16 @@
+---
+source: FEGA Ayudas PAC
+url: https://www.fega.gob.es/es/el-fega/publicaciones/campana-de-publicidad-2025
+category: PAC
+---
+
+Campaña de publicidad de la Nueva PAC 2025
+AYUDAS DE LA POLÍTICA AGRÍCOLA COMÚN 2025. CAMPAÑA PUBLICITARIA
+CATALAN: CAMPANYA DE PUBLICITAT PAC 2025
+EUSKERA: PUBLIZITATE KANPAINA PAC 2025
+Fecha de actualización de la página
+22/10/2025
+Campaña de publicidad de la Nueva PAC 2025
+AYUDAS DE LA POLÍTICA AGRÍCOLA COMÚN 2025. CAMPAÑA PUBLICITARIA
+CATALAN: CAMPANYA DE PUBLICITAT PAC 2025
+EUSKERA: PUBLIZITATE KANPAINA PAC 2025

@@ -1,0 +1,12 @@
+---
+source: Ministerio de Agricultura - Sanidad Vegetal
+url: https://www.mapa.gob.es/es/agricultura/temas/regulacion-de-los-mercados
+category: fitosanitarios
+---
+
+El Tratado Constitutivo de la Comunidad Europea (1957) estableció los objetivos de la Política Agrícola Común (PAC) aun hoy vigentes de: incrementar la productividad de la agricultura, asegurar un nivel de vida equitativo a los agricultores, estabilizar los mercados, garantizar el abastecimiento de los mercados así como el suministro de alimentos a los consumidores a precios razonables En 1962, con la adopción de las primeras disposiciones sectoriales de regulación de los mercados, las organizaciones comunes de mercado (OCM), se pone en marcha la PAC. Cada OCM constituye la base jurídica reguladora de la producción, la comercialización y los regímenes de ayudas en cada uno de los sectores agrarios
+La reforma de McSharry (1992) supone un cambio de rumbo en la regulación de la actividad agraria, pretendía asegurar la competitividad de la agricultura europea, controlar la producción y el gasto agrícola, así como preservar el medio ambiente.
+El Acuerdo de Berlín (1999) que se enmarca en la Agenda 2000, profundiza en los cambios introducidos en 1992, pero lo que en principio únicamente se había previsto como una revisión, terminó siendo la reforma de la PAC más profunda en su casi medio siglo de recorrido.
+El Acuerdo de Luxemburgo de junio de 2003, supone que la gran mayoría de las ayudas directas ya no estarán vinculadas a la producción. Las ayudas sectoriales, recogidas hasta entonces en las diferentes OCM, inician un proceso de desacoplamiento del producto al productor.
+Este proceso de desacoplamiento iniciado en 2003 se consolidó con la adopción en enero de 2009 del paquete legislativo conocido como "Chequeo Médico de la PAC" por el que casi todas las ayudas cuyo acoplamiento parcial se dejó a decisión de los Estados miembros, así como la gran mayoría de las primas específicas vinculadas a la producción, se integraron en el pago único entre 2010 y 2012.
+Con la publicación del paquete legislativo en diciembre de 2013 ha finalizado la última reforma de la PAC, que se inició con la propuesta presentada por la Comisión en octubre de 2011 y con la que se pretende dar respuesta a los retos de futuro planteados en la Estrategia 2020 europea dentro del sector agrario, y que busca hacer de la PAC una política más efectiva para una agricultura europea más sostenible y competitiva. Esta es la primera vez que en el diseño y aprobación de la PAC interviene el Parlamento Europeo.

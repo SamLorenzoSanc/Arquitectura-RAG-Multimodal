@@ -10,6 +10,7 @@ import type {
     RetrievalInfo,
     Message
 } from "@/types/chat";
+import KnowledgeService from "../services/knowledge.service";
 
 export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -27,11 +28,41 @@ export default function ChatPage() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [knowledgeBaseId, setKnowledgeBaseId] = useState<string>("");
     const [documents, setDocuments] = useState<DocumentItem[]>([]);
-
+    const [conversations, setConversations] = useState<any[]>([]);
+    const [activeConversation, setActiveConversation] = useState<string | null>(null);
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
+    const openConversation = async(id:string)=>{
+
+       try{
+        
+           const data =
+               await ChatService.getConversation(id);
+        
+        
+           setConversationId(
+               data.conversation_id
+           );
+        
+        
+           setMessages(
+               data.messages.map((msg:any)=>({
+                   id:msg.id,
+                   role:msg.role,
+                   content:msg.content,
+                   timestamp:new Date()
+               }))
+           );
+        
+        
+       }catch(error){
+        
+           console.error(error);
+        
+       }
     
+        };
     const fileInputRef = useRef<HTMLInputElement>(null);
     const contextCharacters = useMemo(() => {
         return context.reduce(
@@ -40,26 +71,40 @@ export default function ChatPage() {
         );
     }, [context]);
 
+    const createNewChat = () => {
+        setConversationId(null);
+        setActiveConversation(null);
+        setMessages([]);
+        setContext([]);
+        setRetrieval(null);
+
+    };
     useEffect(() => {
         initialize();
+        loadConversations();
     }, [knowledgeBaseId]);
 
     const estimatedTokens = useMemo(() => {
         return Math.round(contextCharacters / 4);
     }, [contextCharacters]);
 
+    const loadConversations = async()=>{
+        try{
+            const data =
+                await ChatService.listConversations();
+            setConversations(data);
+        }catch(error){
+            console.error(error);
+        }
+
+    };
     const initialize = async () => {
 
         try {
-
             const kb = await KnowledgeService.getCurrent();
-
             setKnowledgeBaseId(kb.id);
-
             const docs = await DocumentService.list(kb.id);
-
             setDocuments(docs);
-
         } catch (err) {
 
             console.error(err);
@@ -88,6 +133,7 @@ export default function ChatPage() {
         setIsLoading(true);
 
         try {
+            
              if (uploadedFiles.length > 0) {
                 console.log({
                     file: File.name,
@@ -117,6 +163,7 @@ export default function ChatPage() {
                 question,
                 conversation_id: conversationId,
                 history,
+                knowledge_base_id: knowledgeBaseId,
             });
 
             console.log("===== RESPUESTA CHAT =====");
@@ -124,7 +171,28 @@ export default function ChatPage() {
 
             // Guardar conversationId
             if (response.conversation_id) {
-                setConversationId(response.conversation_id);
+                setConversations(prev => {
+
+                const exists = prev.some(
+                    c => c.id === response.conversation_id
+                );
+
+
+                if(exists)
+                return prev;
+
+
+                return [
+                    ...prev,
+                    {
+                        id: response.conversation_id,
+                        title: question.substring(0,40),
+                        updated_at:
+                            new Date().toLocaleDateString()
+                    }
+                ];
+
+                });
             }
 
             // Parsear contexto RAG
@@ -215,19 +283,106 @@ export default function ChatPage() {
                         <h1 className="mt-2 text-2xl font-bold text-slate-900">Directores RRHH</h1>
                     </div>
                     <button
+                        type="button"
                         onClick={() => setShowUploadModal(true)}
-                        className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                        className="rounded-lg border border-gray-200 p-3 transition hover:bg-gray-100"
                     >
-                        <Upload size={16} />
-                        Upload
+                        <Upload size={18} />
                     </button>
                 </div>
             </div>
-
+            
             {/* Messages Area */}
             <div className="flex flex-1 overflow-hidden">
 
                 {/* ================= CHAT ================= */}
+                <aside className="
+                    w-[260px]
+                    border-r
+                    border-gray-200
+                    bg-white
+                    p-4
+                    flex
+                    flex-col
+                ">
+                
+
+                <button
+                    onClick={createNewChat}
+                    className="
+                    mb-4
+                    flex
+                    items-center
+                    justify-center
+                    rounded-lg
+                    bg-emerald-600
+                    px-4
+                    py-3
+                    text-sm
+                    font-medium
+                    text-white
+                    hover:bg-emerald-700
+                    "
+                >
+                    + Nuevo chat
+                </button>
+
+
+
+                <h3 className="
+                    mb-3
+                    text-xs
+                    font-semibold
+                    uppercase
+                    text-gray-400
+                ">
+                    Conversaciones
+                </h3>
+
+                <div className="space-y-2 overflow-y-auto">
+                    {conversations.length === 0 && (
+                    
+                        <p className="text-sm text-gray-400">
+                            No hay chats todavía
+                        </p>
+                    )}
+                
+                    {conversations.map(chat=>(                
+                        <button
+                            key={chat.id}
+                            onClick={() =>
+                                openConversation(chat.id)
+                            }
+                            className="
+                            w-full
+                            rounded-lg
+                            px-3
+                            py-3
+                            text-left
+                            hover:bg-gray-100
+                            "
+                        >
+                        
+                            <p className="truncate text-sm font-medium">
+                                {chat.title}
+                            </p>
+                        
+                            <p className="text-xs text-gray-400">
+                                {new Date(
+                                    chat.updated_at
+                                ).toLocaleDateString()}
+                            </p>
+                            
+                            
+                        </button>
+
+                        ))}
+
+                    
+                    </div>
+                    
+                    
+                </aside>
                 <div className="flex flex-1 flex-col">
 
                     <div className="flex-1 overflow-y-auto px-8 py-8">
@@ -437,7 +592,170 @@ export default function ChatPage() {
             </aside>
                 
             </div>
+            {showUploadModal && (
+<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
 
+    <div className="w-[420px] rounded-xl bg-white shadow-xl">
+
+        <div className="flex justify-between border-b px-6 py-4">
+
+            <div>
+                <h2 className="font-semibold">
+                    Upload documents
+                </h2>
+
+                <p className="text-xs text-gray-500">
+                    Add files to this knowledge base
+                </p>
+            </div>
+
+            <button
+                onClick={() => setShowUploadModal(false)}
+            >
+                <X size={18}/>
+            </button>
+
+        </div>
+
+
+        <div className="space-y-5 p-6">
+
+            <div>
+
+                <label className="text-xs font-medium">
+                    Files
+                </label>
+
+
+                <div
+                    onClick={() =>
+                        fileInputRef.current?.click()
+                    }
+                    className="
+                    mt-2 cursor-pointer
+                    rounded-lg border
+                    border-dashed
+                    p-8
+                    text-center
+                    hover:bg-gray-50
+                    "
+                >
+
+                    <Upload className="mx-auto mb-2 text-gray-400"/>
+
+                    <p className="text-sm">
+                        Select files
+                    </p>
+
+                </div>
+
+
+                {uploadedFiles.length > 0 && (
+                    <div className="mt-3 space-y-2">
+
+                        {uploadedFiles.map((file,index)=>(
+                            <div
+                                key={index}
+                                className="flex justify-between rounded bg-gray-50 px-3 py-2 text-sm"
+                            >
+
+                                <span className="truncate">
+                                    {file.name}
+                                </span>
+
+                                <button
+                                    onClick={() =>
+                                        setUploadedFiles(files =>
+                                            files.filter(
+                                                (_,i)=>i!==index
+                                            )
+                                        )
+                                    }
+                                >
+                                    <X size={14}/>
+                                </button>
+
+                            </div>
+                        ))}
+
+                    </div>
+                )}
+
+            </div>
+
+
+            <div>
+
+                <label className="text-xs font-medium">
+                    Category
+                </label>
+
+
+                <select
+                    value={selectedCategory}
+                    onChange={(e)=>
+                        setSelectedCategory(e.target.value)
+                    }
+                    className="
+                    mt-2 w-full rounded-lg
+                    border px-3 py-2 text-sm
+                    "
+                >
+
+                    <option>
+                        Misc
+                    </option>
+
+                    <option>
+                        Normativa agrícola
+                    </option>
+
+                    <option>
+                        Manual técnico
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <div className="
+            flex justify-end gap-3
+            border-t px-6 py-4
+        ">
+
+            <button
+                onClick={() =>
+                    setShowUploadModal(false)
+                }
+                className="
+                rounded-lg border px-4 py-2 text-sm
+                "
+            >
+                Cancel
+            </button>
+
+
+            <button
+                onClick={handleUploadFiles}
+                disabled={uploadedFiles.length === 0}
+                className="
+                rounded-lg bg-emerald-600
+                px-4 py-2 text-sm text-white
+                disabled:opacity-50
+                "
+            >
+                Upload files
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+)}
             {/* Input Area */}
             <div className="border-t border-gray-200 bg-white px-8 py-6">
 
@@ -522,5 +840,7 @@ export default function ChatPage() {
         </form>   
     </div>
     </div>
+    
     );
+    
 }

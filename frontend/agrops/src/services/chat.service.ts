@@ -89,6 +89,16 @@ class ChatService {
 
         }
     }
+
+    async listConversations(){
+
+    const response = await api.get(
+        "/chat/conversations"
+    );
+
+    return response.data;
+
+    }
 }
 
 export default new ChatService();

@@ -1,0 +1,10 @@
+---
+source: POSEI Gobierno Canarias Agricultura
+url: https://www.gobiernodecanarias.org/agricultura/temas/controles_higiene/
+category: POSEI
+---
+
+Con el deseo de dar cumplimiento al Programa Nacional de Control Oficial de la Higiene de la Producción Primaria Agrícola y del Uso de Productos Fitosanitarios, aprobado en Conferencia Sectorial de Agricultura y Desarrollo Rural en febrero de 2016, e incluido en el Plan Nacional de Control Oficial de la Cadena Alimentaria (PNCOCA) para el periodo 2016-2020, se recuerda que es necesario establecer una serie de controles para comprobar su cumplimiento en las explotaciones agrarias de Producción Primaria de Comunidad Autónoma de Canarias.
+El Programa Nacional ha sido consensuado con las Comunidades Autonomas y se ha elaborado con objeto de dar cumplimiento a las disposiciones comunitarias, en el ámbito de la Producción Primaria Agrícola (”Paquete Higiene”), y con la normativa española en la materia, concretamente con el Real Decreto 9/2015 de 16 de enero por el que se regulan las condiciones de aplicación de la normativa comunitaria en materia de higiene en la Producción Primaria Agrícola.
+Le ofrecemos a continuación un resumen de los resultados que se han alcanzado con el desarrollo de este Programa, que recordamos contribuye a mejorar la seguridad alimentaria de todos/as.
+Queremos señalar que gran parte de los controles necesarios para implementar este Programa se venían realizando desde hace años. Entre ellos cabe destacar el Programa de Vigilancia del Uso de Productos Fitosanitarios, la puesta en marcha de las disposiciones legislativas correspondientes al Real Decreto 1311/2012 sobre el Uso Sostenible de los Productos Fitosanitarios, o la Orden APA/326/2007 sobre el Registro de Información de las Explotaciones Agrícolas. A todo ello se suma las Inspecciones de Condicionalidad que de manera regular se vienen realizando en el marco del control de las ayudas de la PAC, que contemplan aspectos relacionados con la higiene de la producción agrícola.

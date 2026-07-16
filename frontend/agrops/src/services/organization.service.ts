@@ -1,4 +1,5 @@
 import api from "@/api";
+import type { Organization } from "@/types/organization";
 
 export const getOrganizations = async () => {
     const { data } = await api.get("/organization");
@@ -36,3 +37,26 @@ export const updateOrganization = async (
 export const deleteOrganization = async (id: string) => {
     await api.delete(`/organization/${id}`);
 };
+
+const OrganizationService = {
+
+
+    async getAll(): Promise<Organization[]> {
+
+
+        const response =
+            await api.get(
+                "/organization"
+            );
+
+
+        return response.data;
+
+
+    },
+
+
+};
+
+
+export default OrganizationService;

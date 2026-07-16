@@ -1,0 +1,250 @@
+---
+source: Comisión Europea - EU Pesticides Database
+url: https://food.ec.europa.eu/food-safety/food-waste/resources-library_en
+category: fitosanitarios
+---
+
+Disclaimer: The content of the documents does not necessarily represent the official position of the European Commission
+EU Food Loss and Waste Prevention Hub
+A One-stop-shop where stakeholders can find good practices and news as well as relevant information on national actions.
+Studies - Reports - Policy documents - Legislation
+- European Commission - EU Platform on Food Losses and Food Waste activity report, 2021
+- European Commission – EU Code of Conduct on responsible food business and marketing practices, 2021
+- European Commission - A Farm to Fork Strategy for a fair, healthy and environmentally-friendly food system, 2020
+- European Commission - A new Circular Economy Action Plan: For a cleaner and more competitive Europe, 2020
+- European Commission - Guidelines for the feed use of food no longer intended for human consumption, 2018
+- European Commission - Closing the loop - An EU action plan for the Circular Economy, Annex to the action plan, 2015
+- European Commission - Guidelines on the Preparation of Food Waste Prevention Programmes, 2011
+- European Commission - Roadmap to a Resource Efficient Europe, 2011
+- European Commission - Food Hygiene- Commission Notice on the implementation of food safety management systems covering prerequisite programs (PRPs) and procedures based on the HACCP principles, including the facilitation/flexibility of the implementation in certain food businesses
+- European Commission - Guidelines for food business operators on the Understanding of certain provisions on flexibility provided in the Hygiene Package, 2010
+- European Commission - Guidelines for the competent authorities on the Understanding of certain provisions on flexibility provided in the Hygiene Package, 2010
+- Commission Regulation 2021/382 amending the Annexes to Regulation No 852/2004 of the European Parliament and of the Council on the hygiene of foodstuffs as regards food allergen management, redistribution of food and food safety culture, 2021
+- Commission Delegated Regulation 2021/1374 amending Annex III to Regulation No 853/2004 of the European Parliament and of the Council on specific hygiene requirements for food of animal origin, 2021
+- European Food Safety Authority - Hazard analysis approaches for certain small retail establishments and food donations: second scientific opinion, 2018
+- European Commission - VAT committee- European Commission - Guidelines on Foodstuffs donated to the poor concerning the application of EU VAT provisions ; (all guidelines )
+- European Commission - Food Quality Certification Schemes- EU best practice guidelines for voluntary certification schemes for agricultural products and foodstuffs. This might help for those who would like to develop quality certification schemes on food products that will be food waste "friendly".
+- European Commission, JRC - Food System Analysis: Food waste
+- European Commission, JRC - Life Cycle Thinking - seeks to identify possible improvements to goods and services in the form of lower environmental impacts and reduced use of the resources across all life cycle stages.
+- Life Cycle indicators for resources, products and waste
+- Environmental Assessment of Municipal Waste Management Scenarios:
+- Inventory of Existing Studies Applying Life Cycle Thinking to Biowaste Management
+- Bioeconomy Report, 2016
+- Current options for the valorization of food manufacturing waste: a review, 2013
+- Improving Sustainability and Circularity of European Food Waste Management with a Life Cycle Approach, 2015
+- Techno-economic and profitability analysis of food waste biorefineries at European level, 2018
+- European Commission, JRC - Assessment of food waste prevention actions. Development of an evaluation framework to assess the performance of food waste prevention actions, 2019
+- European Commission, JRC – Brief on food waste in the European Union, 2020
+- EU: European Court of Auditors report - Combating Food Waste: an opportunity for the EU to improve the resource-efficiency of the food supply chain, 2016
+- Food losses and waste in the context of sustainable food systems, Committee on World Food Security/High Level Panel of Experts (CFS/HLPE), 2014
+- The European Innovation Partnership (EIP) "Agricultural Productivity and Sustainability"
+- EU Parliament report: "How to avoid food wastage: strategies for a more efficient food chain in EU", 2012
+- EU Parliament - "Resource efficiency: Reducing food waste, improving food safety", 2017.
+- Council of the European Union - "Food losses and food waste: Council conclusions", 2016.
+- Council of the European Union - "Food losses and food waste: assessment of progress made on the implementation of June 2016 Council conclusions", 2018.
+- Council of the European Union - "Food losses and food waste: assessment of progress made on the implementation of June 2016 Council conclusions", 2020.
+- EU Economic and Social Committee: "Comparative Study on EU Member States legislation and practices on food donation", 2014
+- EU Economic and Social Committee: "Opinion on prevention and reduction of food waste", 2013
+- Sustainable food consumption & production in a resource-constrained world, 3rd SCAR report, 2011
+- FAO - Voluntary Code of Conduct for Food Loss and Waste Reduction, 2021
+- Netherlands, Food Waste Free United Taskforce – Changing the rules together: 10 priorities, halve food waste together by 2030, 2020
+- Nordic Council of Ministers - Food Redistribution in the Nordic Region: experiences and results from a pilot study, 2015
+- Nordic Council of Ministers - Food Redistribution in the Nordic Region, phase II: identification of best practice models for enhanced food redistribution, 2016
+- Sweden - Consumer survey on knowledge and behaviours related to household food waste [SV, Summary in EN], 2021
+- Wageningen University and Research - Changing the rules of the game: Impact and feasibility of policy and regulatory measures on the prevention and reduction of food waste, 2020
+- Wageningen University and Research - Behavioural insights from food waste initiatives: What do they teach us?, 2021
+- World Resources Institute (WRI) report - The business case for reducing food loss and waste, 2017
+- World Resources Institute (WRI) report - The business case for reducing food loss and waste: Catering, 2018
+- World Resources Institute (WRI) report - The business case for reducing food loss and waste: Hotels, 2018
+- World Resources Institute (WRI) report - The business case for reducing food loss and waste: Restaurants, 2019
+- World Resources Institute (WRI) report - Reducing Food Loss and Waste: Setting a Global Action Agenda, 2019
+- World Resources Institute (WRI) report - Reducing Food Loss and Waste: Ten Interventions to Scale Impact, 2019
+- World Resources Institute (WRI) report - SDG Target 12.3 on Food Loss and Waste: 2020 Progress Report, 2020
+- World Resources Institute (WRI) - Call to Global Action on Food Loss and Waste, 2020
+- World Resources Institute (WRI) - Frequently Asked Questions About Food Loss and Waste – Answered!, 2020
+- World Resources Institute (WRI) - WRI/Champions 12.3 progress report for 2021
+- WWF/WRAP report - Halving food loss and waste in the EU by 2030: the major steps needed to accelerate progress, 2020
+Food waste measurement
+- ADEME - Food Losses and Waste - Inventory and management at each stage in the food chain, Report (FR), Executive Summary (EN), 2016
+- ADEME – Gaspillage alimentaire : Bilan du Groupe de Travail "indicateurs et mesures", Report and Work Summary on ‘Indicators and Measurements’ working group of the National Pact against Food Waste, 2019
+- Estonian Ministry of the Environment, Stockholm Environment Institute Tallinn Centre & Estonian University of Life Sciences - A study on food losses and waste in the Estonian food supply chain [ET, summary in EN available], 2021
+- Global food losses and food waste, FAO, 2011
+- Food Wastage Footprint: Impacts on Natural Resources, FAO, 2013
+- FAO - The State of Food and Agriculture Moving forward on Food Loss and Waste Reduction, 2019
+- Food Loss and Waste Database, FAO
+- Technical Platform on the Measurement and Reduction of Food Loss and Waste, FAO, 2020
+- Hungarian National Food Chain Safety Office - Assessment of household food waste in Hungary, 2018
+- Hungarian National Food Chain Safety Office, Quantification of Household Food Waste in Hungary: A Replication Study Using the FUSIONS Methodology,2020
+- JRC - Food waste accounting along global and European food supply chains: State of the art and outlook, 2018
+- Quantifying household waste of fresh fruit and vegetables in the EU, 2018
+- Food waste accounting: Methodologies, challenges and opportunities, 2017
+- JRC - Quantification of food waste per product group along the food supply chain in the European Union: a mass flow analysis, 2019
+- JRC - Grown and thrown: Exploring approaches to estimate food waste in EU countries, 2021
+- Netherlands Nutrition Centre, Fact sheet - Consumer Food Waste, December 2014
+- Netherlands Nutrition Centre - Synthesis report on food waste in Dutch households in 2019
+- Nordic Council of Ministers - Food losses and waste in primary production: Data collection in the Nordic countries, 2016
+- Nordic Council of Ministers - Food losses and waste in primary production (technical report) Case studies on carrots, onions, peas, cereals and farmed fish, 2017
+- Østfoldforskning, Food Waste in Norway 2010-2015 - Final Report from the ForMat Project
+- Preparatory study on food waste across EU 27, BIO IS, 2010
+- Swedish Food Agency - Mapping of food waste in municipal pre-schools, schools and elderly homes (SV), Executive Summary available in EN, 2019
+- Swedish Food Agency - Method for food waste measurement in Sweden [SV]
+- Swedish Board of Agriculture - Methods for national follow-up on food losses [summary in EN, full version SV], 2021
+- UNECE - Food loss and waste measuring methodology for fresh produce supply chains, 2019
+- UNEP Food Waste Index Report, 2021
+- WRI/WRAP – The Food Waste Atlas
+- WRAP - Farmer-led data gathering pilots 2018-2021
+- WRAP - Household food & drink waste: A product focus, A people focus, 2012; Household food waste: restated data for 2007-2015, 2018; Food surplus and waste in the UK – key facts, 2020, updated 2021
+Date marking
+- Belgium - Circular concerning date marking, Belgian food safety agency (Agence fédérale pour la Sécurité de la Chaine Alimentaire), 2011 (FR; NL)
+- European Commission - Flash Eurobarometer 425 on food waste and date marking, 2015
+- European Commission - Milan BExpo 2015: A behavioural study on food choices and eating habits
+- European Commission - Market study on date marking and other information provided on food labels and food waste prevention, Executive summary, Annexes, 2018
+- European Food Safety Authority - Guidance on date marking and related food information: part 1 (date marking), 2020
+- European Food Safety Authority - Guidance on date marking and related food information: part 2 (food information) & Guidance to consumers: Defrosting food safely, 2021
+- Nordic Council of Ministers - Best before - Good After? Infographic, Food Waste and date labelling: Factors determining the durability of refrigerated foods, 2017
+- Nordic Council of Ministers - Date labelling in the Nordic Countries: practice of legislation, 2015
+- Nordic Council of Ministers - Food waste and date labelling: Issues affecting the durability, 2016
+- Nordic Council of Ministers - Food Waste and date labelling: Factors determining the durability of refrigerated foods, 2017
+- Sweden - Q&A Date marking in store, National Food Agency (EN)
+- Wageningen UR - Study on date marking and food waste, 2013 (EN)
+- Wageningen UR - Brochure for industry: information on expiry dates for businesses, 2014
+- Wageningen UR - The effect of date marking terminology of products with a long shelf life on food discarding behaviour of consumers, 2017
+- WRAP, Food Standards Agency, UK Department for Environment, Food & Rural Affairs – Labelling guidance, 2017, updated in 2019
+- WRAP – Retail Study, Helping Consumers Reduce Food Waste Through Better Labelling and Product Changes, 2019
+EU funded food waste projects
+- FUSIONS- FUSIONS food waste data set for EU-28, EXPO Milano, 15 October, 2015
+- Estimates of European food waste levels, FUSIONS, 31 March 2016
+- Food waste quantification manual to monitor food waste amounts and progression, FUSIONS, 31 March 2016
+- REFRESH
+- FOOD HEROES
+- WASTELESS, Hungary- Good practices for food waste reduction for the catering, food industry, retail and trade, and community sectors [EN] [HU] (NEBIH, Wasteless, 2019)
+- School Programme materials [EN] [HU] (NEBIH, Wasteless)
+- Animation videos – YouTube channel [HU] (NEBIH, Wasteless)
+- BREADCRUMB
+- FOLOU
+- FOODRUS
+- FUSIONS
+- LOWINFOOD
+- ROSETTA
+- SavingFood
+- ZeroW
+Guidelines for Food Donation
+- EU - Guidelines on food donation, 2017
+- Commission Notice providing guidance on food safety management systems for food retail activities, including food donations 2020/C 199/01
+- Food redistribution in the EU: Mapping and analysis of existing regulatory and policy measures impacting food redistribution from EU Member States, Report, Annexes, 2020
+- Austria - Hygiene guidelines for industrial kitchens, healthcare facility kitchens and similar public catering facilities, Federal Ministry of Labour, Social Affairs, Health and Consumer Protection, 2017
+- Belgium - Circular on the provisions applied to food banks and charity organisations (FR; NL), EN, Belgian food safety agency (Agence fédérale pour la Sécurité de la Chaine Alimentaire), 2017.
+- Croatia – Food donation guidelines [HR], Ministry of Agriculture, 2019
+- Czech Republic - Principles of “Compulsory food donation”, Joint initiative of the Czech Confederation of Commerce and Tourism and the Czech Food Bank Federation (EN)
+- Denmark - Food Waste Prevention (visual guide for food donations), Ministry of Environment and Food of Denmark, Danish Veterinary an Food Administration (EN)
+- Finland - Foodstuffs donated to food aid, Finnish food safety agency (EVIRA), 2017
+- FoodDrinkEurope, EuroCommerce, FEBA, 2017- Every Meal Matters
+- France - Information on food donation and sectorial guidelines
+- France - Food donation guidelines for agricultural products, Direction régionale de l'alimentation, de l'agriculture et de la forêt de Rhône-Alpes (DRAAF), 2013 - More information on donation of agricultural products
+- France - Food donation guidelines for food industry, Direction régionale de l'alimentation, de l'agriculture et de la forêt de Rhône-Alpes (DRAAF), 2013 - More information on food donation
+- France - Food donation guidelines for the catering sector, Direction régionale de l'alimentation, de l'agriculture et de la forêt de Rhône-Alpes (DRAAF), 2013 - More information on food donation from the food service sector
+- France - Food donation from catering sector - city of Paris
+- France - Guide to food donation by national food industry (ANIA), retail (FCD), primary producers (FNSEA) and association for solidarity (SOLAAL), 2013
+- France - Guide to Good Hygiene Practices in the distribution of foods by charity organisations, French Federation of Food Banks, 2011
+- FUSIONS: Hospitality Food Surplus Redistribution Guidelines, September 2015
+- Germany - Guidelines for the donation of food to social welfare organisations. Legal aspects - EN version. German Federal Ministry of Food, Agriculture and Consumer Protection, 2018
+- Hungary - Food donation guidelines for hospitality sector [HU]/[EN version], Hungarian Food Loss and Waste Platform, 2021
+- Hungary - Food donation guidelines for food processing and retail sectors [HU]/[EN version], Hungarian Food Loss and Waste Platform, 2021
+- Ireland - Food Donation Guidance to Charities and Businesses, the Food Safety Authority of Ireland (FSAI), 2017
+- Italy - Food donation guidelines of Emilia Romagna
+- Italy - Guide to good practice for charitable organisations, Caritas Italiana, Fondazione Banco Alimentare Onlus, March 2016
+- Luxembourg - Recovery / donation of food for human consumption, 2016
+- Netherlands - Food Safety Guide of the Association of Dutch Food Banks, 2018 (EN)
+- Netherlands - Information Sheet 76: Charitable institutions and organisations, Ministry of Agriculture, Nature and Food Quality, 2015 (EN)
+- Portugal - Technical note on food donations, Portuguese Authority for Food and Economic Safety (ASAE), 2014
+- Portugal - Procedures for food donation in restaurants, catering services, events, Dariacordar/ASAE/DGAV
+- Portugal - Procedures for food donated by large establishments, Dariacordar/ASAE/DGAV
+- Portugal - Frequently Asked Questions on food donation, Dariacordar/ASAE/DGAV
+- Slovakia - Joint Instructions regarding procedure before and during provision of foodstuffs after expiry of the date of minimum durability by a charity in accordance with Section 6 of Act on Foodstuffs (No. 152/1995) (EN)
+- Spain - Practical guide to reduce food waste in the catering sector ‘Buen Aprovecho’, Ministry of Agriculture, Fisheries and Food, 2016 (EN).
+- Spain (Autonomous Community of Catalonia) - Guide to good hygiene practices for food waste reduction in restaurants and retail trade (ES), Catalan Food Safety Agency (Agència Catalana de Seguretat Alimentària), 2019
+- Spain (Basque Country) – Guidelines on food donation of surplus food (ES and EUS), ELIKA-Basque Foundation for Agro-food Safety (Fundación Vasca para la Seguridad Agroalimentaria), 2020
+- WRAP - Framework for Effective Redistribution Partnerships, 2016
+- WRAP, Defra and FSA - Surplus food redistribution labelling guidance & checklist, 2017, updated in 2020
+- WRAP - Best practice on redistributing own-label products within the supply chain, 2021
+Food waste prevention: strategies and plans
+- Autonomous Community of Catalonia - Law 3/2020, 11 March, on Food Loss and Wastage Prevention approved by the Parliament of Catalonia, 2020;
+- Croatia - Food Waste Prevention and Reduction Plan by 2022, 2019;
+- France – National Food Programme, including Strategy for Food Waste Reduction, 2019; National Pact against Food Waste 2017-2020 [FR];
+- Germany - National Strategy for Food Waste Reduction, 2019;
+- Portugal - National Strategy and Action Plan to Combat Food Waste, 2018;
+- Scotland - Food Waste Reduction Action Plan by 2025, 2019;
+- Spain – More Food, Less Waste. National Strategy for Food Loss and Waste Reduction, 2017-2020;
+- Sweden - More to do more. Action Plan for Food Loss and Food Waste Reduction by 2030, 2018;
+Food waste prevention: guidance and tools
+- EU Platform on Food Losses and Food Waste – Recommendations for action in food waste prevention
+- Eurostat – Guidance to EU Member States for national food waste measurement activities, 2020
+- JRC - Calculator for impacts of food waste prevention actions, 2019
+- European Hospitality Industry Guidelines to Reduce Food Waste and Recommendations to Manage Food Donations, (Hotrec, 2017)
+- Food waste measurement principles and resources guide, (WRAP, 2018)
+- Food Waste Reduction Roadmap Grower guidance for measuring in-field food surplus and waste, (WRAP, 2020)
+- Prevention and reduction of food and drink waste in businesses and households. Guidance for governments, local authorities, businesses and other organisations, UNEP/FAO/WRAP, 2014
+- Croatia - Guidelines for food waste reduction for the retail sector and hospitality and institutional kitchens, [HR] (Ministry of Agriculture, 2021)
+- France - Toolbox for food business operators to help them conduct food waste diagnosis – collective catering [FR] (ADEME, 2018)
+- France - Practical guide for food waste reduction for small businesses in the food sector [FR] & online self-evaluation questionnaire for food waste diagnosis, [FR] (ADEME/Regional Chamber of Trades and Crafts of Nouvelle-Aquitaine/ Nouvelle-Aquitaine Region, 2019)
+- France – Toolbox for food business operators to help them conduct food waste diagnosis – manufacturing [FR] (ADEME, 2020)
+- FAO – Online repository: Food Loss and Waste in Fish Value Chains
+- FoodWIN – Online calculator for canteens, assessing food waste levels, related costs and potential savings
+- Spain - Practical guide to reduce food waste in the retail sector. Good use of food (MAGRAMA, 2015)
+- Spain - Practical guide to reduce food waste at education centres. Good use of food (MAGRAMA, 2015)
+- Spain - Practical guide for the consumer: How to reduce food waste. Good use of food (MAGRAMA, 2015)
+- Spain - Practical guide to reduce food waste in the hospitality sector. Good use of food (MAGRAMA, 2016)
+- Spain (Autonomous Community of Catalonia) - Principles and guidelines for the implementation of a food loss and waste prevention and reduction plan in agri-food companies
+- Spain (Autonomous Community of Catalonia) – Guidelines for safe gleaning [CA], 2020, short versions in EN and ES also available
+- Sweden - Guidelines for food waste measurement in the dairy, fisheries and wholesale sectors (SV), Swedish Environmental Research Institute, 2020
+- Sweden – Handbook for food waste measurement in public meals (eg. preschools, schools, elderly care and hospitals) (SV), Swedish Food Agency, 2020
+- UNECE - Code of good practice: Reducing food loss in handling fruit and vegetables, 2019
+- WRAP - Food loss and waste data capture sheet, 2020
+- WRAP – Guardians of Grub: Guidance & tools to reduce food waste in the hospitality and food service industry, 2020
+- WRAP - Farm adviser resources, 2021
+- Zero Waste Scotland – How to systematically trial behavioral interventions to change the common behaviours which contribute to the climate crisis: a case study on using the nudge technique to reduce food waste in a Scottish school, 2020
+Newsletter of the EU Platform on Food Losses and Food Waste
+Other links
+- Agència Catalana de Seguretat Alimentària. Malbaratament d’aliments - Despilfarro de alimentos
+- Austria - Lebensmittel sind kostbar!
+- Basque Country, ELIKA Fundazioa – Zerodespilfarro
+- Bruxelles - Good Food
+- Bruxelles Environnement - Alimentation: Le gaspi, salsifi!
+- Bruxelles Environnement - Mon alimentation - Halte au gaspillage!
+- Denmark - Think Tank ONE\THIRD
+- Finland - The Food Waste Table
+- Flanders - Food waste prevention
+- France - Alimentation.gouv.fr - Gaspillage alimentaire
+- Germany - Zu gut für die Tonne!
+- Hungary – Live Wastelessly!
+- Ireland – Stop Food Waste
+- Ireland – Food Waste Charter
+- Leefmilieu Brussel - Voeding: Verspilling, weg ermee!
+- Luxembourg - AntiGaspi website
+- The Netherlands - No waste network website
+- Portugal - The National Commission for Combating Food Waste
+- Slovenia – Naša super hrana (food waste articles)
+- Spain - "Más alimento, menos desperdicio" national strategy
+- Sweden – Food Loss and Waste Reduction project (business, consumers)
+- Wallonia - Plan REGAL
+- WRAP, UK - Food waste reduction
+- WRAP, UK - Love Food Hate Waste
+Videos
+| Food loss and waste actions proposed in the Farm to Fork Strategy Learn more about the food loss and waste related actions proposed in the Farm to Fork Strategy, adopted by the Commission in May 2020, for a fair, healthy and environmentally-friendly food system | |
+| EU Platform on Food Losses and Food Waste The Platform aims to support all actors of the food supply chain across Europe in defining measures to prevent food waste, sharing best practice and evaluating progress made over time. | |
+| International Day of Awareness of Food Loss and Waste | |
+| Date marking campaign in the Netherlands | |
+| Date marking guidance – Swedish Food Agency What to do when the date marking has passed? This short video shows consumers how to interpret ’best before’ and ’use by’ dates. | |
+| The European Food Information Council (EUFIC) Educational videos produced by EUFIC to attract attention and raise awareness about the importance of not wasting food. |
+Food loss and waste prevention during the COVID-19 crisis
+- Estonia – Storage advice for consumers [ET], Ministry of Environment
+- FAO - Mitigating risks to food systems during COVID-19: Reducing food loss and waste, 2020
+- France - COVID-19: Practical information and useful contacts for facilitating food donation [FR]
+- Hungary - Covid-19 : Kitchen hygiene and food safety guide during an emergency [HU]
+- Hungary – Guidance against stockpiling behaviours [HU], Wasteless project
+- Netherlands - Coronavirus manual [NL], Food Banks Netherlands
+- Portugal - Good practices in food donation in the context of the ‘COVID-19 alert period’, Dariacordar/DGAV
+- Portugal - Recommendations for food redistribution entities [PT], CNCDA/GDS
+- Slovenia – Consumer communications (advice on how to prevent food waste, food shopping planning and date marking, and general info on food waste) [SL], Ministry of Agriculture, Forestry and Food
+- WRAP - Life under Covid-19: Food waste attitudes and behaviours in 2020
+- Zero Waste Scotland - Saving Food Safely – Food Redistribution during COVID-19

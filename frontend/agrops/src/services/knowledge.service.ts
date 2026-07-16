@@ -57,14 +57,17 @@ class KnowledgeService {
     }
 
     async getMap(
-        organizationId: string,
-    ): Promise<KnowledgeMap> {
+        organizationId:string,
+    ):Promise<KnowledgeMap>{
 
-        const { data } = await api.get<KnowledgeMap>(
+
+        const {data}=await api.get<KnowledgeMap>(
             `/organization/${organizationId}/knowledge-map`
         );
 
+
         return data;
+
     }
 }
 

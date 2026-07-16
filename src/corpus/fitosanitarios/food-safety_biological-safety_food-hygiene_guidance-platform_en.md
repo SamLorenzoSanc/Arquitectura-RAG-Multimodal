@@ -1,0 +1,415 @@
+---
+source: Comisión Europea - EU Pesticides Database
+url: https://food.ec.europa.eu/food-safety/biological-safety/food-hygiene/guidance-platform_en
+category: fitosanitarios
+---
+
+About the platform
+In order to assist Member States and food business operators to better understand the food hygiene rules and how to implement them in specific sectors, a selection of representative full guides at EU and national level for different aspect are made available through the links below.
+For detailed information about national guidelines in different sectors users should check the EU Register of National Guides to Good Hygiene Practice which provides an overview of all guides.
+Guidance document on hygiene of food of animal origin
+Guidance document on the implementation of certain provisions of Regulation (EC) No 853/2004 on the hygiene of food of animal origin
+- 22 APRIL 2024
+- български(696.11 KB - PDF)
+- español(514.42 KB - PDF)
+- čeština(661.08 KB - PDF)
+- dansk(486.29 KB - PDF)
+- Deutsch(596.16 KB - PDF)
+- eesti(511.3 KB - PDF)
+- ελληνικά(699.59 KB - PDF)
+- français(677.62 KB - PDF)
+- Gaeilge(626.03 KB - PDF)
+- hrvatski(634.06 KB - PDF)
+- italiano(556.87 KB - PDF)
+- latviešu(652.2 KB - PDF)
+- lietuvių(659.34 KB - PDF)
+- magyar(655.28 KB - PDF)
+- Malti(707.92 KB - PDF)
+- Nederlands(652.16 KB - PDF)
+- polski(700.86 KB - PDF)
+- português(599.76 KB - PDF)
+- română(681.82 KB - PDF)
+- slovenčina(778.87 KB - PDF)
+- slovenščina(628.6 KB - PDF)
+- suomi(538.03 KB - PDF)
+- svenska(646.01 KB - PDF)
+FAQ on flexibility for food business operators
+- Communication
+- 15 March 2021
+- Често задавани въпроси - Насоки за оператори в хранително-вкусовата промишленост(1.37 MB - PDF)
+- Preguntas frecuentes - Directrices para operadores de empresas alimentarias(1.01 MB - PDF)
+- Často kladené otázky - Směrnice pro provozovatele potravinářských podniků(1.28 MB - PDF)
+- Ofte stillede spørgsmål - Retningslinjer for fødevarevirksomhedsledere(1.08 MB - PDF)
+- Häufig gestellte Fragen – Leitlinien für Lebensmittelunternehmer(949.71 KB - PDF)
+- Korduma kippuvad küsimused – juhised toidukäitlejatele(1.06 MB - PDF)
+- Συχνές Ερωτήσεις - Οδηγίες για υπεύθυνους επιχειρήσεων τροφίμων(1.36 MB - PDF)
+- Foire aux questions - Lignes directrices pour les exploitants du secteur alimentaire(1.28 MB - PDF)
+- Često postavljana pitanja - Smjernice za subjekte u poslovanju s hranom(1.29 MB - PDF)
+- Domande frequenti - Linee guida per gli operatori del settore alimentare(1021.31 KB - PDF)
+- Bieži uzdotie jautājumi – Vadlīnijas pārtikas apritē iesaistītajiem uzņēmējiem(2.15 MB - PDF)
+- Dažnai užduodami klausimai – gairės maisto tvarkymo subjektams(1.25 MB - PDF)
+- Gyakran Ismételt Kérdések – Útmutató élelmiszer-ipari vállalkozók számára(1.29 MB - PDF)
+- Mistoqsijiet Frekwenti - Linji gwida għall-operaturi tan-negozju tal-ikel(1.36 MB - PDF)
+- Veelgestelde vragen - Richtlijnen voor exploitanten van levensmiddelenbedrijven(1.09 MB - PDF)
+- Często zadawane pytania — wytyczne dla podmiotów prowadzących przedsiębiorstwa spożywcze(1.31 MB - PDF)
+- Perguntas frequentes - Orientações para operadores de empresas do setor alimentar(1.01 MB - PDF)
+- Întrebări frecvente - Ghid pentru operatorii din sectorul alimentar(1.35 MB - PDF)
+- Často kladené otázky – Pokyny pre prevádzkovateľov potravinárskych podnikov(1.28 MB - PDF)
+- Pogosto zastavljena vprašanja - Smernice za nosilce živilske dejavnosti(1.25 MB - PDF)
+- Usein kysytyt kysymykset - Ohjeita elintarvikealan toimijoille(1.16 MB - PDF)
+- Vanliga frågor - Riktlinjer för livsmedelsföretagare(1.11 MB - PDF)
+FAQs on flexibility for competent authorities
+- Communication
+- 15 March 2021
+- Често задавани въпроси относно гъвкавостта за компетентните органи(1009.75 KB - PDF)
+- Preguntas frecuentes sobre flexibilidad para las autoridades competentes(671.67 KB - PDF)
+- Časté dotazy o flexibilitě pro příslušné orgány(827.96 KB - PDF)
+- Ofte stillede spørgsmål om fleksibilitet for kompetente myndigheder(669.05 KB - PDF)
+- Häufig gestellte Fragen zur Flexibilität für zuständige Behörden(677.12 KB - PDF)
+- KKK-d pädevate asutuste paindlikkuse kohta(654.46 KB - PDF)
+- Συχνές ερωτήσεις σχετικά με την ευελιξία για τις αρμόδιες αρχές(981.45 KB - PDF)
+- FAQ sur la flexibilité pour les autorités compétentes(775.08 KB - PDF)
+- Ceisteanna Coitianta Solúbthachta d'Údaráis Inniúla(749.84 KB - PDF)
+- Često postavljana pitanja o fleksibilnosti za nadležna tijela(890.74 KB - PDF)
+- Domande frequenti sulla flessibilità per le autorità competenti(664.15 KB - PDF)
+- Bieži uzdotie jautājumi par elastīgumu kompetentajām iestādēm(856.02 KB - PDF)
+- DUK apie lankstumą kompetentingoms institucijoms(829.17 KB - PDF)
+- GYIK az illetékes hatóságok rugalmasságáról(838.18 KB - PDF)
+- FAQs dwar il-flessibbiltà għall-awtoritajiet kompetenti(857.88 KB - PDF)
+- Veelgestelde vragen over flexibiliteit voor bevoegde autoriteiten(681.2 KB - PDF)
+- Często zadawane pytania dotyczące elastyczności dla właściwych organów(920.5 KB - PDF)
+- Perguntas frequentes sobre flexibilidade para autoridades competentes(671.94 KB - PDF)
+- Întrebări frecvente privind flexibilitatea pentru autoritățile competente(972.83 KB - PDF)
+- Časté otázky o flexibilite pre príslušné orgány(909.79 KB - PDF)
+- Pogosta vprašanja o prilagodljivosti za pristojne organe(756.34 KB - PDF)
+- Usein kysytyt kysymykset toimivaltaisten viranomaisten joustavuudesta(658.51 KB - PDF)
+- Vanliga frågor om flexibilitet för behöriga myndigheter(664.38 KB - PDF)
+Commission Notice on the implementation of food safety management systems covering Good Hygiene Practices and procedures based on the HACCP principles, including the facilitation/flexibility of the implementation in certain food businesses
+Please note: The link referred to in footnote 9 contains an error and should read: https://www.fooddrinkeurope.eu/wp-content/uploads/2022/04/FoodDrinkEuropes-Guidance-on-Food-Allergen-Management-for-Food-Manufacturers-2022.pdf
+Guidance document on the hygiene of all food
+Guidance document on the implementation of certain provisions of Regulation (EC) No 852/2004 on the hygiene of foodstuffs
+- 15 MARCH 2021
+- български(312.49 KB - PDF)
+- español(233.82 KB - PDF)
+- čeština(303.16 KB - PDF)
+- dansk(237 KB - PDF)
+- Deutsch(232.16 KB - PDF)
+- eesti(210.33 KB - PDF)
+- ελληνικά(377.3 KB - PDF)
+- français(239.64 KB - PDF)
+- hrvatski(578.51 KB - PDF)
+- italiano(227.74 KB - PDF)
+- latviešu(316.1 KB - PDF)
+- lietuvių(301.36 KB - PDF)
+- magyar(304.98 KB - PDF)
+- Malti(317.85 KB - PDF)
+- Nederlands(228.73 KB - PDF)
+- polski(312.17 KB - PDF)
+- português(230.62 KB - PDF)
+- română(306.71 KB - PDF)
+- slovenčina(307.27 KB - PDF)
+- slovenščina(287.01 KB - PDF)
+- suomi(217.79 KB - PDF)
+- svenska(218.57 KB - PDF)
+Guide to the Principles of Good Practice for the microbiological classification and monitoring of bivalve Mollusc production and relaying areas with regard to Implementing Regulation 2019/627
+Guide to the Principles of Good Practice for the microbiological classification and monitoring of bivalve Mollusc production and relaying areas with regard to Implementing Regulation 2019/627
+Commission Notice providing guidance on food safety management systems for food retail activities, including food donations
+Commission Notice providing guidance on food safety management systems for food retail activities, including food donations, available in all EU languages
+| Attention: Due to the adoption of Regulation (EU) 2021/1374, the guidance on freezing at retail in Section 5.4 is outdated. For the purpose of food donation, freezing of meat is allowed at any retail establishment under the conditions laid down in that Regulation |
+|---|
+Import conditions for raw materials and treated raw materials for the production of gelatine and collagen
+- 15 MARCH 2021
+- български(382.41 KB - PDF)
+- español(382.01 KB - PDF)
+- čeština(393.55 KB - PDF)
+- dansk(462.17 KB - PDF)
+- Deutsch(391.68 KB - PDF)
+- eesti(381.36 KB - PDF)
+- ελληνικά(465.12 KB - PDF)
+- français(388.86 KB - PDF)
+- hrvatski(390.54 KB - PDF)
+- italiano(373.83 KB - PDF)
+- latviešu(545.2 KB - PDF)
+- lietuvių(393.52 KB - PDF)
+- magyar(394.01 KB - PDF)
+- Malti(473.62 KB - PDF)
+- Nederlands(386.11 KB - PDF)
+- polski(395.32 KB - PDF)
+- português(382.85 KB - PDF)
+- română(384.64 KB - PDF)
+- slovenčina(395.95 KB - PDF)
+- slovenščina(386.41 KB - PDF)
+- suomi(377.56 KB - PDF)
+- svenska(386.66 KB - PDF)
+Guidelines on minimum recommendations for official laboratory appointed for the detection of Trichinella in meat
+- 15 MARCH 2021
+- български(656.56 KB - PDF)
+- español(558.25 KB - PDF)
+- čeština(569.95 KB - PDF)
+- dansk(556.71 KB - PDF)
+- Deutsch(558.27 KB - PDF)
+- eesti(634.76 KB - PDF)
+- ελληνικά(653.19 KB - PDF)
+- français(665.02 KB - PDF)
+- hrvatski(551.13 KB - PDF)
+- italiano(631.43 KB - PDF)
+- latviešu(652.47 KB - PDF)
+- lietuvių(642.92 KB - PDF)
+- magyar(656.36 KB - PDF)
+- Malti(664.02 KB - PDF)
+- Nederlands(638.87 KB - PDF)
+- polski(659.81 KB - PDF)
+- português(555.96 KB - PDF)
+- română(649.34 KB - PDF)
+- slovenčina(650.1 KB - PDF)
+- slovenščina(654.98 KB - PDF)
+- suomi(549.42 KB - PDF)
+- svenska(555.33 KB - PDF)
+Monitoring of Toxin-producing Phytoplankton in Bivalve Mollusc Harvesting Areas Guide to Good Practice: Technical Application
+Commission notice on addressing microbiological risks in fresh fruits and vegetables at primary production through good hygiene
+Commission Notice on the implementation of requirements for composite products
+Guidance Document on Listeria monocytogenes shelf-life studies for ready-to-eat foods, under Regulation (EC) No 2073/2005 of 15 November 2005 on microbiological criteria for foodstuffs
+- 18 DECEMBER 2025
+Guidance Document on the minimum requirements for Salmonella control programmes to be recognised equivalent to those approved for Sweden and Finland in respect of meat and eggs of Gallus gallus
+- 15 MARCH 2021
+Guidance document on sharing good practices in slaughter hygiene
+- 24 NOVEMBER 2022
+Guidelines for control of Listeria in quick-frozen vegetables
+Guidelines for control of Listeria in quick-frozen vegetables
+- 15 MARCH 2021
+- български(1.6 MB - PDF)
+- español(1.52 MB - PDF)
+- čeština(1.57 MB - PDF)
+- dansk(1.5 MB - PDF)
+- Deutsch(1.52 MB - PDF)
+- eesti(1.52 MB - PDF)
+- ελληνικά(1.61 MB - PDF)
+- français(1.59 MB - PDF)
+- italiano(1.5 MB - PDF)
+- latviešu(1.6 MB - PDF)
+- lietuvių(1.56 MB - PDF)
+- magyar(1.56 MB - PDF)
+- Malti(1.25 MB - PDF)
+- Nederlands(1.56 MB - PDF)
+- polski(1.66 MB - PDF)
+- português(1.51 MB - PDF)
+- română(1.56 MB - PDF)
+- slovenčina(1.66 MB - PDF)
+- slovenščina(1.56 MB - PDF)
+- suomi(1.5 MB - PDF)
+- svenska(1.49 MB - PDF)
+Guidance document on good practice for smoked and/or salted and/or marinated fish
+- 15 MARCH 2021
+Guidance on cheese as raw material in the manufacture of food products
+- 15 MARCH 2021
+- български(1.59 MB - PDF)
+- español(1.14 MB - PDF)
+- čeština(1.38 MB - PDF)
+- dansk(1.26 MB - PDF)
+- Deutsch(1.57 MB - PDF)
+- eesti(1.5 MB - PDF)
+- ελληνικά(1.61 MB - PDF)
+- français(1.44 MB - PDF)
+- hrvatski(1.46 MB - PDF)
+- italiano(1.56 MB - PDF)
+- latviešu(1.59 MB - PDF)
+- lietuvių(1.49 MB - PDF)
+- magyar(1.54 MB - PDF)
+- Malti(1.58 MB - PDF)
+- Nederlands(1.44 MB - PDF)
+- polski(1.62 MB - PDF)
+- português(1.39 MB - PDF)
+- română(1.62 MB - PDF)
+- slovenčina(1.47 MB - PDF)
+- slovenščina(1.49 MB - PDF)
+- suomi(1.43 MB - PDF)
+- svenska(1.51 MB - PDF)
+European Guide for the hygienic manufacture of Processed Cheese
+- 15 MARCH 2021
+- български(1.13 MB - PDF)
+- español(904.03 KB - PDF)
+- čeština(1.07 MB - PDF)
+- dansk(921.44 KB - PDF)
+- Deutsch(944.58 KB - PDF)
+- eesti(995.68 KB - PDF)
+- ελληνικά(1.09 MB - PDF)
+- français(1.06 MB - PDF)
+- hrvatski(1.07 MB - PDF)
+- italiano(1006.48 KB - PDF)
+- latviešu(1.14 MB - PDF)
+- lietuvių(1.13 MB - PDF)
+- magyar(1.04 MB - PDF)
+- Malti(1.14 MB - PDF)
+- Nederlands(1010.85 KB - PDF)
+- polski(1.1 MB - PDF)
+- português(976.71 KB - PDF)
+- română(1.06 MB - PDF)
+- slovenčina(1.06 MB - PDF)
+- slovenščina(1.04 MB - PDF)
+- suomi(942.62 KB - PDF)
+- svenska(1003.7 KB - PDF)
+ESSA hygiene guideline: Sprouts and seeds for sprouting
+ESSA hygiene guideline for the production of sprouts and seeds for sprouting issued by the European Sprouted Seeds Association” – Final version of 17th January 2017
+- 15 MARCH 2021
+- български(814.32 KB - PDF)
+- español(660.03 KB - PDF)
+- čeština(700.8 KB - PDF)
+- dansk(638.64 KB - PDF)
+- Deutsch(771.49 KB - PDF)
+- eesti(782.27 KB - PDF)
+- ελληνικά(713.6 KB - PDF)
+- français(702.19 KB - PDF)
+- hrvatski(700.96 KB - PDF)
+- italiano(761.07 KB - PDF)
+- latviešu(681.72 KB - PDF)
+- lietuvių(703.9 KB - PDF)
+- magyar(809.65 KB - PDF)
+- Malti(722.26 KB - PDF)
+- Nederlands(673.68 KB - PDF)
+- polski(700.44 KB - PDF)
+- português(660.33 KB - PDF)
+- română(804.54 KB - PDF)
+- slovenčina(701.65 KB - PDF)
+- slovenščina(689.55 KB - PDF)
+- suomi(747.54 KB - PDF)
+- svenska(482.52 KB - PDF)
+Good Hygiene Practices in the production of artisanal cheese and dairy products
+- 15 MARCH 2021
+- български(1.51 MB - PDF)
+- español(1.16 MB - PDF)
+- čeština(1.31 MB - PDF)
+- dansk(1.39 MB - PDF)
+- Deutsch(1.58 MB - PDF)
+- eesti(1.38 MB - PDF)
+- ελληνικά(1.59 MB - PDF)
+- français(1.48 MB - PDF)
+- Gaeilge(1.54 MB - PDF)
+- hrvatski(1.38 MB - PDF)
+- italiano(1.4 MB - PDF)
+- latviešu(1.4 MB - PDF)
+- lietuvių(1.35 MB - PDF)
+- magyar(1.41 MB - PDF)
+- Malti(1.73 MB - PDF)
+- Nederlands(2.23 MB - PDF)
+- polski(1.46 MB - PDF)
+- português(1.41 MB - PDF)
+- română(1.53 MB - PDF)
+- slovenčina(1.36 MB - PDF)
+- slovenščina(1.41 MB - PDF)
+- suomi(1.35 MB - PDF)
+- svenska(3.63 MB - PDF)
+Good hygiene practices specific to wholesale market management in the EU
+Draft translations
+- 15 MARCH 2021
+- български(818.64 KB - PDF)
+- español(438.24 KB - PDF)
+- čeština(731.42 KB - PDF)
+- dansk(421.99 KB - PDF)
+- Deutsch(698.85 KB - PDF)
+- eesti(403.82 KB - PDF)
+- ελληνικά(884.62 KB - PDF)
+- français(445.06 KB - PDF)
+- Gaeilge(425.92 KB - PDF)
+- italiano(621.86 KB - PDF)
+- latviešu(765.87 KB - PDF)
+- lietuvių(711.05 KB - PDF)
+- magyar(680.3 KB - PDF)
+- Malti(715.76 KB - PDF)
+- Nederlands(439.97 KB - PDF)
+- polski(758.52 KB - PDF)
+- português(468.51 KB - PDF)
+- română(811.32 KB - PDF)
+- slovenčina(703.56 KB - PDF)
+- slovenščina(653.31 KB - PDF)
+- suomi(420.46 KB - PDF)
+- svenska(633.93 KB - PDF)
+Food Donation Guidelines "Every Meal Matters"
+Guide to good hygienic practice for Hygiene and the application of the HACCP principles in the production of natural sausage casings
+- 15 MARCH 2021
+Guide to good hygiene practices for packaged water
+- 15 MARCH 2021
+- български(1.07 MB - PDF)
+- español(534.09 KB - PDF)
+- čeština(869.73 KB - PDF)
+- dansk(504.68 KB - PDF)
+- Deutsch(1.08 MB - PDF)
+- eesti(987.9 KB - PDF)
+- ελληνικά(933.92 KB - PDF)
+- français(550.47 KB - PDF)
+- italiano(593.59 KB - PDF)
+- latviešu(954.83 KB - PDF)
+- lietuvių(887.27 KB - PDF)
+- magyar(746.51 KB - PDF)
+- Malti(1.11 MB - PDF)
+- Nederlands(533.55 KB - PDF)
+- polski(1.61 MB - PDF)
+- português(790.55 KB - PDF)
+- română(1.09 MB - PDF)
+- slovenčina(854.84 KB - PDF)
+- slovenščina(789.47 KB - PDF)
+- suomi(529.21 KB - PDF)
+- svenska(529.53 KB - PDF)
+Guide to good manufacturing practice for "liquid, concentrated, frozen and dried egg products" used as food ingredients
+- Guidance note
+- 15 March 2021
+EEPA – European Egg Processors Association
+Guide To Good Manufacturing Practice For "Liquid, Concentrated, Frozen And Dried Egg Products" Used As Food Ingredients (Non-Ready To Eat Egg Products)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_bg.pdf(653.38 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_es.pdf(417.69 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_cs.pdf(550.69 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_da.pdf(389.67 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_de.pdf(465.64 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_et.pdf(441.87 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_el.pdf(631.05 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_fr.pdf(581.98 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_it.pdf(400.09 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_lv.pdf(620.38 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_lt.pdf(617.88 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_hu.pdf(713.16 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_mt.pdf(569.86 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_nl.pdf(446.38 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_pl.pdf(623.46 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_pt.pdf(445.77 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_ro.pdf(558.62 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_sk.pdf(541.21 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_sl.pdf(708.55 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_fi.pdf(427.29 KB - PDF)
+- biosafety\_fh\_guidance\_guide\_good-practice-haccp-eepa\_sv.pdf(429.02 KB - PDF)
+Guidelines for developing EU Guides to Good Practice
+- Guidelines for the development of EU Guides to Good Practice have been prepared together with Member States
+- Guidance on viable parasites in fishery products that may be a risk to consumers' health
+Guidelines for Distributors and Operators of Plumbed-in POU issued by Water Coolers Europe
+- Guidance note
+- 2 July 2024
+EU Guidelines for Good Hygienic Practice for Distributors and Operators of Plumbed-in POU (Point of Use) issued by Water Coolers Europe (WCE) .
+Final version of 5th September 2016
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_bg.pdf(715.99 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_es.pdf(571.94 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_cs.pdf(706.1 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_da.pdf(605.7 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_de.pdf(666.58 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_et.pdf(597.76 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_el.pdf(731.31 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_fr.pdf(699.88 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_ga.pdf(656.91 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_hr.pdf(677.41 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_it.pdf(606.03 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_lv.pdf(714.35 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_lt.pdf(688.75 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_hu.pdf(711.7 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_mt.pdf(753.73 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_nl.pdf(626.05 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_pl.pdf(703.88 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_pt.pdf(618.59 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_ro.pdf(691.72 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_sk.pdf(741.62 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_sl.pdf(699.13 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_fi.pdf(596.57 KB - PDF)
+- biosafety\_fh\_guidance\_guidelines\_water\_coolers\_sv.pdf(605.72 KB - PDF)
+IPIFF Guide on Good Hygiene Practices for European Union (EU) producers of insects as food and feed.
+- General publications
+- 17 December 2024
+IPIFF Guide on Good Hygiene Practices for European Union (EU) producers of insects as food and feed.
+(Disclaimer: This document has been presented to the "Standing Committee on Plants, Animals, Food and Feed" in the "Biological Safety of the Food Chain" and the "Animal Nutrition" sections. Only the legislative references related to these parts have been endorsed.)
+National Guidance
+For detailed information about national guidelines in different sectors users should check the EU Register of National Guides to Good Hygiene Practice which provides an overview of all guides.

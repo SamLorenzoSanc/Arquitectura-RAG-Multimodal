@@ -1,0 +1,365 @@
+---
+source: Comisión Europea - EU Pesticides Database
+url: https://food.ec.europa.eu/animals/animal-welfare/eu-platform-and-expert-group/platform-meetings_en
+category: fitosanitarios
+---
+
+2026
+26 June – Nineteenth meeting of the Platform
+- Agenda
+- Web streaming
+- Hashtag: #EU4AnimalWelfare
+- Conclusions of the animal welfare indicators subgroup
+- Presentations:- Update on the ongoing impact assessment of the EU rules for on-farm animal welfare
+- Preliminary results of the study on modernising EU on-farm animal welfare legislation
+- Presentation of the subgroup’s conclusions on the animal welfare indicators
+- The Irish Presidency forthcoming work on the Commission’s proposal for a Regulation on the protection of animals during transport
+- Study on digital modalities of animal welfare during transport
+- Implementation of the upcoming Regulation on the welfare of dogs and cats and their traceability
+- New mandate of the voluntary initiative on dogs and cats
+- Responsible Pet Ownership From Legislation to Action
+- Presentation by Choose Health Coalition
+- Report on the six guiding principles for humane livestock farming
+2025
+16-17 October – Eighteenth meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- List of participants
+- Webstreaming 16 October
+- Webstreaming 17 October
+- Hashtag: #EU4AnimalWelfare
+- Presentations:- Introduction of new Platform Members
+- State of play of the revision of the EU rules for on-farm animal welfare and the study on animal welfare indicators
+- Group housing for calves
+- EFSA Scientific opinions on the welfare of cattle
+- EFSA Scientific Opinion on the welfare of American mink, red and Arctic foxes, raccoon dog and chinchilla kept for fur production
+- State of play of the Commission’s study on fur animals and next steps
+- Update on the Danish Presidency’s ongoing work on the legislative proposal on the protection of animals during transport
+- AOB: RSPCA
+- AOB: United for The Future of Cats & Dogs
+30 June – Seventeenth meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- List of participants
+- Webstreaming
+- Hashtag: #EU4AnimalWelfare
+- Presentations:- State of play of the modernisation of the EU legislation for on-farm animal welfare, and follow-up to the ECI “Fur Free Europe”
+- Scientific work on phasing out of farrowing crates
+- WelFarmers project
+- Animal welfare at the global level: FAO’s work on animal welfare
+- Animal welfare at the global level: WOAH’s work on animal welfare
+- Study on the genetics of dog and cat breeding and digital solutions for their traceability, study on modalities of animal welfare during transport and consultation activities
+- AOB: Donkeys skin market
+- New Platform mandate & the call for applications for the EU Platform on Animal Welfare
+31 March – Sixteenth meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- List of participants
+- Webstreaming
+- Hashtag: #EU4AnimalWelfare
+- Presentations:- Vision for Agriculture and Food
+- Implications of the Vision for animal welfare. Procedural steps
+- Digitalisation and welfare indicators for poultry state of play and future steps
+- European Partnership on Animal Health and Welfare
+- Animal Welfare Platform within the European Partnership on Animal Health and Welfare
+- Video: EP legislative work on the legislative proposal on the protection of animals during transport
+- Polish Presidency’s work on animal welfare
+- New mandate and Call for Application for additional Members Type A and C
+- Information leaflet specific to the use of equids in conservation and rewilding by the voluntary initiative
+- 10. PigStun Event
+Previous meetings
+2024
+17-18 June – Fifteenth meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- List of participants
+- Webstreaming 17 June
+- Webstreaming 18 June
+- Hashtag: #EU4AnimalWelfare
+- Leaflet: Best Practices Hens
+- Leaflet: Care4Dairy
+- Presentations:- Update on the Belgian Presidency’s work on animal welfare
+- EC SWD summarising Evidence supporting the proposal on the welfare and traceability of dogs and cats
+- Update on EFSA’s activities related to the welfare of beef cattle, turkeys, animals kept for fur production
+- Update from the EU Reference Centres on Animal Welfare (EURCAWs)
+- Presentation of the information leaflet on equids working in tourism
+Conclusions VI Equidae 15th Platform meeting
+- Platform on Animal Welfare for Europe of the World Organisation for AnimalHealth
+- Better Training for Safer Food Program – Animal Welfare Courses and Training materials
+- ClearFarm – a platform to control animal welfare in pig and dairy cattle farming
+- PPILOW - Poultry and Pig Low-input and Organic production systems
+- Summary of feedback from citizens and stakeholders on the Commission proposal on the welfare of dogs and cats and their traceability
+- Summary of stakeholder feedback on the Commission proposal on the welfare of animals during transport
+- Subgroup on animal welfare policy indicators
+2023
+7 December - Fourteenth meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- List of participants
+- Proposal for new rules on the welfare of dogs and cats and their traceability
+- Proposal for a Regulation of the Council and European Parliament on the protection of animals during transport
+- Webstreaming
+- Hashtag: #EU4AnimalWelfare
+- Presentations- EFSA - EU Platform - Recent and new activities on AW
+- IA & Transport proposal
+- Carcasses transport
+- ECI Fur Free Europe
+- WelFur - AnimalWelfare
+- Proposal on dogs and cats
+- Agriculture policy, Animal Welfare and Policy indicators CAP
+- Subgroup animal welfare policy indicators
+- Extreme breeding
+- aWISH
+- Voluntary initiative presentation
+15-16 June – Thirteenth meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- List of participants
+- Webstreaming 15 June
+- Webstreaming 16 June
+- Hashtag: #EU4AnimalWelfare
+- Presentations- Overview report laying hens
+- Welfare of laying hens
+- Welfare of broilers
+- Subgroup Poultry
+- Welfare of ducks geese & quails
+- Subgroup labelling
+- Subgroup on animal transport
+- Transport of live animals in the EU
+- Voluntary initiative on equids
+- The case for a Fur Free Europe
+- Calves
+- Subgroup calves and dairy cows
+- Welfare of dairy cows
+- Care4Dairy
+- Pig Subgroup
+- Ending castration
+- Illegal trade of cats and dogs
+- Voluntary initiative on dogs
+2022
+5-6 December – Twelfth meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- Attendance list
+- Webstreaming 5 December
+- Webstreaming 6 December AM
+- Webstreaming 6 December PM
+- Hashtag: #EU4AnimalWelfare
+- Presentations- Presentation of the Commission Staff Working Document “Fitness check of the EU Animal Welfare legislation”
+- State of play of the impact assessment for the revision of the animal welfare legislation
+- Horizontal provisions of the revised legislation for the welfare of kept animals
+- Presentation of EFSA scientific opinion on the welfare of pigs on farm
+- Subgroup on the welfare of pigs
+- Subgroup on animal welfare at the time of killing
+- Presentation of the pilot project on best practices for alternative egg production systems
+- Subgroup on the welfare of poultry
+- Presentation of EFSA scientific opinion on the welfare of animals during transport
+- Subgroup on the protection of animals during transport
+- Subgroup on animal welfare labelling
+- Subgroup on the welfare of calves and dairy cows
+- Subgroups and modes of operation of the Platform in the future
+- Work of the voluntary initiative on the health and welfare of pets (dogs) in trade to support the work on the Commission proposals
+- Cat and dog welfare in future EU animal welfare legislation
+- Voluntary initiative on responsible ownership and care of equidae
+30 June - 1 July – Eleventh meeting of the Platform - Hybrid format
+- Agenda
+- Minutes
+- Attendance list
+- Conclusions
+- Webstreaming 30 June – password: EUanimalMeeting
+- Webstreaming 1 July – password: EUanimalMeeting
+- Hashtag: #EU4AnimalWelfare
+- Presentations- Video message from Commissioner Kyriakides
+- Main outcomes of the online public consultation on the fitness check and revision of the EU animal welfare legislation
+- Overview report - the use of indicators for animal welfare at farm level
+- Introduction to the sessions dedicated to the work of the subgroups
+- Subgroup on the welfare of poultry
+- Study on animal welfare labelling
+- Subgroup on animal welfare labelling
+- African swine fever in the EU
+- Subgroup on the welfare of pigs
+- Subgroup on animal welfare at the time of killing
+- Conclusions of the voluntary initiative on the health and welfare of pets (dogs) in trade
+- Update on activities of the voluntary initiative on responsible ownership and care of equidae
+- Subgroup on the welfare of calves and dairy cows
+- Study on shifting from transport of unweaned male dairy calves over long distance to local rearing and fattening
+- Study on economic models to prevent the transport of unfit end-of-career dairy cows
+- Subgroup on the protection of animals during transport
+2021
+10 November – Tenth meeting of the Platform in WebEx video conference
+- Agenda
+- Minutes
+- Video of meeting
+- Attendance list
+- Hashtag: #EU4AnimalWelfare
+- Presentations- Outcomes of the call for applications for the Platform members
+- Information on the Platform’s digital tool
+- Sustainable food system framework
+- Update on the progress of the Fitness Check
+- EC answer to the ECI End the cage age
+- Exchange on the future revision of the legislation - Inception Impact Assessment
+- Exchange on the future revision of the legislation - 5 MSs position paper
+- Exchange on the future revision of the legislation - Eurogroup for animals’ campaign ‘No animal left behind’
+- Exchange on the future revision of the legislation - Copa Cogeca position
+- Role of the Platform in the revision of the EU legislation - creation of new subgroups
+- Presentation of the H2020 PPILOW project
+22 June – Ninth meeting of the Platform in WebEx video conference
+- Agenda
+- Minutes
+- Video of meeting
+- Attendance list
+- Hashtag: #EU4AnimalWelfare
+- Platform conclusions
+- Presentations- Speech by Commissioner Stella Kyriakides (video message)
+- Portuguese Presidency presentation on long distance transport to third countries
+- Outcome of the evaluation of the EU Strategy for the Protection and Welfare of Animals 2012-2015
+- Preliminary results of the Fitness Check of the EU animal welfare legislation and state of play of the planned impact assessment
+- Transport of live animals by sea: update on Commission actions
+- Update on the Code of Conduct for responsible business and marketing in relation to animal welfare
+- Conclusions of the sub-group on animal welfare labelling
+- Guide on best management practice for the welfare of pullets developed by the corresponding voluntary initiative
+- Update on activities of the voluntary initiative on responsible ownership and care of equidae
+- Update from EFSA on ongoing and upcoming animal welfare scientific opinions
+- Third EU Reference Centre for the welfare of ruminants and equines (1/2)
+- Third EU Reference Centre for the welfare of ruminants and equines (2/2)
+- Educational materials on alternative methods to surgical pig castration
+- CLEARFARM- a platform to control animal welfare in pig and dairy cattle farming
+2020
+3 November – Eighth meeting of the Platform in WebEx video conference
+- Agenda
+- Minutes
+- Video of meeting
+- Attendance list
+- Hashtag: #EU4AnimalWelfare
+- Platform conclusions
+- Presentations- German Presidency priorities regarding animal welfare
+- Overview of the DG Sante ongoing activities under the Farm to Fork Strategy
+- Mandates and planning of the European Food Safety Authority (EFSA)
+- Selection process and composition of the subgroup on animal welfare labelling and the outcomes of its first meeting
+- Conclusions of the voluntary initiative on responsible ownership and care of equidae
+- Conclusions of the voluntary initiative on the health and welfare of pets (dogs) in trade
+- Conclusions endorsed at the 8th meeting of the EU Platform on Animal Welfare
+- Activities of the voluntary initiative on piglets: alternatives for surgical castration
+- Introduction to the Commission’s procedure for the European Citizens' Initiative
+- The End the Cage Age European Citizens’ Initiative by Compassion in World Farming
+- The ban of laying hens in cages by the Czech Republic
+- EU Reference Centres for the welfare of pigs: activities on training inspectors
+15 June – Seventh meeting of the Platform in WebEx video conference
+- Agenda
+- Minutes
+- Video of meeting
+- Attendance list
+- Hashtag: #EU4AnimalWelfare
+- Platform conclusions
+- Presentations- Croatian Presidency presentation on the illegal trade of pet animals
+- Animal welfare within the Farm to Fork strategy
+- Mid-term findings of the evaluation of the EU Strategy 2012-2015
+- Follow up of the documents produced by the subgroups and subgroup on labelling
+- Responsible ownership and care of equidae
+- Health and welfare of pets (dogs) in trade
+- Welfare of fish
+- Conclusions of the Platform
+- Work programmes of the EU Reference Centre for Animal Welfare – Small farmed animals
+- Work programmes of the EU Reference Centre for Animal Welfare – Pigs
+- Third Action plan of the OIE Platform on Animal Welfare for Europe
+2019
+7 October – Sixth meeting of the Platform in Brussels
+- Agenda
+- Minutes
+- Attendance list
+- Hashtag: #EU4AnimalWelfare
+- Platform conclusions
+- Presentations- Finnish Presidency priorities regarding animal welfare
+- Speech by Commissioner Vytenis Andriukaitis
+- Outputs of the Commission’s subgroups
+- Responsible ownership and care of equidae
+- Health and welfare of pets (dogs) in trade
+- Welfare of fish
+- Welfare of pullets
+- Presentation of the activities of the first EU Reference Centre for Animal Welfare
+- Presentation of the Platform's achievements
+- Conclusions of the Platform
+17 June – Fifth meeting of the Platform in Brussels
+- Agenda
+- Minutes
+- Attendance list
+- Hashtag: #EU4AnimalWelfare
+- Presentations- Romanian priorities regarding animal welfare during transport for export purposes
+- Roadmap for the evaluation of the EU Strategy for the Protection and Welfare of Animals 2012-2015
+- Speech by Commissioner Vytenis Andriukaitis
+- Presentation of the outcomes of the third meeting of the subgroup on transport
+- (Presentation of the outcomes of the second meeting of the subgroup on the welfare of pigs – NO POWERPOINT)
+- Responsible ownership and care of equidae
+- Health and welfare of pets (dogs) in trade
+- Welfare of fish
+- Welfare of pullets
+- Results of the Commission Control Plan for the official controls on online sales of dogs and cats
+- Spanish governmental campaign “Eres responsable”
+- Animal Protection Index
+2018
+19 November – Fourth meeting of the Platform in Brussels
+- Agenda
+- Minutes
+- ECA - Video on the EU Action on Animal Welfare - YouTube link
+- Presentations- Speech by Commissioner Vytenis Andriukaitis
+- Austrian priorities on animal welfare
+- European Court of Auditors’ report on animal welfare audit
+- Presentation of a forthcoming DG SANTE project “Quality controls and indicators for animal welfare”
+- Responsible ownership and care of equidae
+- Health and welfare of pets (dogs) in trade
+- Welfare of fish
+- Welfare of pullets
+- Presentation by the Commission of the Platform Digital Tool
+- First European Union Reference Centre for Animal Welfare
+- A third country experience: New Zealand
+21 June – Third meeting of the Platform in Brussels
+- Agenda
+- Minutes
+- Attendance list
+- Minutes 1st Meeting of the subgroup Transport
+- Subgroup on pig welfare\_Mandate
+- Subgroup on pig welfare\_Annex
+- EC Study on the welfare of farmed fish
+- Summary of the EC study on the welfare of farmed fish
+- EC Report on the protection of fish at killing
+- EC Study on the impact of animal welfare international activities
+- EC report on the impact of animal welfare international activities
+- Presentations- Speech by Commissioner Vytenis Andriukaitis
+- Bulgarian Presidency activities on Animal Welfare
+- Presentation of the outcomes of the first meeting of the subgroup on transport
+- Presentation of the scope and terms of reference of the subgroup on the welfare of pigs
+- Welfare of farmed fish - State’s perspective: Norway
+- Welfare of farmed fish - Industry Perspective: FEAP
+- Welfare of farmed fish - Animal welfare organisation’s perspective: Eurogroup for Animals
+- Commission's Report on the impact of animal welfare international activities on the competitiveness of European livestock producers in a globalized world
+- EU Coordinated Control Plan on online sales of dogs and cats
+- The Digital Tool of the EU Platform on Animal Welfare
+- Voluntary Initiative on improving health & welfare of pets (dogs) in trade
+- Stunning in ritual slaughter in Slovenia
+- Responsible ownership and care of equidae: outcome of the Platform’s Members own initiative
+2017
+10 November – Second meeting of the Platform in Brussels
+- Agenda
+- Minutes
+- Attendance list
+- Mandate of sub-group 'Animal Transport'
+- Presentations- EU Platform on Animal Welfare - Vytenis Andriukaitis, Commissioner for Health and Food Safety
+- Animal Welfare Technologies in Estonia - Olev Kalda CVO, Food Safety VFB, Estonia
+- COM ongoing activities on animal transport
+- Scope and terms of reference of the sub-group on animal transport - Directorate General for Health and Food Safety, G 2 and F 2
+- Unwanted Horses – an NGO perspective - Roly Owers MRCVS Chief Executive, World Horse Welfare
+- Unwanted horses Ireland’s views and experiences - Brid Farrell, Department of Agriculture Food and the Marine
+- Horse welfare and unwanted horses: industry perspective - European Commission – Brussels Albert Borschette Conference Center
+- The European Food Safety Authority (EFSA) and its Network on Animal Health and Welfare (AHAW) - Chiara Fabris Scientific officer, AHAW team, ALPHA Unit
+- Animal Transport Guides a tool box for the transport industry to comply with 1/2005 - Hans Spoolder, Kees de Roest, Elena Nalon, Marc Billiet and Nancy De Briyne
+6 June – Inaugural meeting of the Platform in Brussels
+- Agenda
+- Minutes
+- Attendance list
+- Rules of Procedure
+- Presentations- Keeping EU leadership on animal welfare - Vytenis Andriukaitis, Commissioner for Health and Food Safety
+- Member States as key players - Paula Calamatta, Maltese Presidency of the Council of the European Union, Head of Unit for Agriculture and Fisheries, Veterinary and Phytosanitary Attaché
+- What is the Commission doing to promote EU standards in the world? – Eva Zamora Escribano, Head of Unit G2, Animal Health and Welfare, Directorate General for Health and Food Safety
+- What is the World Organisation for Animal Health doing on animal welfare in Europe? - Nadège Leboucq, Sub-Regional Representative of World Organisation for Animal Health (OIE), Brussels
+- Animal welfare label - Katharina Kluge, Head of Animal Welfare Unit, Federal Ministry of Food and Agriculture, Germany
+- European Declaration on pig castration - Gé Backus, Director, Agri and Food, Netherlands
