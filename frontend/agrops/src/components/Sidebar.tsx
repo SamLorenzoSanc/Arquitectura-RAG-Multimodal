@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { useOrganization } from "@/context/OrganizationContext"; // Ajusta la ruta a tu contexto
-import {NewOrgModal} from "./NewOrgModal"; // El componente modal popup que has creado
+import { useOrganization } from "@/context/OrganizationContext"; 
+import {NewOrgModal} from "./NewOrgModal";
 
 import {
     Building2,
@@ -14,6 +14,8 @@ import {
     LogOut,
     Plus,
     Network,
+    BrainCircuit,
+    Database
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -172,8 +174,9 @@ export default function Sidebar() {
                 <MenuItem to="/dashboard/organization" icon={<Building2 size={20} />} text="Organización" />
                 <MenuItem to="/dashboard/tenants" icon={<Tractor size={20} />} text="Inquilinos" />
                 <MenuItem to="/dashboard/settings" icon={<Settings size={20} />} text="Configuración"    />
-                <MenuItem to="/dashboard/knowledge-graph" icon={<Network size={20} />} text="Base de Conocimiento"/>
-    
+                <MenuItem to="/dashboard/knowledge-graph" icon={<Network size={20} />} text="Grafo de Conocimiento"/>
+                <MenuItem to="/dashboard/evaluacion" icon={<BrainCircuit size={20} />} text="Auditoría RAG" />
+                <MenuItem to="/dashboard/chroma-debug" icon={<Database size={20} />} text="Base de Datos"/>
             </nav>
 
             {/* Usuario */}

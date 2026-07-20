@@ -108,6 +108,7 @@ export default function OrganizationPage() {
 
     useEffect(() => {
         if (organizations.length === 0) {
+            setLoading(true);
             void fetchInitialData();
         }
     }, [selectedOrg?.id, organizations.length]);
@@ -131,7 +132,6 @@ export default function OrganizationPage() {
     const syncDetails = async (org: Organization) => {
         try {
             setLoading(true);
-            // Hacer las llamadas de forma individual con mejor manejo de errores
             const deptData = await getDepartments(org.id).catch((err) => {
                 console.error("Error al cargar departamentos:", err);
                 return [];
@@ -174,9 +174,7 @@ export default function OrganizationPage() {
             }
         } catch (error) {
             console.error("Error no manejado en syncDetails:", error);
-        } finally {
-            setLoading(false);
-        }
+        } 
     };
 
     const loadDepartmentMembers = async (
@@ -354,7 +352,7 @@ export default function OrganizationPage() {
     }
 
     return (
-        <div className="flex min-h-screen flex-col gap-6 bg-gray-50 p-8">
+        <div className="flex min-h-screen flex-col gap-6 bg-gray-50 p-4 md:p-8 overflow-x-hidden w-full">
             <div className="flex items-center justify-between">
                 <div>
                     <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-600">Workspace</h4>
@@ -454,7 +452,7 @@ export default function OrganizationPage() {
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
-                                            <div className="flex flex-col gap-3 lg:col-span-5">
+                                            <div className="flex flex-col gap-3 lg:col-span-5 min-w-0">
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Departamentos</h3>
                                                     <span className="text-xs text-gray-400">{orgDepartments.length} totales</span>
@@ -515,7 +513,7 @@ export default function OrganizationPage() {
                                                                 <div key={member.id} className="flex items-center justify-between border-b border-gray-100 p-4 last:border-0 hover:bg-gray-50/60">
                                                                     <div>
                                                                         <h4 className="text-sm font-semibold text-gray-800">{member.name}</h4>
-                                                                        <p className="text-xs text-gray-400">{member.email}</p>
+                                                                        <p className="text-xs text-gray-400 truncate">{member.email}</p>
                                                                     </div>
                                                                     <span className="rounded-lg border border-slate-200 bg-slate-100/80 px-2.5 py-1 text-xs font-medium text-slate-600">
                                                                         {member.role ?? "user"}

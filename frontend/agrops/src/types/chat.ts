@@ -5,7 +5,8 @@ export interface ChatRequest {
         role:string;
         content:string;
     }[];
-    knowledge_base_id:string;
+    use_rag: boolean;
+    knowledge_base_id?:string;
 }
 
 export interface Message {

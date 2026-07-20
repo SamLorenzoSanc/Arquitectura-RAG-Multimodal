@@ -320,7 +320,18 @@ CREATE TABLE department_members (
         ON DELETE SET NULL
 );
 
-   
+
+CREATE TABLE evaluations_results (
+    id UUID PRIMARY KEY,
+    question TEXT,
+    category TEXT,
+    reference_answer TEXT,
+    system_answer TEXT,
+    accuracy_score FLOAT, -- Calificación del 1 al 5
+    retrieval_score FLOAT, -- Éxito en encontrar el chunk (0 o 1)
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -------------------------------------------------------------
 -- ÍNDICES
 -------------------------------------------------------------

@@ -9,18 +9,15 @@ interface DashboardLayoutProps {
     children?: ReactNode;
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout() {
     return (
         <OrganizationProvider>
             <div className="h-screen bg-gray-100 flex">
                 <Sidebar />
-
                 <div className="flex-1 flex flex-col">
                     <Header />
-
-                    <main className="flex-1 overflow-auto p-8">
-                        {/* Si se le pasan hijos, los renderiza. Si no, usa el Outlet de las rutas */}
-                        {children || <Outlet />}
+                    <main className="flex-1 min-w-0 overflow-hidden">
+                        <Outlet />
                     </main>
                 </div>
             </div>

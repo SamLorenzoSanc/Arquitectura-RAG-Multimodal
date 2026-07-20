@@ -8,7 +8,7 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import retry, wait_exponential
-
+import os
 from models.document import Document
 from parsers.base import ParsingContext
 from parsers.factory import FileParserFactory
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 MODEL = "llama3"
 EMBEDDING_MODEL = "qwen3-embedding:latest"
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "storage", "chroma"))
 
 AVERAGE_CHUNK_SIZE = 100
 
@@ -103,7 +104,7 @@ class IngestService:
         self.parser_factory = FileParserFactory()
 
         self.chroma = chromadb.PersistentClient(
-            path=str(CHROMA_PATH)
+            path=str(BASE_DIR)
         )
 
     async def process(

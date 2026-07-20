@@ -15,11 +15,6 @@ async def test_docx_parser(sample_docx: Path):
 
     parsed = await parser.parse(sample_docx)
 
-
-    ##################################################################
-    # OUTPUT PARA INSPECCIÓN
-    ##################################################################
-
     print("\n" + "=" * 80)
     print("DOCX PARSER OUTPUT")
     print("=" * 80)
@@ -27,9 +22,6 @@ async def test_docx_parser(sample_docx: Path):
     print(parsed.markdown[:3000])
 
     print("=" * 80)
-
-
-    # Guardar resultado
 
     out = Path("out")
     out.mkdir(exist_ok=True)
@@ -45,11 +37,6 @@ async def test_docx_parser(sample_docx: Path):
     print(
         f"\nMarkdown generado: {output_file.resolve()}"
     )
-
-
-    ##################################################################
-    # VALIDACIONES
-    ##################################################################
 
     assert parsed.filename == sample_docx.name
 
@@ -67,12 +54,6 @@ async def test_docx_parser(sample_docx: Path):
 
     assert parsed.character_count > 0
 
-
-
-    ##################################################################
-    # METADATA
-    ##################################################################
-
     assert parsed.metadata["source"] == str(sample_docx)
 
     assert parsed.metadata["mime_type"] in (
@@ -82,12 +63,6 @@ async def test_docx_parser(sample_docx: Path):
 
 
     assert "parser" in parsed.metadata
-
-
-
-    ##################################################################
-    # CHECKSUM
-    ##################################################################
 
     checksum = hashlib.sha256(
         sample_docx.read_bytes()
