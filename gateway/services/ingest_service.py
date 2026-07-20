@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import retry, wait_exponential
 
 from models.document import Document
+from parsers.base import ParsingContext
 from parsers.factory import FileParserFactory
 
 logger = logging.getLogger(__name__)
@@ -119,9 +120,15 @@ class IngestService:
             Path(document.storage_path)
         )
 
-        parsed = await parser.parse(
-            Path(document.storage_path)
+        context = self.build_context(
+            document
         )
+
+        parsed = await parser.parse(
+            Path(document.storage_path),
+            context,
+        )
+        
 
         llm_document = {
 
@@ -318,3 +325,28 @@ class IngestService:
             "%s embeddings stored",
             len(chunks),
         )
+    def build_context(
+            self,
+            document: Document,
+        ) -> ParsingContext:
+            """
+            Construye el contexto que reciben todos los parsers.
+            """
+
+            return ParsingContext(
+            
+                tenant_id=document.tenant_id,
+
+                organization_id=None,
+
+                department_id=None,
+
+                member_id=document.owner_id,
+
+                uploaded_by=document.owner_id,
+
+                language="es",
+
+                tags=[],
+
+            )

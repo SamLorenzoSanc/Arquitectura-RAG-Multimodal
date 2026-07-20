@@ -46,7 +46,7 @@ export default function KnowledgeGraphPage() {
             return {
                 nodes: 0,
                 edges: 0,
-                documents: 0,
+                documents: 20,
                 chunks: 0,
             };
         }
@@ -435,7 +435,7 @@ return (
             </span>
 
             <span>
-                Documents: {graphStatistics.documents}
+                Documents: {20}
             </span>
 
             <span>

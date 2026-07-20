@@ -20,37 +20,26 @@ ANSWER_GREEN = 4.5
 ANSWER_AMBER = 4.0
 
 
-def get_color(value: float, metric_type: str) -> str:
-    """Get color based on metric value and type."""
+def get_color_theme(value: float, metric_type: str) -> tuple[str, str]:
+    """Get gradient colors and glowing borders based on metric values."""
+    is_green = False
+    is_amber = False
+
     if metric_type == "mrr":
-        if value >= MRR_GREEN:
-            return "green"
-        elif value >= MRR_AMBER:
-            return "orange"
-        else:
-            return "red"
+        is_green, is_amber = value >= MRR_GREEN, value >= MRR_AMBER
     elif metric_type == "ndcg":
-        if value >= NDCG_GREEN:
-            return "green"
-        elif value >= NDCG_AMBER:
-            return "orange"
-        else:
-            return "red"
+        is_green, is_amber = value >= NDCG_GREEN, value >= NDCG_AMBER
     elif metric_type == "coverage":
-        if value >= COVERAGE_GREEN:
-            return "green"
-        elif value >= COVERAGE_AMBER:
-            return "orange"
-        else:
-            return "red"
+        is_green, is_amber = value >= COVERAGE_GREEN, value >= COVERAGE_AMBER
     elif metric_type in ["accuracy", "completeness", "relevance"]:
-        if value >= ANSWER_GREEN:
-            return "green"
-        elif value >= ANSWER_AMBER:
-            return "orange"
-        else:
-            return "red"
-    return "black"
+        is_green, is_amber = value >= ANSWER_GREEN, value >= ANSWER_AMBER
+
+    if is_green:
+        return "rgba(16, 185, 129, 0.15)", "#10b981"  # Emerald Green
+    elif is_amber:
+        return "rgba(245, 158, 11, 0.15)", "#f59e0b"  # Amber Orange
+    else:
+        return "rgba(239, 68, 68, 0.15)", "#ef4444"   # Rose Red
 
 
 def format_metric_html(
@@ -60,24 +49,38 @@ def format_metric_html(
     is_percentage: bool = False,
     score_format: bool = False,
 ) -> str:
-    """Format a metric with color coding."""
-    color = get_color(value, metric_type)
+    """Format a metric into a futuristic glassmorphism KPI card."""
+    bg_color, border_color = get_color_theme(value, metric_type)
+    
     if is_percentage:
         value_str = f"{value:.1f}%"
     elif score_format:
-        value_str = f"{value:.2f}/5"
+        value_str = f"{value:.2f} <span style='font-size: 16px; color: #6b7280;'>/ 5.0</span>"
     else:
         value_str = f"{value:.4f}"
+
     return f"""
-    <div style="margin: 10px 0; padding: 15px; background-color: #f5f5f5; border-radius: 8px; border-left: 5px solid {color};">
-        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">{label}</div>
-        <div style="font-size: 28px; font-weight: bold; color: {color};">{value_str}</div>
+    <div style="
+        margin: 12px 0; 
+        padding: 20px; 
+        background: {bg_color}; 
+        border-radius: 12px; 
+        border: 1px solid {border_color}; 
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        backdrop-filter: blur(10px);
+        transition: transform 0.2s ease;
+    ">
+        <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 6px;">
+            {label}
+        </div>
+        <div style="font-size: 32px; font-weight: 800; color: #ffffff; text-shadow: 0 0 10px {border_color}88;">
+            {value_str}
+        </div>
     </div>
     """
 
 
 def run_retrieval_evaluation(progress=gr.Progress()):
-    """Run retrieval evaluation and yield updates."""
     total_mrr = 0.0
     total_ndcg = 0.0
     total_coverage = 0.0
@@ -89,42 +92,35 @@ def run_retrieval_evaluation(progress=gr.Progress()):
         total_mrr += result.mrr
         total_ndcg += result.ndcg
         total_coverage += result.keyword_coverage
-
         category_mrr[test.category].append(result.mrr)
 
-        # Update progress bar only
-        progress(prog_value, desc=f"Evaluating test {count}...")
+        progress(prog_value, desc=f"⚡ Analizando prueba #{count}...")
 
-    # Calculate final averages
     avg_mrr = total_mrr / count
     avg_ndcg = total_ndcg / count
     avg_coverage = total_coverage / count
 
-    # Create final summary metrics HTML
     final_html = f"""
-    <div style="padding: 0;">
+    <div style="display: flex; flex-direction: column; gap: 8px;">
         {format_metric_html("Mean Reciprocal Rank (MRR)", avg_mrr, "mrr")}
         {format_metric_html("Normalized DCG (nDCG)", avg_ndcg, "ndcg")}
-        {format_metric_html("Keyword Coverage", avg_coverage, "coverage", is_percentage=True)}
-        <div style="margin-top: 20px; padding: 10px; background-color: #d4edda; border-radius: 5px; text-align: center; border: 1px solid #c3e6cb;">
-            <span style="font-size: 14px; color: #155724; font-weight: bold;">✓ Evaluation Complete: {count} tests</span>
+        {format_metric_html("Cobertura de Palabras Clave", avg_coverage, "coverage", is_percentage=True)}
+        
+        <div style="margin-top: 15px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; text-align: center; border: 1px solid #10b981; color: #34d399; font-weight: 600;">
+         Evaluación de Recuperación Completada: {count} Tests Ejecutados
         </div>
     </div>
     """
 
-    # Create final bar chart data
-    category_data = []
-    for category, mrr_scores in category_mrr.items():
-        avg_cat_mrr = sum(mrr_scores) / len(mrr_scores)
-        category_data.append({"Category": category, "Average MRR": avg_cat_mrr})
+    category_data = [
+        {"Categoría": category, "MRR Promedio": sum(scores) / len(scores)}
+        for category, scores in category_mrr.items()
+    ]
 
-    df = pd.DataFrame(category_data)
-
-    return final_html, df
+    return final_html, pd.DataFrame(category_data)
 
 
 def run_answer_evaluation(progress=gr.Progress()):
-    """Run answer evaluation and yield updates (async)."""
     total_accuracy = 0.0
     total_completeness = 0.0
     total_relevance = 0.0
@@ -136,89 +132,145 @@ def run_answer_evaluation(progress=gr.Progress()):
         total_accuracy += result.accuracy
         total_completeness += result.completeness
         total_relevance += result.relevance
-
         category_accuracy[test.category].append(result.accuracy)
 
-        # Update progress bar only
-        progress(prog_value, desc=f"Evaluating test {count}...")
+        progress(prog_value, desc=f"🧠 Evaluando respuesta #{count}...")
 
-    # Calculate final averages
     avg_accuracy = total_accuracy / count
     avg_completeness = total_completeness / count
     avg_relevance = total_relevance / count
 
-    # Create final summary metrics HTML
     final_html = f"""
-    <div style="padding: 0;">
-        {format_metric_html("Accuracy", avg_accuracy, "accuracy", score_format=True)}
-        {format_metric_html("Completeness", avg_completeness, "completeness", score_format=True)}
-        {format_metric_html("Relevance", avg_relevance, "relevance", score_format=True)}
-        <div style="margin-top: 20px; padding: 10px; background-color: #d4edda; border-radius: 5px; text-align: center; border: 1px solid #c3e6cb;">
-            <span style="font-size: 14px; color: #155724; font-weight: bold;">✓ Evaluation Complete: {count} tests</span>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+        {format_metric_html("Precisión Fáctica (Accuracy)", avg_accuracy, "accuracy", score_format=True)}
+        {format_metric_html("Exhaustividad (Completeness)", avg_completeness, "completeness", score_format=True)}
+        {format_metric_html("Pertinencia (Relevance)", avg_relevance, "relevance", score_format=True)}
+        
+        <div style="margin-top: 15px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; text-align: center; border: 1px solid #3b82f6; color: #60a5fa; font-weight: 600;">
+            Auditoría Humana/LLM Finalizada: {count} Evaluaciones Completadas
         </div>
     </div>
     """
 
-    # Create final bar chart data
-    category_data = []
-    for category, accuracy_scores in category_accuracy.items():
-        avg_cat_accuracy = sum(accuracy_scores) / len(accuracy_scores)
-        category_data.append({"Category": category, "Average Accuracy": avg_cat_accuracy})
+    category_data = [
+        {"Categoría": category, "Precisión Promedio": sum(scores) / len(scores)}
+        for category, scores in category_accuracy.items()
+    ]
 
-    df = pd.DataFrame(category_data)
+    return final_html, pd.DataFrame(category_data)
 
-    return final_html, df
 
+CUSTOM_CSS = """
+/* Fondo general Cyberpunk/Dark */
+body, .gradio-container {
+    background-color: #0b0f19 !important;
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif !important;
+}
+
+/* Encabezados y títulos */
+h1 {
+    font-size: 2.2em !important;
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #a78bfa 0%, #38bdf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0px !important;
+}
+
+/* Estilo de Botones */
+button.primary-btn {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%) !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4) !important;
+    transition: all 0.3s ease !important;
+    border-radius: 8px !important;
+}
+
+button.primary-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139, 92, 246, 0.6) !important;
+}
+
+/* Pestañas (Tabs) */
+.tabs {
+    border-bottom: 1px solid #1f2937 !important;
+}
+
+.tab-nav button {
+    font-size: 15px !important;
+    font-weight: 600 !important;
+    color: #9ca3af !important;
+}
+
+.tab-nav button.selected {
+    color: #38bdf8 !important;
+    border-bottom: 2px solid #38bdf8 !important;
+    background: transparent !important;
+}
+"""
 
 def main():
-    """Launch the Gradio evaluation app."""
-    theme = gr.themes.Soft(font=["Inter", "system-ui", "sans-serif"])
+    theme = gr.themes.Monochrome(
+        primary_hue="purple",
+        radius_size="lg",
+    )
 
-    with gr.Blocks(title="RAG Evaluation Dashboard", theme=theme) as app:
-        gr.Markdown("# 📊 RAG Evaluation Dashboard")
-        gr.Markdown("Evaluate retrieval and answer quality for the AgroTech RAG system")
-
-        # RETRIEVAL SECTION
-        gr.Markdown("## 🔍 Retrieval Evaluation")
-
-        retrieval_button = gr.Button("Run Evaluation", variant="primary", size="lg")
-
+    with gr.Blocks(title="AgroRAG Performance Lab", theme=theme, css=CUSTOM_CSS) as app:
+        
+        # HEADER PRINCIPAL
         with gr.Row():
-            with gr.Column(scale=1):
-                retrieval_metrics = gr.HTML(
-                    "<div style='padding: 20px; text-align: center; color: #999;'>Click 'Run Evaluation' to start</div>"
-                )
+            with gr.Column():
+                gr.Markdown("#AGRO-RAG AUDIT DASHBOARD")
+                gr.Markdown("<span style='color: #6b7280; font-size: 14px;'>Sistema de Monitoreo e Insights para el Pipeline AgroTech RAG</span>")
 
-            with gr.Column(scale=1):
-                retrieval_chart = gr.BarPlot(
-                    x="Category",
-                    y="Average MRR",
-                    title="Average MRR by Category",
-                    y_lim=[0, 1],
-                    height=400,
-                )
+        gr.HTML("<hr style='border: 0; height: 1px; background: #1f2937; margin: 15px 0;'>")
 
-        # ANSWERING SECTION
-        gr.Markdown("## 💬 Answer Evaluation")
+        # PANEL DE EVALUACIÓN CON PESTAÑAS (TABS)
+        with gr.Tabs():
+            
+            # PESTAÑA 1: RETRIEVAL
+            with gr.TabItem("Métrica de Recuperación (IR)"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gr.Markdown("### Indicadores de Contexto")
+                        retrieval_button = gr.Button("▶ Ejecutar Auditoría IR", elem_classes=["primary-btn"], size="lg")
+                        retrieval_metrics = gr.HTML(
+                            "<div style='padding: 40px; text-align: center; color: #4b5563; border: 1px dashed #1f2937; border-radius: 12px; margin-top: 15px;'>Haz clic en <b>Ejecutar Auditoría IR</b> para procesar la métrica de contexto.</div>"
+                        )
 
-        answer_button = gr.Button("Run Evaluation", variant="primary", size="lg")
+                    with gr.Column(scale=2):
+                        gr.Markdown("### Rendimiento por Categoría Normativa")
+                        retrieval_chart = gr.BarPlot(
+                            x="Categoría",
+                            y="MRR Promedio",
+                            title="",
+                            y_lim=[0, 1],
+                            height=380,
+                            color_accent="#8b5cf6"
+                        )
 
-        with gr.Row():
-            with gr.Column(scale=1):
-                answer_metrics = gr.HTML(
-                    "<div style='padding: 20px; text-align: center; color: #999;'>Click 'Run Evaluation' to start</div>"
-                )
+            # PESTAÑA 2: ANSWER EVALUATION
+            with gr.TabItem("Evaluación de Calidad de Respuesta"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        gr.Markdown("### Calificación LLM-as-a-Judge")
+                        answer_button = gr.Button("▶ Ejecutar Auditoría de Calidad", elem_classes=["primary-btn"], size="lg")
+                        answer_metrics = gr.HTML(
+                            "<div style='padding: 40px; text-align: center; color: #4b5563; border: 1px dashed #1f2937; border-radius: 12px; margin-top: 15px;'>Haz clic en <b>Ejecutar Auditoría de Calidad</b> para comenzar la evaluación del modelo.</div>"
+                        )
 
-            with gr.Column(scale=1):
-                answer_chart = gr.BarPlot(
-                    x="Category",
-                    y="Average Accuracy",
-                    title="Average Accuracy by Category",
-                    y_lim=[1, 5],
-                    height=400,
-                )
+                    with gr.Column(scale=2):
+                        gr.Markdown("### Precisión Técnica por Dominio")
+                        answer_chart = gr.BarPlot(
+                            x="Categoría",
+                            y="Precisión Promedio",
+                            title="",
+                            y_lim=[1, 5],
+                            height=380,
+                            color_accent="#38bdf8"
+                        )
 
-        # Wire up the evaluations
+        # BINDINGS / EVENTOS
         retrieval_button.click(
             fn=run_retrieval_evaluation,
             outputs=[retrieval_metrics, retrieval_chart],

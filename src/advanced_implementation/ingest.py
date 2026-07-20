@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from chromadb import PersistentClient
 from tqdm import tqdm
-from litellm import completion
 from multiprocessing import Pool
 from tenacity import retry, wait_exponential
 
@@ -113,7 +112,7 @@ def make_messages(document):
 @retry(wait=wait)
 def process_document(document):
     messages = make_messages(document)
-    response = completion(model=MODEL, messages=messages, response_format=Chunks)
+    response = openai.chat.completions(model=MODEL, messages=messages, response_format=Chunks)
     reply = response.choices[0].message.content
     doc_as_chunks = Chunks.model_validate_json(reply).chunks
     return [chunk.as_result(document) for chunk in doc_as_chunks]

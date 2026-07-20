@@ -37,11 +37,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
-# ===================================
-# UTILIDADES
-# ===================================
-
 def clean_filename(url: str) -> str:
     name = urlparse(url).path.strip("/")
 
@@ -119,10 +114,6 @@ def same_domain(url, domain):
 
     return urlparse(url).netloc == domain
 
-
-# ===================================
-# CRAWLER
-# ===================================
 
 def crawl(source):
 

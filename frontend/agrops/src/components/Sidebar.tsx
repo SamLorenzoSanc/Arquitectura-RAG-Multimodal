@@ -149,7 +149,7 @@ export default function Sidebar() {
 
             {/* Tenant */}
             <div className="px-6 mt-6">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Tenant</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Inquilinos</p>
                 <button className="group w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 flex justify-between items-center transition-all duration-300 hover:border-green-300 hover:shadow-lg">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
@@ -157,7 +157,7 @@ export default function Sidebar() {
                         </div>
                         <div>
                             <p className="font-semibold text-slate-800">Producción</p>
-                            <p className="text-xs text-slate-500">Tenant activo</p>
+                            <p className="text-xs text-slate-500">Inquilinos activo</p>
                         </div>
                     </div>
                     <ChevronDown size={18} className="text-slate-400" />
@@ -170,7 +170,7 @@ export default function Sidebar() {
             <nav className="flex-1 px-4 space-y-2">
                 <MenuItem to="/dashboard/chat" icon={<MessageSquare size={20} />} text="Chat IA" />
                 <MenuItem to="/dashboard/organization" icon={<Building2 size={20} />} text="Organización" />
-                <MenuItem to="/dashboard/tenants" icon={<Tractor size={20} />} text="Tenants" />
+                <MenuItem to="/dashboard/tenants" icon={<Tractor size={20} />} text="Inquilinos" />
                 <MenuItem to="/dashboard/settings" icon={<Settings size={20} />} text="Configuración"    />
                 <MenuItem to="/dashboard/knowledge-graph" icon={<Network size={20} />} text="Base de Conocimiento"/>
     
