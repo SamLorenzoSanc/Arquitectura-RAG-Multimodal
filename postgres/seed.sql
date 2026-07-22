@@ -332,6 +332,14 @@ CREATE TABLE evaluations_results (
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE user_tenants (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL,
+    tenant_id UUID NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'MEMBER', -- 'OWNER', 'ADMIN', 'MEMBER', 'VIEWER'
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, tenant_id)
+);
 -------------------------------------------------------------
 -- ÍNDICES
 -------------------------------------------------------------

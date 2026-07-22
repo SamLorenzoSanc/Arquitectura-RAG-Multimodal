@@ -26,6 +26,7 @@ class ImageParser(FileParser):
         ".gif",
     }
 
+
     def __init__(
         self,
         model: str = "llama3.2-vision",
@@ -40,12 +41,28 @@ class ImageParser(FileParser):
         )
 
 
+    def _validate_format(
+        self,
+        file: Path,
+    ) -> None:
+        """
+        Valida que la extensión sea soportada.
+        """
+
+        extension = file.suffix.lower()
+
+        if extension not in self.SUPPORTED_FORMATS:
+            raise ValueError(
+                f"Unsupported image format: {extension}"
+            )
+
+
     def _get_mime_type(
         self,
         file: Path,
     ) -> str:
         """
-        Obtiene el MIME real del fichero.
+        Obtiene el MIME correcto de la imagen.
         """
 
         mime_type, _ = mimetypes.guess_type(
@@ -57,28 +74,14 @@ class ImageParser(FileParser):
                 f"Unsupported image format: {file.suffix}"
             )
 
+
         if not mime_type.startswith("image/"):
             raise ValueError(
                 f"File is not an image: {mime_type}"
             )
 
+
         return mime_type
-
-
-    def _validate_format(
-        self,
-        file: Path,
-    ) -> None:
-        """
-        Valida extensiones soportadas.
-        """
-
-        extension = file.suffix.lower()
-
-        if extension not in self.SUPPORTED_FORMATS:
-            raise ValueError(
-                f"Unsupported image format: {extension}"
-            )
 
 
     async def parse(
@@ -88,16 +91,23 @@ class ImageParser(FileParser):
     ) -> ParsedDocument:
 
         if not file.exists():
+
             raise FileNotFoundError(
                 f"File not found: {file}"
             )
 
+
         if not file.is_file():
+
             raise ValueError(
                 f"{file} is not a valid file"
             )
 
-        self._validate_format(file)
+
+        self._validate_format(
+            file
+        )
+
 
         logger.info(
             "Parsing image %s",
@@ -135,6 +145,7 @@ class ImageParser(FileParser):
                 markdown
             ),
 
+
             metadata={
 
                 "source": str(file),
@@ -155,9 +166,11 @@ class ImageParser(FileParser):
                     timezone.utc
                 ).isoformat(),
 
+
                 "tenant_id": str(
                     context.tenant_id
                 ),
+
 
                 "organization_id": (
                     str(context.organization_id)
@@ -165,11 +178,13 @@ class ImageParser(FileParser):
                     else None
                 ),
 
+
                 "department_id": (
                     str(context.department_id)
                     if context.department_id
                     else None
                 ),
+
 
                 "member_id": (
                     str(context.member_id)
@@ -177,11 +192,13 @@ class ImageParser(FileParser):
                     else None
                 ),
 
+
                 "uploaded_by": (
                     str(context.uploaded_by)
                     if context.uploaded_by
                     else None
                 ),
+
 
                 "tags": context.tags,
 
@@ -193,12 +210,18 @@ class ImageParser(FileParser):
         self,
         file: Path,
     ) -> str:
+        """
+        Convierte una imagen a Markdown usando un modelo vision.
+        """
 
         image_bytes = file.read_bytes()
 
+
         image_b64 = base64.b64encode(
             image_bytes
-        ).decode("utf-8")
+        ).decode(
+            "utf-8"
+        )
 
 
         mime_type = self._get_mime_type(
@@ -209,6 +232,7 @@ class ImageParser(FileParser):
         response = await self.client.chat.completions.create(
 
             model=self.model,
+
 
             messages=[
 
@@ -233,6 +257,7 @@ class ImageParser(FileParser):
                     ),
                 },
 
+
                 {
                     "role": "user",
 
@@ -245,18 +270,23 @@ class ImageParser(FileParser):
                             ),
                         },
 
+
                         {
                             "type": "image_url",
 
                             "image_url": {
+
                                 "url": (
                                     f"data:{mime_type};base64,"
                                     f"{image_b64}"
                                 )
+
                             },
                         },
+
                     ],
                 },
+
             ],
         )
 

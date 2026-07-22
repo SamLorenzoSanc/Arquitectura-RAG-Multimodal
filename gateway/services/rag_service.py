@@ -58,7 +58,7 @@ class RAGService:
         all_cols = self.chroma.list_collections()
         print(f"[DEBUG] Colecciones encontradas: {[c.name for c in all_cols]}")
         self.collection = self.chroma.get_or_create_collection("documents")
-        print(f"[DEBUG] Conectado a colección: {self.collection.name} con {self.collection.count()} documentos")
+        print(f"[DEBUG] Conectado a colección por defecto: {self.collection.name} con {self.collection.count()} documentos")
 
         self.model = model
         self.embedding_model = embedding_model
@@ -71,7 +71,7 @@ class RAGService:
     def get_embeddings(self):
         return self.embedding_model
 
-    def rewrite_query(self, question, history=None):
+    def rewrite_query(self, question: str, history: list | None = None) -> str:
         history = history or []
         prompt = f"""
 Historial:
@@ -88,34 +88,63 @@ Reescribe únicamente la consulta.
         )
         return response.choices[0].message.content.strip()
 
-    def retrieve(self, question: str, tenant_id: str) -> list[Result]:
+    def retrieve(self, question: str, tenant_id: str = "global", collections: list[str] | None = None) -> list[Result]:
         embedding = self.client.embeddings.create(
             model=self.embedding_model,
             input=[question],
         ).data[0].embedding
 
-        results = self.collection.query(
-            query_embeddings=[embedding],
-            n_results=self.retrieval_k,
-            where={
-                "$or": [
-                    {"tenant_id": tenant_id},
-                    {"tenant_id": "global"},
-                ]
-            },
-        )
+        target_cols = []
+        if collections:
+            for col_name in collections:
+                try:
+                    col = self.chroma.get_collection(col_name)
+                    target_cols.append(col)
+                except Exception as e:
+                    print(f"[WARN] No se pudo obtener la colección '{col_name}': {e}")
+
+        # Si no se pasaron colecciones o no existen, usa la colección por defecto
+        if not target_cols:
+            target_cols = [self.collection]
 
         chunks = []
-        docs = results.get("documents")
-        metas = results.get("metadatas")
 
-        if docs and metas and len(docs[0]) > 0:
-            for doc, meta in zip(docs[0], metas[0]):
-                chunks.append(Result(page_content=doc, metadata=meta or {}))
+        # Consultar cada colección objetivo y consolidar
+        for col in target_cols:
+            where_clause = None
+            # Si usamos la colección global "documents", aplicamos el filtro por tenant
+            if col.name == "documents":
+                where_clause = {
+                    "$or": [
+                        {"tenant_id": tenant_id},
+                        {"tenant_id": "global"},
+                    ]
+                }
 
-        return chunks
+            results = col.query(
+                query_embeddings=[embedding],
+                n_results=self.retrieval_k,
+                where=where_clause,
+            )
 
-    def merge_chunks(self, chunks1, chunks2):
+            docs = results.get("documents")
+            metas = results.get("metadatas")
+
+            if docs and metas and len(docs[0]) > 0:
+                for doc, meta in zip(docs[0], metas[0]):
+                    chunks.append(Result(page_content=doc, metadata=meta or {}))
+
+        # Desduplicar fragmentos preservando el orden
+        unique_chunks = []
+        seen = set()
+        for chunk in chunks:
+            if chunk.page_content not in seen:
+                seen.add(chunk.page_content)
+                unique_chunks.append(chunk)
+
+        return unique_chunks
+
+    def merge_chunks(self, chunks1: list[Result], chunks2: list[Result]) -> list[Result]:
         merged = chunks1.copy()
         existing = {chunk.page_content for chunk in chunks1}
         for chunk in chunks2:
@@ -123,7 +152,10 @@ Reescribe únicamente la consulta.
                 merged.append(chunk)
         return merged
 
-    def rerank(self, question, chunks):
+    def rerank(self, question: str, chunks: list[Result]) -> list[Result]:
+        if not chunks:
+            return []
+
         system_prompt = """
 Eres un sistema de reordenación de documentos.
 REGLA CRÍTICA DE IDIOMA: Debe responder SIEMPRE en español.
@@ -147,7 +179,7 @@ Responde únicamente con la lista de identificadores de los fragmentos clasifica
         order = RankOrder.model_validate_json(reply).order
         return [chunks[i - 1] for i in order if 0 < i <= len(chunks)]
 
-    def build_prompt(self, question, history, chunks):
+    def build_prompt(self, question: str, history: list, chunks: list[Result]):
         context = "\n\n".join(
             f"Extrae de {c.metadata.get('source', 'fuente_desconocida')}:\n{c.page_content}"
             for c in chunks
@@ -158,10 +190,10 @@ Responde únicamente con la lista de identificadores de los fragmentos clasifica
             + [{"role": "user", "content": question}]
         )
 
-    def fetch_context_simple(self, question: str, tenant_id: str):
+    def fetch_context_simple(self, question: str, tenant_id: str = "global", collections: list[str] | None = None):
         rewritten = self.rewrite_query(question)
-        original = self.retrieve(question, tenant_id)
-        rewritten_chunks = self.retrieve(rewritten, tenant_id)
+        original = self.retrieve(question, tenant_id=tenant_id, collections=collections)
+        rewritten_chunks = self.retrieve(rewritten, tenant_id=tenant_id, collections=collections)
         merged = self.merge_chunks(original, rewritten_chunks)
         final_chunks = merged[: self.final_k]
 
@@ -173,10 +205,10 @@ Responde únicamente con la lista de identificadores de los fragmentos clasifica
             "chunks": final_chunks,
         }
 
-    def fetch_context(self, question: str, tenant_id: str):
+    def fetch_context(self, question: str, tenant_id: str = "global", collections: list[str] | None = None):
         rewritten = self.rewrite_query(question)
-        original = self.retrieve(question, tenant_id)
-        rewritten_chunks = self.retrieve(rewritten, tenant_id)
+        original = self.retrieve(question, tenant_id=tenant_id, collections=collections)
+        rewritten_chunks = self.retrieve(rewritten, tenant_id=tenant_id, collections=collections)
         merged = self.merge_chunks(original, rewritten_chunks)
         reranked = self.rerank(question, merged)
         final_chunks = reranked[: self.final_k]
@@ -196,7 +228,7 @@ Responde únicamente con la lista de identificadores de los fragmentos clasifica
             },
         }
 
-    def simple_chat(self, question, history=None):
+    def simple_chat(self, question: str, history: list | None = None):
         history = history or []
         messages = [{"role": "system", "content": self.SYSTEM_PROMPT.format(context="")}]
         messages += history + [{"role": "user", "content": question}]
@@ -212,9 +244,15 @@ Responde únicamente con la lista de identificadores de los fragmentos clasifica
             "retrieval": None,
         }
 
-    def answer(self, question, history=None, tenant_id: str = "global"):
+    def answer(
+        self,
+        question: str,
+        history: list | None = None,
+        tenant_id: str = "global",
+        collections: list[str] | None = None,
+    ):
         history = history or []
-        retrieval = self.fetch_context_simple(question, tenant_id)
+        retrieval = self.fetch_context_simple(question, tenant_id=tenant_id, collections=collections)
         chunks = retrieval["chunks"]
         messages = self.build_prompt(question, history, chunks)
 
@@ -260,8 +298,8 @@ Responde únicamente con la lista de identificadores de los fragmentos clasifica
         idcg = self.calculate_dcg(ideal_relevances, k)
         return dcg / idcg if idcg > 0 else 0.0
 
-    def evaluate_retrieval(self, test, tenant_id: str, k: int = 10) -> RetrievalEval:
-        retrieved_docs = self.fetch_context_simple(test.question, tenant_id)["chunks"]
+    def evaluate_retrieval(self, test, tenant_id: str, collections: list[str] | None = None, k: int = 10) -> RetrievalEval:
+        retrieved_docs = self.fetch_context_simple(test.question, tenant_id=tenant_id, collections=collections)["chunks"]
 
         mrr_scores = [self.calculate_mrr(keyword, retrieved_docs) for keyword in test.keywords]
         ndcg_scores = [self.calculate_ndcg(keyword, retrieved_docs, k) for keyword in test.keywords]
@@ -280,28 +318,28 @@ Responde únicamente con la lista de identificadores de los fragmentos clasifica
             keyword_coverage=coverage,
         )
 
-    def evaluate_answer(self, test, tenant_id: str) -> tuple[AnswerEval, str, list]:
-        generated_answer_result = self.answer(test.question, history=[], tenant_id=tenant_id)
+    def evaluate_answer(self, test, tenant_id: str, collections: list[str] | None = None) -> tuple[AnswerEval, str, list]:
+        generated_answer_result = self.answer(test.question, history=[], tenant_id=tenant_id, collections=collections)
         generated_answer = generated_answer_result["answer"]
         retrieved_docs = generated_answer_result["chunks"]
 
         prompt = f"""
-Pregunta:
-{test.question}
-
-Respuesta generada:
-{generated_answer}
-
-Respuesta de referencia:
-{test.reference_answer}
-
-Evalúa:
-1. Precisión.
-2. Exhaustividad.
-3. Pertinencia.
-
-Devuelve JSON con feedback, accuracy, completeness y relevance.
-"""
+            Pregunta:
+            {test.question}
+            
+            Respuesta generada:
+            {generated_answer}
+            
+            Respuesta de referencia:
+            {test.reference_answer}
+            
+            Evalúa:
+            1. Precisión.
+            2. Exhaustividad.
+            3. Pertinencia.
+            
+            Devuelve JSON con feedback, accuracy, completeness y relevance.
+            """
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -316,10 +354,10 @@ Devuelve JSON con feedback, accuracy, completeness y relevance.
 
         return eval_result, generated_answer, retrieved_docs
 
-    def evaluate_all_retrieval(self, tests, tenant_id: str):
+    def evaluate_all_retrieval(self, tests, tenant_id: str, collections: list[str] | None = None):
         results = []
         for test in tests:
-            result = self.evaluate_retrieval(test, tenant_id)
+            result = self.evaluate_retrieval(test, tenant_id=tenant_id, collections=collections)
             results.append({
                 "question": test.question,
                 "category": test.category,
@@ -331,10 +369,10 @@ Devuelve JSON con feedback, accuracy, completeness y relevance.
             })
         return results
 
-    def evaluate_all_answers(self, tests, tenant_id: str):
+    def evaluate_all_answers(self, tests, tenant_id: str, collections: list[str] | None = None):
         results = []
         for test in tests:
-            result, generated_answer, _ = self.evaluate_answer(test, tenant_id)
+            result, generated_answer, _ = self.evaluate_answer(test, tenant_id=tenant_id, collections=collections)
             results.append({
                 "question": test.question,
                 "category": test.category,

@@ -15,17 +15,11 @@ logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
 
-    def __init__(
-        self,
-        session: AsyncSession,
-    ):
+    def __init__(self, session: AsyncSession):
         self.session = session
         self.ingest = IngestService(session)
 
-    async def process(
-        self,
-        document_id: UUID,
-    ):
+    async def process(self, document_id: UUID):
 
         logger.info(
             "Processing document %s",
@@ -55,40 +49,29 @@ class DocumentProcessor:
                 job.status = "PROCESSING"
                 job.started_at = datetime.now()
                 await self.session.commit()
-
             chunks_generated = await self.ingest.process(
                 document
             )
-
             if job:
                 job.status = "COMPLETED"
                 job.finished_at = datetime.now()
                 job.chunks_generated = chunks_generated
                 await self.session.commit()
-
             logger.info(
                 "Document %s processed successfully",
                 document.filename,
             )
-
             return chunks_generated
 
         except Exception as e:
-
             logger.exception(
                 "Pipeline failed"
             )
-
             await self.session.rollback()
 
             if job:
-
                 job.status = "FAILED"
-
                 job.finished_at = datetime.now()
-
                 job.error_message = str(e)
-
                 await self.session.commit()
-
             raise

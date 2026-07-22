@@ -1,5 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import (
+    APIRouter, UploadFile, File, Form, HTTPException,
+    Depends, BackgroundTasks, status,
+)
 from fastapi.concurrency import run_in_threadpool
+
 from schemas.chat import ChatRequest, ChatResponse, ContextChunk
 from services import rag_service
 from uuid import uuid4
@@ -7,6 +11,7 @@ from .auth import get_current_user
 from services.database import get_db
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from utils.tenant import get_user_tenant_id
 from models.user import User
 from core.test import load_tests
 import pandas as pd

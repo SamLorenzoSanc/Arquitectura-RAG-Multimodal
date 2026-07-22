@@ -9,13 +9,12 @@ from pathlib import Path
 from models.document import Document
 from parsers.parsed_document import ParsedDocument
 
-from .knowledge_assets import (
+from models.knowledge_assets import (
     AssetContent,
     AssetContext,
     AssetMetadata,
     KnowledgeAsset,
 )
-
 logger = logging.getLogger(__name__)
 
 
@@ -27,10 +26,6 @@ class KnowledgeBuilder:
     ) -> None:
 
         self.storage_root = storage_root
-
-    ###########################################################################
-    # PUBLIC API
-    ###########################################################################
 
     async def ingest(
         self,
@@ -61,9 +56,6 @@ class KnowledgeBuilder:
 
         return asset
 
-    ###########################################################################
-    # BUILDERS
-    ###########################################################################
 
     def _build_asset(
         self,
@@ -136,10 +128,6 @@ class KnowledgeBuilder:
             root=root,
 
         )
-
-    ###########################################################################
-    # FILESYSTEM
-    ###########################################################################
 
     def _create_structure(
         self,
@@ -222,9 +210,6 @@ class KnowledgeBuilder:
 
         )
 
-    ###########################################################################
-    # MARKDOWN
-    ###########################################################################
 
     def _render_markdown(
         self,
