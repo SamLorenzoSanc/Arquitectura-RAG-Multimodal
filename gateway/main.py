@@ -12,6 +12,7 @@ from routes.tenant import router as tenant_router
 from routes.knowledge import router as knowledge_router
 from routes.organization import router as organization_router
 from routes.department import router as department_router
+from routes.forecast import router as forecast_router
 import models
 
 
@@ -46,6 +47,7 @@ app.include_router(tenant_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
 app.include_router(organization_router, prefix="/api/v1")
 app.include_router(department_router, prefix="/api/v1")
+app.include_router(forecast_router, prefix="/api/v1")
 
 def main():
     uvicorn.run(app, host="0.0.0.0", port=8000)

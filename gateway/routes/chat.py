@@ -3,7 +3,7 @@ from fastapi import (
     Depends, BackgroundTasks, status,
 )
 from fastapi.concurrency import run_in_threadpool
-
+from fastapi.responses import StreamingResponse
 from schemas.chat import ChatRequest, ChatResponse, ContextChunk
 from services import rag_service
 from uuid import uuid4
@@ -19,6 +19,7 @@ from models.eval import AnswerEval
 from models.tenant import Tenant
 import os
 from models.organization import Organization
+import json
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -28,6 +29,7 @@ def calculate_averages(results: list[dict[str, any]]) -> dict[str, float]:
         return {
             "mrr": 0.0,
             "ndcg": 0.0,
+            "precision": 0.0,
             "accuracy": 0.0,
             "completeness": 0.0,
             "relevance": 0.0,
@@ -36,7 +38,7 @@ def calculate_averages(results: list[dict[str, any]]) -> dict[str, float]:
     df = pd.DataFrame(results)
     return {
         col: float(df[col].mean()) if col in df.columns else 0.0
-        for col in ["mrr", "ndcg", "accuracy", "completeness", "relevance"]
+        for col in ["mrr", "ndcg", "precision", "accuracy", "completeness", "relevance"]
     }
 
 @router.get("/list-all-documents")
@@ -468,7 +470,7 @@ async def evaluate_retrieval_route(
     if test_id < 0 or test_id >= len(tests):
         raise HTTPException(status_code=404, detail="Test no encontrado")
 
-    tenant_id = await get_user_tenant_id(current_user, db)
+    tenant_id = await get_user_tenant_id(current_user.id, db)
     test = tests[test_id]
 
     result = await run_in_threadpool(
@@ -485,40 +487,48 @@ async def evaluate_retrieval_route(
     }
 
 @router.post("/evaluation/answer/{test_id}")
-def evaluate_answer(self, test, tenant_id: str) -> tuple[AnswerEval, str, list]:
-    generated_answer_result = self.answer(test.question, history=[], tenant_id=tenant_id)
-    generated_answer = generated_answer_result["answer"]
-    retrieved_docs = generated_answer_result["chunks"]
+async def evaluate_answer_route(
+    test_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # 1. Cargar la lista actualizada de tests en cada petición
+    tests = load_tests()
+    
+    # 2. Validar que el test_id esté dentro del rango
+    if test_id < 0 or test_id >= len(tests):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Test no encontrado (ID: {test_id})"
+        )
 
-    prompt = f"""
-        Pregunta:
-        {test.question}
-        
-        Respuesta generada:
-        {generated_answer}
-        
-        Respuesta de referencia:
-        {test.reference_answer}
-        
-        Evalúa:
-        1. Precisión.
-        2. Exhaustividad.
-        3. Pertinencia.
-        
-        Devuelve JSON con feedback, accuracy, completeness y relevance.
-        """
+    # 3. Obtener el tenant_id del usuario y seleccionar el test
+    tenant_id = await get_user_tenant_id(current_user.id, db)
+    test = tests[test_id]
 
-    completion = self.client.chat.completions.parse(
-        model=self.model,
-        messages=[
-            {"role": "system", "content": "Eres un evaluador experto. Responde solo en JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        response_format=AnswerEval,
+    # 4. Ejecutar la evaluación de calidad de forma segura fuera del event loop
+    eval_result, generated_answer, chunks = await run_in_threadpool(
+        rag_service.evaluate_answer,
+        test=test,
+        tenant_id=str(tenant_id),
     )
 
-    eval_result = completion.choices[0].message.parsed
-    return eval_result, generated_answer, retrieved_docs
+    # 5. Formatear los datos para el renderizado en frontend
+    return {
+        "test_id": test_id,
+        "question": test.question,
+        "category": getattr(test, "category", "general"),
+        "reference_answer": test.reference_answer,
+        "generated_answer": generated_answer,
+        "evaluation": eval_result.model_dump() if hasattr(eval_result, "model_dump") else eval_result,
+        "retrieved_chunks": [
+            {
+                "content": getattr(chunk, "page_content", str(chunk)),
+                "metadata": getattr(chunk, "metadata", {}),
+            }
+            for chunk in chunks
+        ],
+    }
 
 @router.post("/evaluation/run")
 async def run_full_evaluation(
@@ -573,3 +583,66 @@ async def run_full_evaluation(
         "detail": "La evaluación se ha lanzado en segundo plano",
         "total_tests": len(tests),
     }
+    
+@router.get("/evaluation/stream-run")
+async def stream_evaluation(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = await get_user_tenant_id(current_user.id, db)
+    tests = load_tests()
+
+    async def event_generator():
+        answer_results = []
+
+        for idx, test in enumerate(tests):
+            # 1. Evaluar el test fuera del Event Loop
+            eval_result, generated_answer, _ = await run_in_threadpool(
+                rag_service.evaluate_answer,
+                test=test,
+                tenant_id=str(tenant_id),
+            )
+            
+            # Formatear el resultado individual
+            eval_dict = eval_result.model_dump() if hasattr(eval_result, "model_dump") else eval_result
+            
+            # Guardar para cálculo final de promedios
+            answer_results.append({
+                "accuracy": getattr(eval_result, "accuracy", 0.0),
+                "completeness": getattr(eval_result, "completeness", 0.0),
+                "relevance": getattr(eval_result, "relevance", 0.0),
+            })
+
+            payload = {
+                "done": False,
+                "progress": f"{idx + 1}/{len(tests)}",
+                "current": idx + 1,
+                "total": len(tests),
+                "test_id": idx,
+                "question": test.question,
+                "category": getattr(test, "category", "general"),
+                "generated_answer": generated_answer,
+                "evaluation": eval_dict,
+            }
+            
+            # Enviar evento progresivo al frontend
+            yield f"data: {json.dumps(payload)}\n\n"
+
+        # 2. Evento final con promedios acumulados
+        averages = calculate_averages(answer_results)
+        final_payload = {
+            "done": True,
+            "progress": "Completado",
+            "averages": averages,
+        }
+        yield f"data: {json.dumps(final_payload)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Desactiva buffering en Nginx / Traefik
+        },
+    )

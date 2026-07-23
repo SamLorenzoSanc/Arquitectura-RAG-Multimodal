@@ -6,6 +6,7 @@ import TenantPage from "@/pages/TenantPage";
 import SettingsPage from "@/pages/SettingsPage";
 import KnowledgeGraphPage from "./pages/KnowledgeGraphPage";
 import EvaluationPage from "./pages/EvalutionPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Landing from "@/pages/Landing"; 
@@ -40,6 +41,7 @@ export default function App() {
             >
                 <Route index element={<Navigate to="/dashboard/organization" replace />} />
                 <Route path="chat" element={<ChatPage />} />
+                <Route path="analytics" element={<AnalyticsPage />} />
                 <Route path="organization" element={<OrganizationPage />} />
                 <Route path="tenants" element={<TenantPage />} />
                 <Route path="settings" element={<SettingsPage />} />

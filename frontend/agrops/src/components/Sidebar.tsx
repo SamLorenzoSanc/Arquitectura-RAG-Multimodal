@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { useOrganization } from "@/context/OrganizationContext"; 
-import {NewOrgModal} from "./NewOrgModal";
+import { NewOrgModal } from "./NewOrgModal";
 
 import {
     Building2,
@@ -15,14 +15,14 @@ import {
     Plus,
     Network,
     BrainCircuit,
-    Database
+    Database,
+    TrendingUp // <-- 1. Nuevo Icono Importado
 } from "lucide-react";
 
 export default function Sidebar() {
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     
-    // 1. Estados y variables de las organizaciones globales
     const { organizations, selectedOrg, setSelectedOrg, addOrganization } = useOrganization();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showOrgDropdown, setShowOrgDropdown] = useState(false);
@@ -72,7 +72,6 @@ export default function Sidebar() {
                     </button>
                 </p>
 
-                {/* Botón Principal del Selector */}
                 <button 
                     onClick={() => setShowOrgDropdown(!showOrgDropdown)}
                     className="group w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 flex justify-between items-center transition-all duration-300 hover:border-green-300 hover:shadow-lg focus:outline-none"
@@ -88,7 +87,6 @@ export default function Sidebar() {
                     <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${showOrgDropdown ? "rotate-180" : ""}`} />
                 </button>
 
-                {/* Menú desplegable flotante de selección */}
                 {showOrgDropdown && (
                     <div className="absolute left-6 right-6 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden max-h-48 overflow-y-auto animate-fade-in">
                         {organizations.length === 0 ? (
@@ -169,11 +167,12 @@ export default function Sidebar() {
             <div className="mx-6 my-8 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
 
             {/* Navegación */}
-            <nav className="flex-1 px-4 space-y-2">
+            <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
                 <MenuItem to="/dashboard/chat" icon={<MessageSquare size={20} />} text="Chat IA" />
+                <MenuItem to="/dashboard/analytics" icon={<TrendingUp size={20} />} text="Analítica de Demanda" /> {/* <-- NUEVO */}
                 <MenuItem to="/dashboard/organization" icon={<Building2 size={20} />} text="Organización" />
                 <MenuItem to="/dashboard/tenants" icon={<Tractor size={20} />} text="Inquilinos" />
-                <MenuItem to="/dashboard/settings" icon={<Settings size={20} />} text="Configuración"    />
+                <MenuItem to="/dashboard/settings" icon={<Settings size={20} />} text="Configuración" />
                 <MenuItem to="/dashboard/knowledge-graph" icon={<Network size={20} />} text="Grafo de Conocimiento"/>
                 <MenuItem to="/dashboard/evaluacion" icon={<BrainCircuit size={20} />} text="Auditoría RAG" />
                 <MenuItem to="/dashboard/chroma-debug" icon={<Database size={20} />} text="Base de Datos"/>
@@ -201,7 +200,6 @@ export default function Sidebar() {
                 </div>
             </div>
 
-            {/* 2. Inyección del Pop-up Modal */}
             <NewOrgModal
                 isOpen={isModalOpen} 
                 onClose={() => setIsModalOpen(false)} 
