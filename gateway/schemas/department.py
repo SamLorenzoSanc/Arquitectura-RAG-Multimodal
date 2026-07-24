@@ -12,6 +12,9 @@ class DepartmentUpdateRequest(BaseModel):
     name: str
     description: Optional[str] = None
 
+class AddMemberPayload(BaseModel):
+    email: str
+    role_id: Optional[str] = None
 
 class DepartmentMemberRequest(BaseModel):
     user_id: str

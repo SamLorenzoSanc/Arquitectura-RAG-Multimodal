@@ -78,30 +78,19 @@ async def get_current_user(
 @router.post("/register")
 async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db)):
     try:
+        # 1. Verificar si el usuario ya existe
         exists = await db.scalar(
             text("SELECT id FROM users WHERE email = :email"), {"email": request.email}
         )
         if exists:
             raise HTTPException(status_code=400, detail="El usuario ya existe")
-        print(1)
-        org_id = uuid.uuid4()
         
+        # 2. Crear la Organización por defecto
+        org_id = str(uuid.uuid4())
         await db.execute(
             text("""
-                INSERT INTO organizations 
-                (
-                    id,
-                    name,
-                    description,
-                    active
-                )
-                VALUES
-                (
-                    :id,
-                    :name,
-                    :description,
-                    :active
-                )
+                INSERT INTO organizations (id, name, description, active)
+                VALUES (:id, :name, :description, :active)
             """),
             {
                 "id": org_id,
@@ -110,49 +99,47 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
                 "active": True,
             },
         )
-        print(2)
-        role_id = await db.scalar(
-            text(
-                "SELECT id FROM roles "
-                "WHERE name = 'user' AND (organization_id = :org_id OR organization_id IS NULL) "
-                "LIMIT 1"
-            ),
-            {"org_id": org_id},
-        )
 
+        # 3. Crear el Usuario
         password_hash = hash_password(request.password)
-
         new_user_id = await db.scalar(
-            text(
-                "INSERT INTO users (name, email, password_hash) "
-                "VALUES (:name, :email, :password) RETURNING id"
-            ),
+            text("""
+                INSERT INTO users (name, email, password_hash) 
+                VALUES (:name, :email, :password) RETURNING id
+            """),
             {"name": request.name, "email": request.email, "password": password_hash},
         )
 
+        # 4. Obtener el ID del rol global 'ORG_ADMIN'
+        role_id = await db.scalar(
+            text("""
+                SELECT id FROM roles 
+                WHERE name = 'ORG_ADMIN' AND organization_id IS NULL 
+                LIMIT 1
+            """)
+        )
+
+        if not role_id:
+            raise HTTPException(
+                status_code=500,
+                detail="Error crítico: No existe el rol ORG_ADMIN global en el sistema."
+            )
+
+        # 5. Asociar el Usuario a la Organización con el rol ORG_ADMIN
         await db.execute(
-            text(
-                "INSERT INTO organization_members (organization_id, user_id, role_id) "
-                "VALUES (:org_id, :user_id, :role_id)"
-            ),
+            text("""
+                INSERT INTO organization_members (organization_id, user_id, role_id, active) 
+                VALUES (:org_id, :user_id, :role_id, true)
+            """),
             {"org_id": org_id, "user_id": new_user_id, "role_id": role_id},
         )
-        print(3)
+
+        # 6. Crear el Tenant principal
         tenant_id = str(uuid.uuid4())
         await db.execute(
             text("""
-                INSERT INTO tenants
-                (
-                    id, organization_id, name, description, active
-                )
-                VALUES
-                (
-                    :id,
-                    :organization_id,
-                    :name,
-                    :description,
-                    true
-                )
+                INSERT INTO tenants (id, organization_id, name, description, active)
+                VALUES (:id, :organization_id, :name, :description, true)
             """),
             {
                 "id": tenant_id,
@@ -162,68 +149,57 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
             },
         )
 
+        # 7. Crear la Knowledge Base por defecto para el sistema RAG
         knowledge_base_id = str(uuid.uuid4())
-        print(4)
         await db.execute(
             text("""
-                INSERT INTO knowledge_bases
-                (id, tenant_id, name, description, chroma_collection)
-                VALUES
-                (:id, :tenant_id, :name, :description, :chroma_collection)
+                INSERT INTO knowledge_bases (id, tenant_id, name, description, chroma_collection)
+                VALUES (:id, :tenant_id, :name, :description, :chroma_collection)
             """),
             {
                 "id": knowledge_base_id,
                 "tenant_id": tenant_id,
                 "name": "General",
                 "description": "Knowledge Base por defecto",
-                "chroma_collection": 'default_general_collection'
+                "chroma_collection": f"col_{tenant_id.replace('-', '')}" 
             },
-        )
-        print(5)
-        role_id = await db.scalar(
-            text("""
-                SELECT id
-                FROM roles
-                WHERE name='admin'
-                LIMIT 1
-            """)
         )
 
-        if role_id is None:
-            raise HTTPException(
-                status_code=500,
-                detail="No existe el rol admin."
-            )
-        print(6)
-        await db.execute(
-            text("""
-                INSERT INTO organization_members
-                (
-                    organization_id,
-                    user_id,
-                    role_id,
-                    active
-                )
-                VALUES
-                (
-                    :organization_id,
-                    :user_id,
-                    :role_id,
-                    true
-                )
-                ON CONFLICT (organization_id, user_id)
-                DO NOTHING
-            """),
-            {
-                "organization_id": org_id,
-                "user_id": new_user_id,
-                "role_id": role_id,
-            },
+        # =========================================================
+        # 8. INSCRIBIR AUTOMÁTICAMENTE EN LA ORG GLOBAL
+        # =========================================================
+        GLOBAL_ORG_NAME = "AgroTech" # Cambia esto a "Agrotech" si usaste ese nombre
+        
+        global_org_id = await db.scalar(
+            text("SELECT id FROM organizations WHERE name = :global_name LIMIT 1"),
+            {"global_name": GLOBAL_ORG_NAME}
         )
+
+        if global_org_id:
+            # Buscar el rol global básico de lectura
+            basic_role_id = await db.scalar(
+                text("SELECT id FROM roles WHERE name = 'USER' AND organization_id IS NULL LIMIT 1")
+            )
+
+            # Insertar al usuario como miembro de la organización global si el rol existe
+            if basic_role_id:
+                await db.execute(
+                    text("""
+                        INSERT INTO organization_members (organization_id, user_id, role_id, active)
+                        VALUES (:org_id, :user_id, :role_id, true)
+                        ON CONFLICT (organization_id, user_id) DO NOTHING
+                    """),
+                    {
+                        "org_id": global_org_id, 
+                        "user_id": new_user_id, 
+                        "role_id": basic_role_id
+                    }
+                )
+        # =========================================================
+
         await db.commit()
-        return {
-            "status": "registered",
-        }
+        return {"status": "registered"}
+
     except HTTPException:
         await db.rollback()
         raise

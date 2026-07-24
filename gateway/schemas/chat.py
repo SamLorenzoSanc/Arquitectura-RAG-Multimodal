@@ -31,7 +31,7 @@ class ChatRequest(BaseModel):
     knowledge_base_id: Optional[str] = None
     retrieval_k: int = 20
     final_k: int = 10
-    model: str = "ollama/llama3"
+    model: str | None = None
     temperature: float = 0
     use_query_rewrite: bool = True
     use_reranking: bool = True

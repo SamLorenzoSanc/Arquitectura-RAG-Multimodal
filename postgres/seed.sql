@@ -340,6 +340,24 @@ CREATE TABLE user_tenants (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, tenant_id)
 );
+
+CREATE TABLE shipments (
+    id VARCHAR(50) PRIMARY KEY,
+    tenant_id UUID REFERENCES tenants(id),
+    product VARCHAR(100),
+    container_id VARCHAR(50),
+    origin_name VARCHAR(255),
+    origin_lat FLOAT,
+    origin_lng FLOAT,
+    destination_name VARCHAR(255),
+    destination_lat FLOAT,
+    destination_lng FLOAT,
+    vessel_name VARCHAR(100),
+    departure_date TIMESTAMP,
+    eta TIMESTAMP,
+    current_step INT,
+    temperature_threshold FLOAT
+);
 -------------------------------------------------------------
 -- ÍNDICES
 -------------------------------------------------------------

@@ -20,6 +20,9 @@ from models.tenant import Tenant
 import os
 from models.organization import Organization
 import json
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, ToolMessage
+from services.tool import agent_executor
+import json
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -78,7 +81,7 @@ async def chat(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        # Tenant del usuario vía su organización activa
+        # 1. Tenant del usuario vía su organización activa (Aislamiento Multi-Tenant)
         member_info = (
             await db.execute(
                 text("""
@@ -98,6 +101,9 @@ async def chat(
         tenant_id = member_info["tenant_id"]
         conversation_id = request.conversation_id
         kb_id = request.knowledge_base_id
+        
+        # Extracción del modelo de lenguaje gratuito seleccionado en el frontend (Ollama)
+        selected_model = getattr(request, "model", None) or "llama3.2:latest"
         
         if kb_id == "undefined" or kb_id == "":
             kb_id = None
@@ -124,7 +130,7 @@ async def chat(
                 },
             )
 
-        # 2. Mensaje del usuario
+        # 2. Guardar mensaje del usuario
         user_message_id = str(uuid4())
         await db.execute(
             text("""
@@ -133,22 +139,22 @@ async def chat(
             """),
             {"id": user_message_id, "conversation": conversation_id, "content": request.question},
         )
-        # commit único de la conversación + mensaje de usuario
         await db.commit()
 
-        # 3. RAG — bloqueante: fuera del event loop
+        # 3. RAG — Ejecución asíncrona pasando el modelo seleccionado dinámicamente
         rag_result = await run_in_threadpool(
             rag_service.answer,
             question=request.question,
             history=request.history,
-            tenant_id=str(tenant_id) 
+            tenant_id=str(tenant_id),
+            model=selected_model 
         )
 
         answer = rag_result["answer"]
         chunks = rag_result["chunks"]
         retrieval = rag_result["retrieval"]
 
-        # 4. Respuesta del asistente
+        # 4. Guardar respuesta del asistente
         assistant_message_id = str(uuid4())
         await db.execute(
             text("""
@@ -158,7 +164,7 @@ async def chat(
             {"id": assistant_message_id, "conversation": conversation_id, "content": answer},
         )
 
-        # 5. Fuentes utilizadas
+        # 5. Registrar fuentes utilizadas (Chunks)
         for chunk in chunks:
             metadata = getattr(chunk, "metadata", None)
             if metadata is None and isinstance(chunk, dict):
@@ -179,14 +185,14 @@ async def chat(
                 },
             )
 
-        # 6. Timestamp de la conversación
+        # 6. Actualizar timestamp de la conversación
         await db.execute(
             text("UPDATE conversations SET updated_at = NOW() WHERE id = :id"),
             {"id": conversation_id},
         )
         await db.commit()
 
-        # 7. Salida Pydantic
+        # 7. Mapeo a salida Pydantic
         contextos_validados = []
         for chunk in chunks:
             page_content = getattr(chunk, "page_content", None)

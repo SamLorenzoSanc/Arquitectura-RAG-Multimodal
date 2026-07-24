@@ -691,9 +691,6 @@ export default function AuditPage() {
   );
 }
 
-// ---------------------------------------------------------
-// COMPONENTES AUXILIARES
-// ---------------------------------------------------------
 function ClientMetricCard({
   title,
   technicalName,

@@ -10,7 +10,11 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import Landing from "@/pages/Landing"; 
+import AboutProductPage from "@/pages/AboutProductPage";
+import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
+import SustainabilityPage from "@/pages/SustainabilityPage"; // NUEVO
 import ChromaDebugPage from "./pages/ChromaDebuPage";
+import LogisticsDashboard from "@/pages/LogisticDashboard";
 import { useAuth } from "@/context/AuthContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -26,7 +30,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
     return (
         <Routes>
+            {/* Rutas Públicas */}
             <Route path="/" element={<Landing />} />
+            <Route path="/about" element={<AboutProductPage />} />
+            <Route path="/sustainability" element={<SustainabilityPage />} /> {/* NUEVO */}
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -48,6 +56,7 @@ export default function App() {
                 <Route path="knowledge-graph" element={<KnowledgeGraphPage />}/>
                 <Route path="evaluacion" element={<EvaluationPage />} />
                 <Route path="chroma-debug" element={<ChromaDebugPage />} />
+                <Route path="logistics" element={<LogisticsDashboard />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />
