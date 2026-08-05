@@ -13,9 +13,6 @@ import {
   ResponsiveContainer 
 } from "recharts";
 
-// ---------------------------------------------------------
-// TIPOS DE DATOS
-// ---------------------------------------------------------
 type TestItem = {
   id: number;
   question: string;
@@ -32,12 +29,14 @@ type RetrievalResult = {
   mrr?: number;
   ndcg?: number;
   keyword_coverage?: number;
+  accuracy?: number;
   retrieval?: {
     mrr: number;
     ndcg: number;
     keywords_found: number;
     total_keywords: number;
     keyword_coverage: number;
+    accuracy: number;
   };
 };
 
@@ -61,13 +60,10 @@ type AnswerResult = {
   };
 };
 
-// ---------------------------------------------------------
-// HELPERS DEFENSIVOS DE EXTRACCIÓN
-// ---------------------------------------------------------
 function getRetrievalMetric(item: RetrievalResult | undefined | null, metric: string): number {
   if (!item) return 0;
   
-  const target = item.retrieval || (item as unknown as Record<string, unknown>);
+  const target = (item.retrieval || item) as Record<string, any>;
   if (target[metric] !== undefined && target[metric] !== null) {
     const val = Number(target[metric]);
     if (!isNaN(val)) return val;
@@ -78,8 +74,8 @@ function getRetrievalMetric(item: RetrievalResult | undefined | null, metric: st
 function getAnswerMetric(item: AnswerResult | undefined | null, metric: string): number {
   if (!item) return 0;
 
-  const rawItem = item as unknown as Record<string, unknown>;
-  const target = (rawItem.evaluation || rawItem.data || rawItem) as Record<string, unknown>;
+  const rawItem = item as unknown as Record<string, any>;
+  const target = (rawItem.evaluation || rawItem.data || rawItem) as Record<string, any>;
 
   const metricAliases: Record<string, string[]> = {
     accuracy: ["accuracy", "punteria", "accuracy_score", "score"],
@@ -113,11 +109,6 @@ function getSafePercentage(value: number): number {
   if (!value || isNaN(value)) return 0;
   const scaled = value > 1 ? value : value * 100;
   return Math.round(Math.min(Math.max(scaled, 0), 100));
-}
-
-function formatAsPercent(value: number | undefined | null): string {
-  if (value === undefined || value === null) return "N/A";
-  return `${getSafePercentage(value)}%`;
 }
 
 export default function AuditPage() {
@@ -161,8 +152,8 @@ export default function AuditPage() {
       const settledResults = await Promise.allSettled(promises);
       
       const successfulResults = settledResults
-        .filter((res): res is PromiseFulfilledResult<{ data: RetrievalResult }> => res.status === "fulfilled")
-        .map((res) => res.value.data);
+        .filter((res: any) => res.status === "fulfilled")
+        .map((res: any) => res.value.data);
 
       if (successfulResults.length < tests.length) {
         setError(`Se completaron ${successfulResults.length} de ${tests.length} evaluaciones de búsqueda.`);
@@ -188,17 +179,17 @@ export default function AuditPage() {
         api.post<AnswerResult>(`/chat/evaluation/answer/${test.id}`)
       );
 
-      const settledResults = await Promise.allSettled(promises);
+      const settledAnswers = await Promise.allSettled(promises);
 
-      const successfulResults = settledResults
-        .filter((res): res is PromiseFulfilledResult<{ data: AnswerResult }> => res.status === "fulfilled")
-        .map((res) => res.value.data);
+      const successfulAnswers = settledAnswers
+        .filter((res: any) => res.status === "fulfilled")
+        .map((res: any) => res.value.data);
 
-      if (successfulResults.length < tests.length) {
-        setError(`Se completaron ${successfulResults.length} de ${tests.length} evaluaciones de respuestas.`);
+      if (successfulAnswers.length < tests.length) {
+        setError(`Se completaron ${successfulAnswers.length} de ${tests.length} evaluaciones de las respuestas.`);
       }
 
-      setAnswers(successfulResults);
+      setAnswers(successfulAnswers);
     } catch {
       setError("Error crítico ejecutando evaluación de respuestas.");
     } finally {
@@ -223,12 +214,12 @@ export default function AuditPage() {
       ]);
 
       const successfulRetrieval = retrievalSettled
-        .filter((res): res is PromiseFulfilledResult<{ data: RetrievalResult }> => res.status === "fulfilled")
-        .map((res) => res.value.data);
+        .filter((res: any) => res.status === "fulfilled")
+        .map((res: any) => res.value.data);
 
       const successfulAnswers = answerSettled
-        .filter((res): res is PromiseFulfilledResult<{ data: AnswerResult }> => res.status === "fulfilled")
-        .map((res) => res.value.data);
+        .filter((res: any) => res.status === "fulfilled")
+        .map((res: any) => res.value.data);
 
       setRetrieval(successfulRetrieval);
       setAnswers(successfulAnswers);
@@ -240,7 +231,6 @@ export default function AuditPage() {
     }
   };
 
-  // Promedios dinámicos
   const averages = useMemo(() => {
     const avg = (arr: number[]) =>
       arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -248,7 +238,7 @@ export default function AuditPage() {
     return {
       mrr: avg(retrieval.map((r) => getRetrievalMetric(r, "mrr"))),
       ndcg: avg(retrieval.map((r) => getRetrievalMetric(r, "ndcg"))),
-      accuracy: avg(answers.map((a) => getAnswerMetric(a, "accuracy"))),
+      accuracy: avg(retrieval.map((r) => getRetrievalMetric(r, "accuracy"))),
       precision: avg(answers.map((a) => getAnswerMetric(a, "precision"))),
       completeness: avg(answers.map((a) => getAnswerMetric(a, "completeness"))),
       relevance: avg(answers.map((a) => getAnswerMetric(a, "relevance"))),
@@ -289,7 +279,6 @@ export default function AuditPage() {
     );
   }, [answers, searchFilter]);
 
-  // Datos para el gráfico por pregunta
   const chartData = useMemo(() => {
     return tests.map((test) => {
       const ret = retrieval.find((r) => (r.test_id ?? r.id) === test.id);
@@ -300,6 +289,7 @@ export default function AuditPage() {
       if (ret) {
         metrics.push(getSafePercentage(getRetrievalMetric(ret, "mrr")));
         metrics.push(getSafePercentage(getRetrievalMetric(ret, "ndcg")));
+        metrics.push(getSafePercentage(getRetrievalMetric(ret, "accuracy")));
       }
 
       if (ans) {
@@ -346,7 +336,7 @@ export default function AuditPage() {
             </h1>
             {runningStep && (
               <p className="mt-1 animate-pulse text-xs font-semibold text-emerald-700">
-                ⏳ {runningStep}
+                {runningStep}
               </p>
             )}
           </div>
@@ -531,6 +521,7 @@ export default function AuditPage() {
 
         {/* TRES PANELES EN GRID */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          
           {/* Panel 1: Banco de Preguntas */}
           <Panel title={`Banco de Preguntas (${filteredTests.length})`}>
             {filteredTests.length === 0 ? (
@@ -593,7 +584,8 @@ export default function AuditPage() {
                   const mrrVal = getSafePercentage(getRetrievalMetric(item, "mrr"));
                   const ndcgVal = getSafePercentage(getRetrievalMetric(item, "ndcg"));
                   const covVal = getSafePercentage(getRetrievalMetric(item, "keyword_coverage"));
-
+                  const accVal = getSafePercentage(getRetrievalMetric(item, "accuracy"));
+                  
                   return (
                     <div
                       key={testId}
@@ -612,10 +604,11 @@ export default function AuditPage() {
                         {item.question}
                       </p>
 
-                      <div className="grid grid-cols-3 gap-2 text-sm">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                         <MiniStat label="Posición" value={`${mrrVal}%`} percentage={mrrVal} />
                         <MiniStat label="Orden" value={`${ndcgVal}%`} percentage={ndcgVal} />
                         <MiniStat label="Cobertura" value={`${covVal}%`} percentage={covVal} />
+                        <MiniStat label="Exactitud" value={`${accVal}%`} percentage={accVal} />
                       </div>
                     </div>
                   );
@@ -659,7 +652,7 @@ export default function AuditPage() {
                         {item.question}
                       </p>
 
-                      <div className="grid grid-cols-4 gap-2 text-sm">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                         <MiniStat label="Puntería" value={`${accVal}%`} percentage={accVal} />
                         <MiniStat label="Sin Paja" value={`${precVal}%`} percentage={precVal} />
                         <MiniStat label="Completa" value={`${compVal}%`} percentage={compVal} />
@@ -674,10 +667,10 @@ export default function AuditPage() {
                       )}
 
                       {feedback && (
-                        <p className="mt-2 rounded-lg border border-slate-200/60 bg-white p-2 text-xs text-slate-600">
+                        <div className="mt-2 rounded-lg border border-slate-200/60 bg-white p-2 text-xs text-slate-600">
                           <strong className="text-slate-800">Evaluación: </strong>
                           {feedback}
-                        </p>
+                        </div>
                       )}
                     </div>
                   );
@@ -685,6 +678,7 @@ export default function AuditPage() {
               </div>
             )}
           </Panel>
+
         </div>
       </div>
     </div>

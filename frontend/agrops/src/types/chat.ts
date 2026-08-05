@@ -1,12 +1,12 @@
 export interface ChatRequest {
-    question:string;
-    conversation_id:string|null;
-    history:{
-        role:string;
-        content:string;
-    }[];
-    use_rag: boolean;
-    knowledge_base_id?:string;
+    question: string;
+    conversation_id?: string | null;
+    history?: Array<{ role: string; content: string }>;
+    knowledge_base_id?: string;
+    use_rag?: boolean;
+    organization_id?: string;
+    organization_name?: string;
+    model?: string;
 }
 
 export interface Message {

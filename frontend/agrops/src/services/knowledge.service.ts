@@ -1,5 +1,5 @@
 import api from "@/api";
-import type { KnowledgeBase } from "@/types/knowledge";
+import type { KnowledgeMap } from "@/types/knowledge";
 
 export const getOrganizations = async () => {
     const { data } = await api.get("/organization");
@@ -32,24 +32,10 @@ export const updateOrganization = async (
 export const deleteOrganization = async (id: string) => {
     await api.delete(`/organization/${id}`);
 };
-
-export interface KnowledgeNode {
-    id: string;
-    x: number;
-    y: number;
-    label: string;
-    source?: string;
-    chunk?: string;
-}
-
-export interface KnowledgeMap {
-    nodes: KnowledgeNode[];
-}
-
 class KnowledgeService {
 
-    async getCurrent(): Promise<KnowledgeBase> {
-        const response = await api.get<KnowledgeBase>(
+    async getCurrent(): Promise<KnowledgeMap> {
+        const response = await api.get<KnowledgeMap>(
             "/knowledge/current"
         );
 

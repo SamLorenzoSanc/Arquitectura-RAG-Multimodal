@@ -1,40 +1,64 @@
-import { ArrowRight, Bot, TrendingUp, ShieldCheck, Building2, Sparkles, ChevronRight, ThermometerSnowflake, MessageSquare, Info, Leaf } from "lucide-react";
+import { 
+    ArrowRight, 
+    Bot, 
+    TrendingUp, 
+    ShieldCheck, 
+    Building2, 
+    Sparkles, 
+    ChevronRight, 
+    ThermometerSnowflake, 
+    MessageSquare, 
+    Info, 
+    Leaf 
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function Landing() {
     return (
-        <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-200 selection:text-emerald-900">
+        <div className="min-h-screen bg-slate-50 font-sans selection:bg-yellow-200 selection:text-blue-900">
             {/* HEADER CORPORATIVO */}
             <header className="h-20 bg-white/95 backdrop-blur-md border-b border-slate-200 flex justify-between items-center px-8 sticky top-0 z-50 shadow-xs">
-                <Link to="/" className="flex items-center gap-2 group">
-                    <div className="h-9 w-9 rounded-xl bg-emerald-700 flex items-center justify-center text-white shadow-md shadow-emerald-700/20">
-                        <ThermometerSnowflake size={20} />
+                <Link to="/" className="flex items-center gap-2.5 group">
+                    {/* Icono Bandera de Canarias */}
+                    <div className="relative h-10 w-10 flex overflow-hidden rounded-xl shadow-md border border-slate-200 shrink-0 transition-transform group-hover:scale-105">
+                        {/* Franjas verticales: Blanco, Azul, Amarillo */}
+                        <div className="flex-1 bg-white"></div>
+                        <div className="flex-1 bg-[#15539C]"></div>
+                        <div className="flex-1 bg-[#FFD300]"></div>
+                        
+                        {/* Termómetro superpuesto con efecto cristal */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-slate-900/70 backdrop-blur-[2px] p-1 rounded-lg text-white shadow-sm">
+                                <ThermometerSnowflake size={16} />
+                            </div>
+                        </div>
                     </div>
+                    
+                    {/* Texto del Logo */}
                     <span className="text-xl font-black tracking-wider text-slate-900">
-                        AGRO<span className="text-emerald-600">PS</span>
+                        AGRO<span className="text-[#15539C]">PS</span>
                     </span>
                 </Link>
 
-                {/* Enlaces del Header actualizados */}
                 <nav className="hidden lg:flex items-center gap-8">
-                    <Link to="/about" className="text-sm font-semibold text-slate-700 hover:text-emerald-600 transition flex items-center gap-1.5">
+                    <Link to="/about" className="text-sm font-semibold text-slate-700 hover:text-blue-600 transition flex items-center gap-1.5">
                         <Info size={16} /> Acerca del Producto
                     </Link>
-                    <Link to="/sustainability" className="text-sm font-semibold text-slate-700 hover:text-emerald-600 transition flex items-center gap-1.5">
+                    <Link to="/sustainability" className="text-sm font-semibold text-slate-700 hover:text-blue-600 transition flex items-center gap-1.5">
                         <Leaf size={16} /> Sostenibilidad
                     </Link>
-                    <Link to="/privacy-policy" className="text-sm font-semibold text-slate-700 hover:text-emerald-600 transition flex items-center gap-1.5">
+                    <Link to="/privacy-policy" className="text-sm font-semibold text-slate-700 hover:text-blue-600 transition flex items-center gap-1.5">
                         <ShieldCheck size={16} /> Política de Privacidad
                     </Link>
                 </nav>
 
                 <div className="flex items-center gap-4">
-                    <Link to="/login" className="text-sm font-bold text-slate-700 hover:text-slate-900 px-3 py-2 transition">
+                    <Link to="/login" className="text-sm font-bold text-slate-700 hover:text-blue-700 px-3 py-2 transition">
                         Iniciar Sesión
                     </Link>
                     <Link 
                         to="/register" 
-                        className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-emerald-700/20 transition flex items-center gap-1.5"
+                        className="bg-blue-700 hover:bg-blue-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md shadow-blue-700/20 transition flex items-center gap-1.5"
                     >
                         Empieza
                     </Link>
@@ -42,29 +66,29 @@ export default function Landing() {
             </header>
 
             {/* HERO SECTION */}
-            <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/40 to-slate-50 pt-24 pb-16">
+            <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/60 to-slate-50 pt-24 pb-16">
                 <div className="mx-auto flex max-w-7xl flex-col items-center px-6 text-center">
                     
-                    <span className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-100/50 px-4 py-1.5 text-sm font-semibold text-emerald-800 shadow-sm backdrop-blur-sm">
-                        <Sparkles size={16} className="text-emerald-600" />
-                        AGROPS & CanariasCold - Innovación Agrícola y Logística Multimodal
+                    <span className="flex items-center gap-2 rounded-full border border-yellow-300 bg-yellow-100/50 px-4 py-1.5 text-sm font-semibold text-yellow-800 shadow-sm backdrop-blur-sm">
+                        <Sparkles size={16} className="text-yellow-600" />
+                        AGROPS & CanariasCold - Innovación Agrícola y Logística
                     </span>
 
                     <h1 className="mt-8 max-w-4xl text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
                         Tu ecosistema inteligente para la{' '}
-                        <span className="bg-gradient-to-r from-emerald-600 to-green-500 bg-clip-text text-transparent">
+                        <span className="bg-gradient-to-r from-blue-600 to-yellow-500 bg-clip-text text-transparent">
                             gestión agrícola y cadena de frío
                         </span>
                     </h1>
 
                     <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-                        Centraliza documentos con IA, predice mercados con ARIMAX y garantiza la trazabilidad en tiempo real desde Canarias hasta Mercamadrid con alertas por WhatsApp.
+                        Centraliza documentos con IA, predice mercados con ARIMAX y garantiza la trazabilidad en tiempo real desde Canarias hasta Mercamadrid.
                     </p>
 
                     <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:gap-6">
                         <Link
                             to="/login"
-                            className="group flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-8 py-4 text-base font-semibold text-white shadow-lg shadow-emerald-700/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-800 hover:shadow-emerald-700/30 active:translate-y-0"
+                            className="group flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-8 py-4 text-base font-semibold text-white shadow-lg shadow-blue-700/20 transition-all hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-blue-700/30 active:translate-y-0"
                         >
                             Comenzar ahora
                             <ChevronRight size={20} className="transition-transform group-hover:translate-x-1" />
@@ -175,10 +199,10 @@ export default function Landing() {
                 </div>
             </section>
 
-            {/* CTA SECTION */}
+            {/* SECCIÓN CTA FINAL */}
             <section className="relative overflow-hidden bg-slate-900 py-24 sm:py-32">
-                <div className="absolute -left-20 -top-20 h-[400px] w-[400px] rounded-full bg-emerald-600/20 blur-[100px]" />
-                <div className="absolute -right-20 -bottom-20 h-[400px] w-[400px] rounded-full bg-green-600/20 blur-[100px]" />
+                <div className="absolute -left-20 -top-20 h-[400px] w-[400px] rounded-full bg-blue-600/30 blur-[100px]" />
+                <div className="absolute -right-20 -bottom-20 h-[400px] w-[400px] rounded-full bg-yellow-400/20 blur-[100px]" />
 
                 <div className="relative mx-auto max-w-5xl px-6 text-center">
                     <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
@@ -191,7 +215,7 @@ export default function Landing() {
                     <div className="mt-10 flex items-center justify-center gap-x-6">
                         <Link
                             to="/register"
-                            className="group flex items-center gap-2 rounded-xl bg-emerald-500 px-8 py-4 text-base font-semibold text-slate-900 transition-all hover:bg-emerald-400 hover:shadow-lg hover:shadow-emerald-500/20"
+                            className="group flex items-center gap-2 rounded-xl bg-yellow-400 px-8 py-4 text-base font-semibold text-blue-900 transition-all hover:bg-yellow-500 hover:shadow-lg hover:shadow-yellow-500/20"
                         >
                             Crear mi cuenta gratuita
                             <ArrowRight size={18} className="transition-transform group-hover:translate-x-1" />
@@ -203,12 +227,12 @@ export default function Landing() {
     );
 }
 
-// COMPONENTES AUXILIARES
+// COMPONENTES AUXILIARES ACTUALIZADOS CON LA PALETA AZUL/AMARILLA
 
 function FeatureCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
     return (
-        <div className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-emerald-200 hover:shadow-xl hover:shadow-emerald-900/5 hover:ring-1 hover:ring-emerald-200">
-            <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 transition-colors group-hover:bg-emerald-100 group-hover:text-emerald-800">
+        <div className="group flex flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-xl hover:shadow-blue-900/5 hover:ring-1 hover:ring-blue-200">
+            <div className="mb-6 inline-flex h-14 w-14 items-center justify-center rounded-xl bg-blue-50 text-blue-700 transition-colors group-hover:bg-blue-100 group-hover:text-blue-800">
                 {icon}
             </div>
             <h3 className="mb-3 text-xl font-bold text-slate-900">
@@ -232,7 +256,7 @@ function Step({ number, title, text, imgSrc, alt }: { number: string; title: str
                 />
                 <div className="absolute inset-0 bg-slate-900/10 group-hover:bg-transparent transition-colors"></div>
                 
-                <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-700 text-xl font-bold text-white shadow-lg ring-4 ring-white">
+                <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 flex h-12 w-12 items-center justify-center rounded-full bg-blue-700 text-xl font-bold text-white shadow-lg ring-4 ring-white">
                     {number}
                 </div>
             </div>

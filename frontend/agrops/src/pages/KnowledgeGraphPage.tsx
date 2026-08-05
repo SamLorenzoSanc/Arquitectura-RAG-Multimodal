@@ -11,6 +11,7 @@ import ForceGraph2D from "react-force-graph-2d";
 import type { Organization } from "@/types/organization";
 import { useOrganization } from "@/context/OrganizationContext";
 import OrganizationService from "@/services/organization.service";
+
 import KnowledgeService from "@/services/knowledge.service";
 import type { KnowledgeMap } from "@/types/knowledge";
 
@@ -52,10 +53,6 @@ export default function KnowledgeGraphPage() {
         }
 
         return graph.statistics;
-    }, [graph]);
-
-    const organizationName = useMemo(() => {
-        return graph?.organization?.name ?? "";
     }, [graph]);
 
     const getFileName = (path?: string) => {

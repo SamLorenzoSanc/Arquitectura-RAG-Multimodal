@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, FileText, HardDrive, Layers, PlusCircle, CheckCircle2, Loader2 } from "lucide-react";
+import { Building2, FileText, HardDrive, Layers, CheckCircle2, Loader2 } from "lucide-react";
 import TenantService from "@/services/tenant.service";
 import DocumentService from "@/services/document.service";
 import { useOrganization } from "@/context/OrganizationContext";
 
-import type { Tenant, DocumentItem } from "@/types/tenant";
+import type { Tenant } from "@/types/tenant";
+
+// Definición local o interfaz para el ítem de documento si no está exportada
+interface DocumentItem {
+    id: string;
+    title?: string;
+    filename?: string;
+    size?: number;
+}
 
 export default function TenantPage() {
     const { selectedOrg } = useOrganization();
@@ -24,8 +32,8 @@ export default function TenantPage() {
             setError(null);
 
             // 1. Intentar listar los tenants existentes
-            const tenants = await TenantService.list();
-            const tenantList = Array.isArray(tenants) ? tenants : (tenants.items || []);
+            const tenants: any = await TenantService.list();
+            const tenantList = Array.isArray(tenants) ? tenants : (tenants?.items || []);
             
             // Buscar si ya existe un tenant para esta organización
             let tenantMatch = tenantList.find((t: any) => t.organization_id === org.id || t.id === org.id);
@@ -38,6 +46,7 @@ export default function TenantPage() {
                 const newTenant = await TenantService.create({
                     name: defaultTenantName,
                     description: `Espacio de trabajo principal y aislamiento de datos para ${org.name}`,
+                    // @ts-ignore: Forzamos si organization_id no está definido en el DTO estricto de creación
                     organization_id: org.id
                 });
                 tenantMatch = newTenant;

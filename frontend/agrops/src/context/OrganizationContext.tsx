@@ -2,40 +2,8 @@
 import { createContext, useContext, useState} from "react";
 import type { ReactNode } from "react";
 import { createOrganization } from "@/services/organization.service";
+import type { Organization, Department, OrgContextType } from "@/types/organization";
 
-// Interfaces ampliadas
-export interface Department {
-    id: string;
-    name: string;
-    description?: string;
-}
-
-export interface Member {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-    departmentId?: string; // Vinculación clave
-}
-
-export interface Organization {
-    id: string;
-    name: string;
-    description?: string;
-    status: string;
-    departments?: Department[];
-    members?: Member[];
-}
-
-interface OrgContextType {
-    organizations: Organization[];
-    selectedOrg: Organization | null;
-    selectedDept: Department | null;
-    setSelectedOrg: (org: Organization | null) => void;
-    setSelectedDept: (dept: Department | null) => void;
-    addOrganization: (name: string, description: string) => Promise<void>;
-    setOrganizations: (orgs: Organization[]) => void;
-}
 
 const OrganizationContext = createContext<OrgContextType | undefined>(undefined);
 

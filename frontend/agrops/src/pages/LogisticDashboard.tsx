@@ -4,21 +4,13 @@ import { useState, useEffect } from "react";
 import { 
     Ship, 
     ThermometerSnowflake, 
-    MapPin, 
-    PackageCheck, 
     AlertTriangle, 
-    CheckCircle2,
-    Compass,
-    Warehouse,
     Layers,
     Loader2,
     PackagePlus,
     PlusCircle,
-    Box,
-    Anchor,
     Truck,
     ArrowRight,
-    Building2,
     MessageSquare,
     UserCheck
 } from "lucide-react";
@@ -53,13 +45,6 @@ const farmerIcon = new L.DivIcon({
     iconAnchor: [16, 16],
 });
 
-const coopIcon = new L.DivIcon({
-    html: `<div style="background-color: #f59e0b; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 21h18M3 7v14M21 7v14M6 11h4M6 15h4M14 11h4M14 15h4M12 3L2 7h20L12 3z"></path></svg></div>`,
-    className: "custom-icon-coop",
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-});
-
 const shipIcon = new L.DivIcon({
     html: `<div style="background-color: #3b82f6; color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.2);"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg></div>`,
     className: "custom-icon-ship",
@@ -81,10 +66,10 @@ interface ShipmentDetails {
     product: string;
     containerId: string;
     farmerName: string;
-    originCoords: [number, number];       
+    originCoords: [number, number];      
     coopName: string;
     coopCoords: [number, number];
-    vesselCoords: [number, number];       
+    vesselCoords: [number, number];      
     destinationName: string;
     destinationCoords: [number, number];  
     vessel: string;
@@ -100,27 +85,17 @@ interface ShipmentDetails {
     hasAlert?: boolean;
 }
 
-const TIMELINE_STEPS = [
-    { label: "Agricultor & Finca", icon: UserCheck },
-    { label: "Cooperativa Agrícola", icon: Building2 },
-    { label: "Tránsito Marítimo", icon: Ship },
-    { label: "Puerto Peninsular", icon: MapPin },
-    { label: "Mercamadrid Destino", icon: CheckCircle2 }
-];
-
 const COLORS_PALETTE = ["#10b981", "#f59e0b", "#ef4444", "#3b82f6", "#8b5cf6"];
 
 interface LogisticsTrackerProps {
     selectedShipmentId?: string;
-    onAskAI?: (query: string) => void;
 }
 
-export default function LogisticsTracker({ selectedShipmentId: externalShipmentId, onAskAI }: LogisticsTrackerProps) {
+export default function LogisticsTracker({ selectedShipmentId: externalShipmentId}: LogisticsTrackerProps) {
     const [shipmentsData, setShipmentsData] = useState<Record<string, ShipmentDetails>>({});
     const [catalog, setCatalog] = useState<any[]>([]);
     const [fleetCatalog, setFleetCatalog] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
-    const [error, setError] = useState<string | null>(null);
 
     const [internalShipmentId, setInternalShipmentId] = useState<string>("");
     const [activeOverlayIds, setActiveOverlayIds] = useState<string[]>([]);
@@ -129,31 +104,30 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
     const [formLoading, setFormLoading] = useState<boolean>(false);
     
     const [formData, setFormData] = useState({
-        id: "LOTE-" + Math.floor(400 + Math.random() * 100),
-        product: "",
-        container_id: "",
-        farmer_name: "Juan Antonio Pérez (Finca San Miguel)",
-        origin_lat: 28.4682,
-        origin_lng: -16.2546,
-        coop_name: "Cooperativa Agrícola del Norte de Tenerife",
-        coop_lat: 28.5000,
-        coop_lng: -16.3500,
-        destination_name: "Mercamadrid - Madrid",
-        destination_lat: 40.3833,
-        destination_lng: -3.6833,
-        vessel_name: "",
+        id: "LOTE-438",
+        product: "Plátano de Canarias IGP",
+        container_id: "MSCU 982105-4",
+        origin_name: "Samuel - Finca San Miguel - Tazacorte (La Palma)",
+        origin_lat: 28.6478,
+        origin_lng: -17.9255,
+        coop_name: "CoValle",
+        coop_lat: 28.6628,
+        coop_lng: -17.9105,
+        destination_name: "Plataforma Logística - Cádiz",
+        destination_lat: 36.5271,
+        destination_lng: -6.2886,
+        vessel_name: "Volcán de Teneguía",
         air_chamber: "Cámara Proa - Zona Fría A",
         truck_plate: "4829-LMX",
         land_carrier: "Transports Frío Peninsular S.A.",
-        departure_date: new Date().toISOString().slice(0, 19),
-        eta: new Date(Date.now() + 6 * 86400000).toISOString().slice(0, 19),
-        temperature_threshold: 14.0
+        departure_date: "2026-07-25T07:49:15",
+        eta: "2026-07-31T07:49:15",
+        temperature_threshold: 14
     });
 
     const fetchData = async () => {
         try {
             setLoading(true);
-            setError(null);
             
             const [shipmentsRes, catalogRes, fleetRes] = await Promise.all([
                 api.get("/logistics/shipments"),
@@ -187,7 +161,6 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
             }
         } catch (err) {
             console.error("Error al sincronizar datos con el backend:", err);
-            setError("No se pudo conectar con el servidor para listar los productos y la flota.");
         } finally {
             setLoading(false);
         }
@@ -205,12 +178,9 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                 product: selected.product,
                 container_id: selected.containerId,
                 vessel_name: selected.vessel || formData.vessel_name,
-                farmer_name: selected.originName || "Agricultor Asociado",
+                origin_name: selected.originName || "Agricultor Asociado",
                 origin_lat: selected.originCoords[0],
                 origin_lng: selected.originCoords[1],
-                coop_name: selected.coopName || "Cooperativa Agrícola Regional",
-                coop_lat: selected.originCoords[0] + 0.015,
-                coop_lng: selected.originCoords[1] + 0.015,
                 destination_name: selected.destinationName,
                 destination_lat: selected.destinationCoords[0],
                 destination_lng: selected.destinationCoords[1],
@@ -275,7 +245,6 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
     return (
         <div className="space-y-6">
             
-            {/* CABECERA Y ACCIÓN PRINCIPAL */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl bg-white p-5 border border-slate-200 shadow-sm">
                 <div>
                     <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -314,22 +283,33 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                 </div>
             </div>
 
-            {/* FORMULARIO DINÁMICO */}
             {showForm && (
                 <form onSubmit={handleFormSubmit} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl space-y-6">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                         <h4 className="text-sm font-bold flex items-center gap-2 text-slate-900">
-                            <PackagePlus size={18} className="text-emerald-600" /> Registro del Agricultor, Cooperativa y Transporte
+                            <PackagePlus size={18} className="text-emerald-600" /> Registro del Envío (Todos los Campos de la Tabla)
                         </h4>
                         <span className="text-[11px] text-slate-500">Sincronizado con la API del backend</span>
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
-                        <div className="space-y-4">
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                             <div>
-                                <label className="text-xs font-semibold text-slate-700 block mb-1">1. Producto Agrícola:</label>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">1. ID de Lote:</label>
+                                <input 
+                                    type="text" 
+                                    value={formData.id} 
+                                    onChange={e => setFormData({...formData, id: e.target.value})}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">2. Producto Agrícola:</label>
                                 <select 
                                     onChange={e => handleProductSelect(e.target.value)}
+                                    value={formData.product}
                                     className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
                                     required
                                 >
@@ -342,80 +322,170 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                                 </select>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-700 block mb-1">2. Agricultor / Finca:</label>
-                                    <input 
-                                        type="text"
-                                        value={formData.farmer_name}
-                                        onChange={e => setFormData({...formData, farmer_name: e.target.value})}
-                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-700 block mb-1">3. Cooperativa de Acopio:</label>
-                                    <input 
-                                        type="text"
-                                        value={formData.coop_name}
-                                        onChange={e => setFormData({...formData, coop_name: e.target.value})}
-                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
-                                        required
-                                    />
-                                </div>
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">3. ID de Contenedor (Reefer):</label>
+                                <input 
+                                    type="text"
+                                    value={formData.container_id}
+                                    onChange={e => setFormData({...formData, container_id: e.target.value})}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">4. Origen / Finca (origin_name):</label>
+                                <input 
+                                    type="text"
+                                    value={formData.origin_name}
+                                    onChange={e => setFormData({...formData, origin_name: e.target.value})}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    required
+                                />
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-700 block mb-1">4. Buque Comercial:</label>
-                                    <select 
-                                        value={formData.vessel_name}
-                                        onChange={e => setFormData({...formData, vessel_name: e.target.value})}
-                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">5. Latitud Origen:</label>
+                                    <input 
+                                        type="number"
+                                        step="any"
+                                        value={formData.origin_lat}
+                                        onChange={e => setFormData({...formData, origin_lat: parseFloat(e.target.value) || 0})}
+                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
                                         required
-                                    >
-                                        <option value="">-- Selecciona buque --</option>
-                                        {fleetCatalog.map((vessel, idx) => (
-                                            <option key={idx} value={vessel.vesselName}>
-                                                🚢 {vessel.vesselName}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-700 block mb-1">5. Código de Lote:</label>
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">6. Longitud Origen:</label>
                                     <input 
-                                        type="text" 
-                                        value={formData.id} 
-                                        onChange={e => setFormData({...formData, id: e.target.value})}
+                                        type="number"
+                                        step="any"
+                                        value={formData.origin_lng}
+                                        onChange={e => setFormData({...formData, origin_lng: parseFloat(e.target.value) || 0})}
                                         className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
                                         required
                                     />
                                 </div>
                             </div>
 
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">7. Destino (destination_name):</label>
+                                <input 
+                                    type="text"
+                                    value={formData.destination_name}
+                                    onChange={e => setFormData({...formData, destination_name: e.target.value})}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    required
+                                />
+                            </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-700 block mb-1">6. Operador Terrestre:</label>
-                                    <select 
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">8. Latitud Destino:</label>
+                                    <input 
+                                        type="number"
+                                        step="any"
+                                        value={formData.destination_lat}
+                                        onChange={e => setFormData({...formData, destination_lat: parseFloat(e.target.value) || 0})}
+                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">9. Longitud Destino:</label>
+                                    <input 
+                                        type="number"
+                                        step="any"
+                                        value={formData.destination_lng}
+                                        onChange={e => setFormData({...formData, destination_lng: parseFloat(e.target.value) || 0})}
+                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">10. Buque Comercial (vessel_name):</label>
+                                <select 
+                                    value={formData.vessel_name}
+                                    onChange={e => setFormData({...formData, vessel_name: e.target.value})}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    required
+                                >
+                                    <option value="">-- Selecciona buque --</option>
+                                    {fleetCatalog.map((vessel, idx) => (
+                                        <option key={idx} value={vessel.vesselName}>
+                                            🚢 {vessel.vesselName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">11. Cámara de Aire (air_chamber):</label>
+                                <input 
+                                    type="text"
+                                    value={formData.air_chamber}
+                                    onChange={e => setFormData({...formData, air_chamber: e.target.value})}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">12. Matrícula Tráiler (truck_plate):</label>
+                                    <input 
+                                        type="text"
+                                        value={formData.truck_plate}
+                                        onChange={e => setFormData({...formData, truck_plate: e.target.value})}
+                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">13. Operador Terrestre (land_carrier):</label>
+                                    <input 
+                                        type="text"
                                         value={formData.land_carrier}
                                         onChange={e => setFormData({...formData, land_carrier: e.target.value})}
                                         className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-bold text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
-                                    >
-                                        <option value="Transports Frío Peninsular S.A.">Transports Frío Peninsular</option>
-                                        <option value="Logística Ibérica de Contenedores">Logística Ibérica</option>
-                                    </select>
+                                    />
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-semibold text-slate-700 block mb-1">7. Matrícula Tráiler:</label>
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">14. Fecha de Salida (departure_date):</label>
                                     <input 
-                                        type="text" 
-                                        value={formData.truck_plate} 
-                                        onChange={e => setFormData({...formData, truck_plate: e.target.value})}
+                                        type="datetime-local"
+                                        value={formData.departure_date}
+                                        onChange={e => setFormData({...formData, departure_date: e.target.value})}
                                         className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
                                         required
                                     />
                                 </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 block mb-1">15. Estimación Llegada (eta):</label>
+                                    <input 
+                                        type="datetime-local"
+                                        value={formData.eta}
+                                        onChange={e => setFormData({...formData, eta: e.target.value})}
+                                        className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-semibold text-slate-700 block mb-1">16. Umbral de Temperatura (ºC):</label>
+                                <input 
+                                    type="number"
+                                    step="any"
+                                    value={formData.temperature_threshold}
+                                    onChange={e => setFormData({...formData, temperature_threshold: parseFloat(e.target.value) || 0})}
+                                    className="w-full p-3 border border-slate-200 rounded-2xl bg-slate-50 font-mono text-slate-900 focus:outline-none focus:border-emerald-500 text-xs shadow-inner"
+                                    required
+                                />
                             </div>
 
                             <div className="pt-2">
@@ -425,7 +495,7 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                                     className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 rounded-2xl transition flex items-center justify-center gap-2 text-xs shadow-md shadow-emerald-600/20 cursor-pointer"
                                 >
                                     {formLoading && <Loader2 className="animate-spin" size={16} />}
-                                    Confirmar y Desplegar con Agricultor
+                                    Registrar Lote en Base de Datos
                                 </button>
                             </div>
                         </div>
@@ -440,10 +510,6 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                                             <UserCheck size={18} />
                                         </div>
                                         <ArrowRight size={14} className="text-slate-400" />
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow">
-                                            <Building2 size={18} />
-                                        </div>
-                                        <ArrowRight size={14} className="text-slate-400" />
                                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500 text-white shadow">
                                             <Ship size={18} />
                                         </div>
@@ -451,13 +517,13 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
 
                                     <div>
                                         <h5 className="text-sm font-extrabold text-slate-900 tracking-wide">{formData.product}</h5>
-                                        <p className="text-[11px] text-emerald-700 font-mono mt-0.5">Agricultor: {formData.farmer_name}</p>
+                                        <p className="text-[11px] text-emerald-700 font-mono mt-0.5">Origen: {formData.origin_name}</p>
                                     </div>
 
                                     <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-left space-y-1">
                                         <p className="text-[11px] text-slate-700 flex items-center justify-between">
-                                            <span className="font-bold flex items-center gap-1"><Building2 size={12} className="text-amber-500"/> Cooperativa:</span>
-                                            <span className="font-semibold text-slate-900">{formData.coop_name}</span>
+                                            <span className="font-bold flex items-center gap-1"><Ship size={12} className="text-blue-500"/> Buque:</span>
+                                            <span className="font-semibold text-slate-900">{formData.vessel_name}</span>
                                         </p>
                                         <p className="text-[11px] text-slate-700 flex items-center justify-between">
                                             <span className="font-bold flex items-center gap-1"><Truck size={12} className="text-purple-500"/> Terrestre:</span>
@@ -468,7 +534,7 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                             ) : (
                                 <div className="text-center space-y-2 z-10 opacity-70">
                                     <UserCheck size={36} className="mx-auto text-emerald-600 animate-bounce" />
-                                    <p className="text-xs text-slate-500 font-medium">Selecciona un producto para ver el esquema del agricultor</p>
+                                    <p className="text-xs text-slate-500 font-medium">Selecciona un producto para ver el esquema de envío</p>
                                 </div>
                             )}
                         </div>
@@ -496,7 +562,7 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
             {shipmentIds.length === 0 ? (
                 <div className="rounded-2xl bg-slate-50 border border-slate-200 p-12 text-center text-slate-600">
                     <p className="font-bold text-base">No hay lotes logísticos activos</p>
-                    <p className="text-sm mt-1">Registra tu primer lote seleccionando al agricultor de origen.</p>
+                    <p className="text-sm mt-1">Registra tu primer lote completando el formulario de campos.</p>
                 </div>
             ) : shipment && (
                 <>
@@ -558,10 +624,7 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                                                 <Polyline positions={landRoute} pathOptions={{ color: '#10b981', weight: 4, opacity: 0.9 }} />
 
                                                 <Marker position={item.originCoords} icon={farmerIcon}>
-                                                    <Popup className="font-sans text-xs rounded-xl"><strong>Agricultor: {item.farmerName}</strong><br/>Finca de Origen</Popup>
-                                                </Marker>
-                                                <Marker position={coopCoords} icon={coopIcon}>
-                                                    <Popup className="font-sans text-xs rounded-xl"><strong>Cooperativa</strong><br/>{item.coopName}</Popup>
+                                                    <Popup className="font-sans text-xs rounded-xl"><strong>Origen: {item.farmerName}</strong></Popup>
                                                 </Marker>
                                                 <Marker position={item.vesselCoords} icon={shipIcon}>
                                                     <Popup className="font-sans text-xs rounded-xl"><strong>Buque: {item.vessel}</strong></Popup>
@@ -577,69 +640,7 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                         </div>
                     </div>
 
-                    {/* TRAZABILIDAD PASO A PASO CON AGRICULTOR */}
-                    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-                            <div>
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                                    <Compass size={18} className="text-emerald-600" /> Trazabilidad Completa: Agricultor ➔ Cooperativa ➔ Mercamadrid
-                                </h3>
-                                <p className="text-xs text-slate-500">Custodia certificada para el lote <span className="font-mono font-bold text-slate-800">{shipment.id}</span></p>
-                            </div>
-                            <span className="text-xs font-mono bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-xl font-bold">
-                                Estado: {TIMELINE_STEPS[shipment.currentStep]?.label || "En Tránsito"}
-                            </span>
-                        </div>
-                            
-                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                            <div className={`p-4 rounded-2xl border transition ${shipment.currentStep >= 0 ? 'bg-emerald-50/50 border-emerald-300 ring-2 ring-emerald-100' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="p-2 rounded-xl bg-emerald-600 text-white shadow-sm"><UserCheck size={16} /></span>
-                                    <span className="text-[10px] font-mono font-bold text-emerald-700">Paso 1</span>
-                                </div>
-                                <h4 className="text-xs font-bold text-slate-900">Agricultor & Finca</h4>
-                                <p className="text-[11px] text-slate-600 mt-1 leading-snug">{shipment.farmerName}</p>
-                            </div>
-                            
-                            <div className={`p-4 rounded-2xl border transition ${shipment.currentStep >= 1 ? 'bg-amber-50/50 border-amber-300' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="p-2 rounded-xl bg-amber-600 text-white shadow-sm"><Building2 size={16} /></span>
-                                    <span className="text-[10px] font-mono font-bold text-amber-700">Paso 2</span>
-                                </div>
-                                <h4 className="text-xs font-bold text-slate-900">Cooperativa</h4>
-                                <p className="text-[11px] text-slate-600 mt-1 leading-snug">{shipment.coopName || "Acopio y Pre-frío"}</p>
-                            </div>
-                            
-                            <div className={`p-4 rounded-2xl border transition ${shipment.currentStep >= 2 ? 'bg-blue-50/50 border-blue-300' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="p-2 rounded-xl bg-blue-600 text-white shadow-sm"><Ship size={16} /></span>
-                                    <span className="text-[10px] font-mono font-bold text-blue-700">Paso 3</span>
-                                </div>
-                                <h4 className="text-xs font-bold text-slate-900">Tránsito Marítimo</h4>
-                                <p className="text-[11px] text-slate-600 mt-1 leading-snug"><strong className="text-slate-900">{shipment.vessel}</strong></p>
-                            </div>
-                            
-                            <div className={`p-4 rounded-2xl border transition ${shipment.currentStep >= 3 ? 'bg-purple-50/50 border-purple-300' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="p-2 rounded-xl bg-purple-600 text-white shadow-sm"><Truck size={16} /></span>
-                                    <span className="text-[10px] font-mono font-bold text-purple-700">Paso 4</span>
-                                </div>
-                                <h4 className="text-xs font-bold text-slate-900">Tráiler Última Milla</h4>
-                                <p className="text-[11px] text-slate-600 mt-1 leading-snug">{shipment.truck_plate || "4829-LMX"}</p>
-                            </div>
-                            
-                            <div className={`p-4 rounded-2xl border transition ${shipment.currentStep >= 4 ? 'bg-violet-50/50 border-violet-300' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="p-2 rounded-xl bg-violet-600 text-white shadow-sm"><CheckCircle2 size={16} /></span>
-                                    <span className="text-[10px] font-mono font-bold text-violet-700">Paso 5</span>
-                                </div>
-                                <h4 className="text-xs font-bold text-slate-900">Mercamadrid</h4>
-                                <p className="text-[11px] text-slate-600 mt-1 leading-snug">{shipment.destinationName}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* GRÁFICO DE TEMPERATURA Y BOTÓN DE SIMULACIÓN DE WHATSAPP */}
+                    {/* GRÁFICO DE TEMPERATURA */}
                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                         <div className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                             <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -650,22 +651,15 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                                     </h3>
                                     <p className="text-xs text-slate-500 mt-0.5">
                                         Contenedor: <span className="font-mono font-semibold text-slate-700">{shipment.containerId}</span> | 
-                                        Zona: <span className="font-semibold text-slate-700">{shipment.air_chamber || "Cámara Principal"}</span> | 
                                         Límite Crítico: <span className="font-semibold text-rose-600">{shipment.temperatureThreshold}ºC</span>
                                     </p>
                                 </div>
-
                                 <div className="flex items-center gap-3">
                                     <div className="text-right">
                                         <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Temperatura Actual</p>
                                         <p className={`text-2xl font-black ${hasTemperatureAlert ? 'text-rose-600' : 'text-emerald-600'}`}>
                                             {latestRecord.temp.toFixed(1)}º<span className="text-sm font-bold">C</span>
                                         </p>
-                                    </div>
-                                    <div className={`px-3 py-1 rounded-xl text-xs font-bold border ${
-                                        hasTemperatureAlert ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                    }`}>
-                                        {hasTemperatureAlert ? "Fuera de Rango" : "Frío Estable"}
                                     </div>
                                 </div>
                             </div>
@@ -677,15 +671,14 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                                         <XAxis dataKey="time" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
                                         <YAxis domain={[shipment.temperatureThreshold - 4, shipment.temperatureThreshold + 4]} tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(value) => `${value}º`} />
                                         <Tooltip content={<CustomTooltip threshold={shipment.temperatureThreshold} />} />
-                                        <ReferenceLine y={shipment.temperatureThreshold} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} label={{ value: `MÁXIMO PERMITIDO (${shipment.temperatureThreshold}ºC)`, position: 'insideTopRight', fill: '#ef4444', fontSize: 10, fontWeight: 'bold' }} />
-                                        <Line type="monotone" dataKey="temp" stroke={hasTemperatureAlert ? "#ef4444" : "#10b981"} strokeWidth={3} dot={{ r: 5, strokeWidth: 3, fill: 'white' }} activeDot={{ r: 7, stroke: hasTemperatureAlert ? "#ef4444" : "#10b981", strokeWidth: 2, fill: 'white' }} isAnimationActive={true} />
+                                        <ReferenceLine y={shipment.temperatureThreshold} stroke="#ef4444" strokeDasharray="4 4" strokeWidth={2} />
+                                        <Line type="monotone" dataKey="temp" stroke={hasTemperatureAlert ? "#ef4444" : "#10b981"} strokeWidth={3} dot={{ r: 5, strokeWidth: 3, fill: 'white' }} />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
 
-                            {/* Botón para Simular Alerta de WhatsApp */}
                             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                                <p className="text-xs text-slate-500">¿Desea probar el envío de avisos de temperatura al WhatsApp del agricultor?</p>
+                                <p className="text-xs text-slate-500">¿Desea probar el envío de avisos de temperatura al WhatsApp?</p>
                                 <button 
                                     onClick={async () => {
                                         try {
@@ -700,50 +693,6 @@ export default function LogisticsTracker({ selectedShipmentId: externalShipmentI
                                 >
                                     <MessageSquare size={14} /> Simular Alerta de WhatsApp
                                 </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* GRÁFICOS ADICIONALES DE HUMEDAD Y VENTILACIÓN */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">                
-                        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                            <div className="mb-4 flex items-center justify-between">
-                                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-900">
-                                    <Layers size={16} className="text-blue-600" /> Humedad Relativa en Cámara (%)
-                                </h3>
-                                <span className="text-xs font-mono bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg font-bold">Óptimo: 85% - 90%</span>
-                            </div>
-                            <div className="h-60 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={shipment.temperatureHistory.map(d => ({ time: d.time, humidity: 85 + (Math.sin(d.temp) * 3) }))}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                        <YAxis domain={[70, 100]} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
-                                        <Tooltip />
-                                        <ReferenceLine y={90} stroke="#3b82f6" strokeDasharray="3 3" label={{ value: 'MAX', fill: '#3b82f6', fontSize: 10 }} />
-                                        <Line type="monotone" dataKey="humidity" stroke="#3b82f6" strokeWidth={2.5} dot={false} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                            <div className="mb-4 flex items-center justify-between">
-                                <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-900">
-                                    <Compass size={16} className="text-emerald-600" /> Tasa de Renovación de Aire (CMH)
-                                </h3>
-                                <span className="text-xs font-mono bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg font-bold">Flujo Constante</span>
-                            </div>
-                            <div className="h-60 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={shipment.temperatureHistory.map(d => ({ time: d.time, airFlow: 20 + (Math.cos(d.temp) * 2) }))}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="time" tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                                        <YAxis domain={[10, 30]} tick={{ fontSize: 11, fill: '#64748b' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v} m³/h`} />
-                                        <Tooltip />
-                                        <Line type="monotone" dataKey="airFlow" stroke="#10b981" strokeWidth={2.5} dot={false} />
-                                    </LineChart>
-                                </ResponsiveContainer>
                             </div>
                         </div>
                     </div>

@@ -12,9 +12,19 @@ import Register from "@/pages/Register";
 import Landing from "@/pages/Landing"; 
 import AboutProductPage from "@/pages/AboutProductPage";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
-import SustainabilityPage from "@/pages/SustainabilityPage"; // NUEVO
+import SustainabilityPage from "@/pages/SustainabilityPage";
 import ChromaDebugPage from "./pages/ChromaDebuPage";
 import LogisticsDashboard from "@/pages/LogisticDashboard";
+
+import FarmDashboard from "@/pages/FarmDashboard";
+import FincasPage from "@/pages/FincasPage";
+import CultivosPage from "@/pages/CultivosPage";
+
+// Páginas adicionales para el Operador Logístico (LOGISTICS_OPERATOR)
+import FlotaPage from "@/pages/FlotaPage";
+import ReeferPage from "@/pages/ReeferPage";
+import TransitoPage from "@/pages/TransitoPage";
+
 import { useAuth } from "@/context/AuthContext";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -57,6 +67,14 @@ export default function App() {
                 <Route path="evaluacion" element={<EvaluationPage />} />
                 <Route path="chroma-debug" element={<ChromaDebugPage />} />
                 <Route path="logistics" element={<LogisticsDashboard />} />
+
+                <Route path="farm-dashboard" element={<FarmDashboard />} />
+                <Route path="fincas" element={<FincasPage />} />
+                <Route path="cultivos" element={<CultivosPage />} />
+
+                <Route path="flota" element={<FlotaPage />} />
+                <Route path="reefer" element={<ReeferPage />} />
+                <Route path="transito" element={<TransitoPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

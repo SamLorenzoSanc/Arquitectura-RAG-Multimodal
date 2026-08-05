@@ -1,12 +1,11 @@
 import { Outlet } from "react-router-dom";
-import type { ReactNode } from "react"; // Usamos 'import type' por la regla estricta de tu tsconfig
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { OrganizationProvider } from "@/context/OrganizationContext";
 
 // Definimos la interfaz para aceptar componentes hijos de forma opcional
-interface DashboardLayoutProps {
-    children?: ReactNode;
+export interface DashboardLayoutProps {
+  children: React.ReactNode;
 }
 
 export default function DashboardLayout() {

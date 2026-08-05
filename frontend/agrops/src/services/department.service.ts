@@ -26,7 +26,7 @@ class DepartmentService {
         return data;
     }
 
-    async get(
+    async getDepartments(
         departmentId: string
     ): Promise<Department> {
 
@@ -79,7 +79,7 @@ class DepartmentService {
 
     }
 
-    async members(
+    async getDepartmentMembers(
         departmentId: string
     ): Promise<DepartmentMember[]> {
 
@@ -139,4 +139,9 @@ class DepartmentService {
     }
 }
 
-export default new DepartmentService();
+const departmentServiceInstance = new DepartmentService();
+
+export default departmentServiceInstance;
+
+export const getDepartments = departmentServiceInstance.getDepartments.bind(departmentServiceInstance);
+export const getDepartmentMembers = departmentServiceInstance.getDepartmentMembers.bind(departmentServiceInstance);

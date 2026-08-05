@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useMemo, useEffect, FormEvent } from "react";
-import { Send, Upload, X, Database, Layers, Loader2, FileText, ChevronDown, Sparkles, Building, Cpu } from "lucide-react";
+import { useState, useRef, useMemo, useEffect, type FormEvent } from "react";
+import { Upload, X, Layers, Loader2, FileText, ChevronDown, Sparkles, Building, Cpu } from "lucide-react";
 import ChatService from "@/services/chat.service";
 import DocumentService from "@/services/document.service";
 import KnowledgeService from "../services/knowledge.service";
@@ -94,7 +94,7 @@ export default function ChatPage() {
         if (selectedOrg?.id) {
             createNewChat();
             initialize(selectedOrg.id);
-            loadConversations(selectedOrg.id);
+            loadConversations();
         }
     }, [selectedOrg?.id]);
 
@@ -106,9 +106,9 @@ export default function ChatPage() {
         return Math.round(contextCharacters / 4);
     }, [contextCharacters]);
 
-    const loadConversations = async (orgId: string) => {
+    const loadConversations = async () => {
         try {
-            const data = await ChatService.listConversations(orgId);
+            const data = await ChatService.listConversations();
             setConversations(data);
         } catch (error) {
             console.error("Error al listar conversaciones:", error);
@@ -118,10 +118,10 @@ export default function ChatPage() {
     const initialize = async (orgId: string) => {
         try {
             let kbList = [];
-            if (typeof KnowledgeService.list === 'function') {
-                kbList = await KnowledgeService.list(orgId);
-            } else if (typeof KnowledgeService.getCurrent === 'function') {
-                const currentKb = await KnowledgeService.getCurrent(orgId);
+            if ('list' in KnowledgeService && typeof (KnowledgeService as any).list === 'function') {
+                kbList = await (KnowledgeService as any).list(orgId);
+            } else if ('getCurrent' in KnowledgeService && typeof (KnowledgeService as any).getCurrent === 'function') {
+                const currentKb = await (KnowledgeService as any).getCurrent();
                 if (currentKb) kbList = [currentKb];
             }
 
@@ -221,16 +221,13 @@ export default function ChatPage() {
                 content: msg.content,
             }));
 
-            // PETICIÓN CON EL MODELO DE LENGUAJE SELECCIONADO
             const response = await ChatService.send({
                 question,
                 conversation_id: conversationId,
                 history,
                 knowledge_base_id: useRag ? (knowledgeBaseId || undefined) : undefined,
                 use_rag: useRag, 
-                organization_id: selectedOrg.id,
-                organization_name: selectedOrg.name,
-                model: selectedModel // Envía el modelo de Ollama seleccionado
+                model: selectedModel
             });
 
             if (response.conversation_id) {
@@ -301,8 +298,8 @@ export default function ChatPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
                         <div className="flex items-center gap-2">
-                            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600">CHAT MULTI-INQUILINO</h4>
-                            <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-[#003B70]">CHAT MULTI-INQUILINO</h4>
+                            <span className="bg-[#FFF2CC] text-[#806600] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#FFE082] flex items-center gap-1">
                                 <Building size={10} />
                                 Aislamiento Activo
                             </span>
@@ -314,7 +311,7 @@ export default function ChatPage() {
                     <div className="flex flex-wrap items-center gap-3">
                         {/* Selector de Modelos Ollama */}
                         <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shrink-0 shadow-xs">
-                            <Cpu size={15} className="text-emerald-600 shrink-0" />
+                            <Cpu size={15} className="text-[#003B70] shrink-0" />
                             <label htmlFor="model-select" className="text-xs font-semibold text-slate-600 whitespace-nowrap">
                                 Modelo:
                             </label>
@@ -335,7 +332,7 @@ export default function ChatPage() {
                         {/* Selector de Base de Conocimiento */}
                         {useRag && (
                             <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 shrink-0 shadow-xs">
-                                <Layers size={15} className="text-emerald-600 shrink-0" />
+                                <Layers size={15} className="text-[#003B70] shrink-0" />
                                 <label htmlFor="kb-select" className="text-xs font-semibold text-gray-600 whitespace-nowrap">
                                     Base de Conocimiento:
                                 </label>
@@ -362,7 +359,7 @@ export default function ChatPage() {
                 <aside className="w-[260px] shrink-0 border-r border-gray-200 bg-white p-4 flex flex-col min-h-0">
                     <button
                         onClick={createNewChat}
-                        className="mb-4 flex items-center justify-center rounded-lg bg-emerald-600 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-700 shrink-0 transition-colors"
+                        className="mb-4 flex items-center justify-center rounded-lg bg-[#003B70] px-4 py-3 text-sm font-medium text-white hover:bg-[#00284d] shrink-0 transition-colors"
                     >
                         + Nuevo chat
                     </button>
@@ -375,11 +372,11 @@ export default function ChatPage() {
                         {conversations.length === 0 && (
                             <p className="text-sm text-gray-400">No hay chats todavía</p>
                         )}
-                        {conversations.map(chat => (       
+                        {conversations.map(chat => (     
                             <button
                                 key={chat.id}
                                 onClick={() => openConversation(chat.id)}
-                                className={`w-full rounded-lg px-3 py-3 text-left hover:bg-gray-100 min-w-0 transition-colors ${conversationId === chat.id ? 'bg-emerald-50 text-emerald-700 font-semibold' : ''}`}
+                                className={`w-full rounded-lg px-3 py-3 text-left hover:bg-gray-100 min-w-0 transition-colors ${conversationId === chat.id ? 'bg-[#003B70]/10 text-[#003B70] font-semibold border-l-4 border-[#FFD100]' : ''}`}
                             >
                                 <p className="truncate text-sm font-medium">
                                     {chat.title}
@@ -401,7 +398,7 @@ export default function ChatPage() {
                                         Asistente de {selectedOrg.name}
                                     </h2>
                                     <p className="text-sm text-gray-500 leading-relaxed">
-                                        Este chat está limitado exclusivamente a la información y documentos de esta organización utilizando el modelo <span className="font-semibold text-emerald-600">{selectedModel}</span>.
+                                        Este chat está limitado exclusivamente a la información y documentos de esta organización utilizando el modelo <span className="font-semibold text-[#003B70]">{selectedModel}</span>.
                                     </p>
                                 </div>
                             </div>
@@ -417,7 +414,7 @@ export default function ChatPage() {
                                         <div
                                             className={`max-w-2xl rounded-xl px-5 py-4 shadow-sm ${
                                                 message.role === "user"
-                                                    ? "bg-emerald-600 text-white"
+                                                    ? "bg-[#003B70] text-white"
                                                     : "border border-gray-200 bg-white text-gray-800"
                                             }`}
                                         >
@@ -427,7 +424,7 @@ export default function ChatPage() {
                                             <p
                                                 className={`mt-3 text-[11px] ${
                                                     message.role === "user"
-                                                        ? "text-emerald-100"
+                                                        ? "text-blue-100"
                                                         : "text-gray-400"
                                                 }`}
                                             >
@@ -445,7 +442,7 @@ export default function ChatPage() {
                                                 className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100/70 text-slate-700 text-xs font-semibold transition-colors"
                                             >
                                                 <div className="flex items-center gap-2">
-                                                    <Sparkles size={14} className="text-emerald-600 animate-spin" />
+                                                    <Sparkles size={14} className="text-[#FFD100] animate-spin" />
                                                     <span>Generando con {selectedModel}...</span>
                                                 </div>
                                                 <ChevronDown
@@ -458,7 +455,7 @@ export default function ChatPage() {
 
                                             {isThinkingOpen && (
                                                 <div className="px-4 py-3 bg-white border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500 font-mono">
-                                                    <Loader2 size={13} className="animate-spin text-emerald-600 shrink-0" />
+                                                    <Loader2 size={13} className="animate-spin text-[#003B70] shrink-0" />
                                                     <p className="animate-pulse truncate">{thinkingStep || "Procesando información..."}</p>
                                                 </div>
                                             )}
@@ -480,7 +477,7 @@ export default function ChatPage() {
                             {knowledgeBaseId && (
                                 <button
                                     onClick={() => setShowUploadModal(true)}
-                                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 transition-colors"
+                                    className="text-xs font-semibold text-[#003B70] hover:text-[#00284d] flex items-center gap-1 bg-[#003B70]/10 px-3 py-1.5 rounded-lg border border-[#003B70]/20 transition-colors"
                                 >
                                     + Añadir documento
                                 </button>
@@ -497,7 +494,7 @@ export default function ChatPage() {
                             <div className="space-y-2">
                                 {documents.map((doc) => (
                                     <div key={doc.id} className="rounded-lg border border-gray-200 p-3 transition hover:bg-gray-50 flex items-center gap-3">
-                                        <FileText size={18} className="text-emerald-600 shrink-0" />
+                                        <FileText size={18} className="text-[#003B70] shrink-0" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-medium text-sm truncate" title={doc.title || doc.filename}>
                                                 {doc.title || doc.filename}
@@ -513,23 +510,23 @@ export default function ChatPage() {
                     </div>
                     
                     {retrieval && (
-                        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
-                            <h3 className="mb-3 font-semibold text-emerald-800">Retrieval (Tenant Context)</h3>
+                        <div className="mb-6 rounded-lg border border-[#FFD100] bg-[#FFFBE6] p-4">
+                            <h3 className="mb-3 font-semibold text-[#806600]">Retrieval (Tenant Context)</h3>
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
-                                    <span className="text-xs font-medium text-emerald-600">Chunks</span>
+                                    <span className="text-xs font-medium text-[#806600]">Chunks</span>
                                     <p className="font-semibold text-slate-700">{retrieval.final_chunks}</p>
                                 </div>
                                 <div>
-                                    <span className="text-xs font-medium text-emerald-600">Caracteres</span>
+                                    <span className="text-xs font-medium text-[#806600]">Caracteres</span>
                                     <p className="font-semibold text-slate-700">{contextCharacters.toLocaleString()}</p>
                                 </div>
                                 <div>
-                                    <span className="text-xs font-medium text-emerald-600">Tokens</span>
+                                    <span className="text-xs font-medium text-[#806600]">Tokens</span>
                                     <p className="font-semibold text-slate-700">{estimatedTokens.toLocaleString()}</p>
                                 </div>
                                 <div>
-                                    <span className="text-xs font-medium text-emerald-600">Uso</span>
+                                    <span className="text-xs font-medium text-[#806600]">Uso</span>
                                     <p className="font-semibold text-slate-700">{Math.round((estimatedTokens / 8192) * 100)}%</p>
                                 </div>
                             </div>
@@ -546,7 +543,7 @@ export default function ChatPage() {
                             {context.map((chunk, index) => (
                                 <div key={index} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                                     <div className="mb-3">
-                                        <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700">
+                                        <span className="rounded bg-[#003B70]/10 px-2 py-1 text-xs font-semibold text-[#003B70]">
                                             {chunk.metadata?.type || "Fragmento"}
                                         </span>
                                     </div>
@@ -569,7 +566,7 @@ export default function ChatPage() {
 
             {showUploadModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
-                    <div className="w-[420px] rounded-xl bg-white shadow-xl overflow-hidden">
+                    <div className="w-[420px] rounded-xl bg-white shadow-xl overflow-hidden border-t-4 border-[#FFD100]">
                         <div className="flex justify-between border-b px-6 py-4 items-center bg-gray-50/50">
                             <div>
                                 <h2 className="font-bold text-slate-800">Subir documentos</h2>
@@ -588,8 +585,8 @@ export default function ChatPage() {
                                 <label className="text-xs font-semibold text-slate-700">Seleccionar Archivos</label>
                                 <div
                                     onClick={() => !isUploadingModal && fileInputRef.current?.click()}
-                                    className={`mt-2 rounded-lg border border-dashed p-8 text-center transition-colors ${
-                                        isUploadingModal ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:bg-gray-50'
+                                    className={`mt-2 rounded-lg border border-dashed border-[#003B70]/40 p-8 text-center transition-colors ${
+                                        isUploadingModal ? 'opacity-50 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:bg-[#003B70]/5'
                                     }`}
                                 >
                                     <input
@@ -601,7 +598,7 @@ export default function ChatPage() {
                                         onChange={handleFileSelect}
                                         disabled={isUploadingModal}
                                     />
-                                    <Upload className="mx-auto mb-2 text-emerald-600 animate-pulse"/>
+                                    <Upload className="mx-auto mb-2 text-[#003B70] animate-pulse"/>
                                     <p className="text-sm font-medium text-slate-700">Haz clic para buscar archivos</p>
                                     <p className="text-xs text-gray-400 mt-1">PDF, TXT, DOCX, imágenes, etc.</p>
                                 </div>
@@ -609,8 +606,8 @@ export default function ChatPage() {
                                 {uploadedFiles.length > 0 && (
                                     <div className="mt-3 space-y-2 max-h-36 overflow-y-auto">
                                         {uploadedFiles.map((file, index) => (
-                                            <div key={index} className="flex items-center justify-between rounded-lg bg-emerald-50/50 px-3 py-2 text-sm border border-emerald-100">
-                                                <span className="truncate pr-4 text-emerald-900 font-medium">{file.name}</span>
+                                            <div key={index} className="flex items-center justify-between rounded-lg bg-[#003B70]/10 px-3 py-2 text-sm border border-[#003B70]/20">
+                                                <span className="truncate pr-4 text-[#003B70] font-medium">{file.name}</span>
                                                 {!isUploadingModal && (
                                                     <button
                                                         onClick={(e) => {
@@ -627,93 +624,10 @@ export default function ChatPage() {
                                     </div>
                                 )}
                             </div>
-                            <div>
-                                <label className="text-xs font-semibold text-slate-700">Categoría</label>
-                                <select
-                                    value={selectedCategory}
-                                    onChange={(e) => setSelectedCategory(e.target.value)}
-                                    disabled={isUploadingModal}
-                                    className="mt-2 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-emerald-500 bg-white"
-                                >
-                                    <option>Misc</option>
-                                    <option>Normativa agrícola</option>
-                                    <option>Manual técnico</option>
-                                </select>
-                            </div>
-
-                            {isUploadingModal && (
-                                <div className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-800 text-xs font-medium animate-pulse">
-                                    <Loader2 size={16} className="animate-spin text-emerald-600 shrink-0" />
-                                    <span>Subiendo e indexando vectores con qwen3-embedding... Por favor espera.</span>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex justify-end gap-3 border-t px-6 py-4 bg-gray-50 rounded-b-xl">
-                            <button
-                                onClick={() => setShowUploadModal(false)}
-                                disabled={isUploadingModal}
-                                className="rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleUploadFilesModal}
-                                disabled={uploadedFiles.length === 0 || isUploadingModal}
-                                className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-50 hover:bg-emerald-700 transition-colors shadow-sm"
-                            >
-                                {isUploadingModal ? (
-                                    <>
-                                        <Loader2 size={16} className="animate-spin" />
-                                        Procesando...
-                                    </>
-                                ) : (
-                                    "Subir e Indexar"
-                                )}
-                            </button>
                         </div>
                     </div>
                 </div>
             )}
-
-            <div className="border-t border-gray-200 bg-white px-8 py-5 shrink-0">
-                <div className="max-w-5xl mx-auto mb-3 flex items-center justify-between">
-                    <label className="flex items-center cursor-pointer group">
-                        <div className="relative flex items-center">
-                            <input 
-                                type="checkbox" 
-                                className="sr-only" 
-                                checked={useRag} 
-                                onChange={() => setUseRag(!useRag)} 
-                            />
-                            <div className={`block w-10 h-5 rounded-full transition-colors ${useRag ? 'bg-emerald-500' : 'bg-gray-300'}`}></div>
-                            <div className={`absolute left-0.5 top-0.5 bg-white w-4 h-4 rounded-full transition-transform ${useRag ? 'transform translate-x-5' : ''}`}></div>
-                        </div>
-                        <div className="ml-3 text-xs font-semibold uppercase tracking-wider text-gray-600 flex items-center gap-1.5 group-hover:text-emerald-600 transition-colors">
-                            <Database size={14} className={useRag ? "text-emerald-500" : "text-gray-400"} />
-                            {useRag ? `RAG Restringido (${selectedOrg.name}) — Modelo: ${selectedModel}` : "Chat General Desactivado"}
-                        </div>
-                    </label>
-                </div>
-                
-                <form onSubmit={handleSendMessage} className="flex items-center gap-3 max-w-5xl mx-auto">
-                    <input
-                        type="text"
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder={`Consulta exclusiva sobre ${selectedOrg.name} usando ${selectedModel}...`}
-                        className="flex-1 rounded-lg border border-gray-200 px-4 py-3.5 text-sm outline-emerald-500 shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                    />
-                    <button
-                        type="submit"
-                        disabled={isLoading || !inputValue.trim()}
-                        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3.5 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                    >
-                        <Send size={18}/>
-                        Enviar
-                    </button>
-                </form>  
-            </div>
         </div>
     );
 }
