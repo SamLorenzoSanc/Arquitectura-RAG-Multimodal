@@ -1,9 +1,22 @@
 {
-    "python.analysis.extraPaths": [
-        "./gateway"
-    ],
-    "pylint.args": [
-        "--init-hook",
-        "import sys; sys.path.insert(0, '.')"
-    ]
+  "python.analysis.extraPaths": ["."],
+  "python.analysis.autoSearchPaths": true,
+  "pylint.args": [
+    "--init-hook=import sys; sys.path.append('.')"
+  ],
+
+  // --- Formateo automático y limpieza al guardar ---
+  "editor.formatOnSave": true,
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+
+  // --- Formateador oficial para Python (Black) ---
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    }
+  }
+
+
 }

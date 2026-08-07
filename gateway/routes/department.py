@@ -20,6 +20,7 @@ router = APIRouter(
 # Crear departamento
 # ============================================================
 
+
 @router.post("")
 async def create_department(
     request: DepartmentCreateRequest,
@@ -28,9 +29,9 @@ async def create_department(
 ):
 
     department = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 INSERT INTO departments(
                     organization_id,
                     name,
@@ -46,11 +47,13 @@ async def create_department(
                     organization_id,
                     name,
                     description
-                """
-            ),
-            request.model_dump(),
+                """),
+                request.model_dump(),
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     await db.commit()
 
@@ -61,6 +64,7 @@ async def create_department(
 # Listar departamentos de una organización
 # ============================================================
 
+
 @router.get("/organization/{organization_id}")
 async def list_departments(
     organization_id: str,
@@ -69,9 +73,9 @@ async def list_departments(
 ):
 
     departments = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     d.id,
                     d.name,
@@ -90,13 +94,13 @@ async def list_departments(
                     d.description
 
                 ORDER BY d.name
-                """
-            ),
-            {
-                "organization_id": organization_id
-            },
+                """),
+                {"organization_id": organization_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     return departments
 
@@ -104,6 +108,7 @@ async def list_departments(
 # ============================================================
 # Obtener un departamento
 # ============================================================
+
 
 @router.get("/{department_id}")
 async def get_department(
@@ -113,9 +118,9 @@ async def get_department(
 ):
 
     department = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     id,
                     organization_id,
@@ -123,13 +128,13 @@ async def get_department(
                     description
                 FROM departments
                 WHERE id=:id
-                """
-            ),
-            {
-                "id": department_id
-            },
+                """),
+                {"id": department_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not department:
         raise HTTPException(
@@ -144,6 +149,7 @@ async def get_department(
 # Actualizar departamento
 # ============================================================
 
+
 @router.put("/{department_id}")
 async def update_department(
     department_id: str,
@@ -153,15 +159,13 @@ async def update_department(
 ):
 
     await db.execute(
-        text(
-            """
+        text("""
             UPDATE departments
             SET
                 name=:name,
                 description=:description
             WHERE id=:id
-            """
-        ),
+            """),
         {
             "id": department_id,
             **request.model_dump(),
@@ -170,14 +174,13 @@ async def update_department(
 
     await db.commit()
 
-    return {
-        "status": "updated"
-    }
+    return {"status": "updated"}
 
 
 # ============================================================
 # Eliminar departamento
 # ============================================================
+
 
 @router.delete("/{department_id}")
 async def delete_department(
@@ -187,28 +190,23 @@ async def delete_department(
 ):
 
     await db.execute(
-        text(
-            """
+        text("""
             DELETE
             FROM departments
             WHERE id=:id
-            """
-        ),
-        {
-            "id": department_id
-        },
+            """),
+        {"id": department_id},
     )
 
     await db.commit()
 
-    return {
-        "status": "deleted"
-    }
+    return {"status": "deleted"}
 
 
 # ============================================================
 # Listar miembros de un departamento
 # ============================================================
+
 
 @router.get("/{department_id}/members")
 async def list_department_members(
@@ -218,9 +216,9 @@ async def list_department_members(
 ):
 
     members = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     u.id,
                     u.name,
@@ -233,23 +231,21 @@ async def list_department_members(
                 WHERE dm.department_id=:department_id
 
                 ORDER BY u.name
-                """
-            ),
-            {
-                "department_id": department_id
-            },
+                """),
+                {"department_id": department_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
-    return {
-        "items": members,
-        "total": len(members)
-    }
+    return {"items": members, "total": len(members)}
 
 
 # ============================================================
 # Añadir usuario a un departamento
 # ============================================================
+
 
 @router.post("/{department_id}/members")
 async def add_department_member(
@@ -260,8 +256,7 @@ async def add_department_member(
 ):
 
     await db.execute(
-        text(
-            """
+        text("""
             INSERT INTO department_members(
                 department_id,
                 user_id
@@ -275,8 +270,7 @@ async def add_department_member(
                 user_id
             )
             DO NOTHING
-            """
-        ),
+            """),
         {
             "department_id": department_id,
             "user_id": request.user_id,
@@ -285,14 +279,13 @@ async def add_department_member(
 
     await db.commit()
 
-    return {
-        "status": "member_added"
-    }
+    return {"status": "member_added"}
 
 
 # ============================================================
 # Eliminar usuario de un departamento
 # ============================================================
+
 
 @router.delete("/{department_id}/members/{user_id}")
 async def remove_department_member(
@@ -303,16 +296,14 @@ async def remove_department_member(
 ):
 
     await db.execute(
-        text(
-            """
+        text("""
             DELETE
             FROM department_members
             WHERE
                 department_id=:department_id
             AND
                 user_id=:user_id
-            """
-        ),
+            """),
         {
             "department_id": department_id,
             "user_id": user_id,
@@ -321,14 +312,13 @@ async def remove_department_member(
 
     await db.commit()
 
-    return {
-        "status": "member_removed"
-    }
+    return {"status": "member_removed"}
 
 
 # ============================================================
 # Departamentos de un usuario
 # ============================================================
+
 
 @router.get("/user/{user_id}")
 async def get_user_departments(
@@ -338,9 +328,9 @@ async def get_user_departments(
 ):
 
     departments = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     d.id,
                     d.name,
@@ -353,23 +343,21 @@ async def get_user_departments(
                 WHERE dm.user_id=:user_id
 
                 ORDER BY d.name
-                """
-            ),
-            {
-                "user_id": user_id
-            },
+                """),
+                {"user_id": user_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
-    return {
-        "items": departments,
-        "total": len(departments)
-    }
+    return {"items": departments, "total": len(departments)}
 
 
 # ============================================================
 # Usuarios disponibles para añadir
 # ============================================================
+
 
 @router.get("/{department_id}/available-users")
 async def available_users(
@@ -379,9 +367,9 @@ async def available_users(
 ):
 
     users = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     u.id,
                     u.name,
@@ -398,15 +386,12 @@ async def available_users(
                 )
 
                 ORDER BY u.name
-                """
-            ),
-            {
-                "department_id": department_id
-            },
+                """),
+                {"department_id": department_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
-    return {
-        "items": users,
-        "total": len(users)
-    }
+    return {"items": users, "total": len(users)}

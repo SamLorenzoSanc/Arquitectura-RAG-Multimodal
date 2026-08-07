@@ -5,11 +5,9 @@ import {
     FileText, 
     Ship, 
     Clock, 
-    CheckCircle2, 
-    AlertCircle, 
+    CheckCircle2,
     Search, 
     MapPin, 
-    Calendar,
     ChevronRight,
     ArrowRight
 } from "lucide-react";

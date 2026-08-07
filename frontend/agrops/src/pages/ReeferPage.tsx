@@ -8,7 +8,6 @@ import {
     AlertTriangle, 
     CheckCircle2, 
     Search, 
-    Filter,
     Activity,
     Clock,
     ChevronRight

@@ -1,24 +1,23 @@
 services:
-  postgres:
-    build:
-      context: ./postgres
-    image: postgres_db
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
 
-  api-gateway:
-    build:
-      context: ./gateway
-    image: api-gateway
-    container_name: agrops-api-gateway
-    depends_on:
-      - postgres
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agrops-ollama
     ports:
-      - "8000:8000"
+      - "11434:11434"
+    volumes:
+      - C:\Users\Usuario\.ollama\models:/root/.ollama/models
+  api: 
+    build:
+      context: ./gateway 
+    image: agrops-api
+    container_name: agrops-api
+    env_file:
+      - .env
+    depends_on:
+      - ollama
+    ports:
+      - "8000:8000" 
 
   frontend:
     build:
@@ -26,6 +25,6 @@ services:
     image: agrops-frontend
     container_name: agrops-frontend
     depends_on:
-      - api-gateway
+      - api
     ports:
       - "80:80"

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from parsers.pdf_parser import PdfParser
+from gateway.parsers.llama_parser import PdfParser
 
 
 @pytest.fixture
@@ -29,9 +29,7 @@ async def test_parse_pdf_success(
 
     fake_result, markdown = mocked_converter_result
 
-    parser.converter.convert = MagicMock(
-        return_value=fake_result
-    )
+    parser.converter.convert = MagicMock(return_value=fake_result)
 
     result = await parser.parse(
         sample_pdf,
@@ -52,10 +50,7 @@ async def test_parse_pdf_success(
     assert result.metadata["mime_type"] == "application/pdf"
     assert result.metadata["parser"] == "docling"
 
-    assert (
-        result.metadata["tenant_id"]
-        == str(parsing_context.tenant_id)
-    )
+    assert result.metadata["tenant_id"] == str(parsing_context.tenant_id)
 
     assert "checksum" in result.metadata
     assert len(result.metadata["checksum"]) == 64
@@ -85,18 +80,14 @@ async def test_parse_pdf_converter_called(
 
     fake_result, _ = mocked_converter_result
 
-    parser.converter.convert = MagicMock(
-        return_value=fake_result
-    )
+    parser.converter.convert = MagicMock(return_value=fake_result)
 
     await parser.parse(
         sample_pdf,
         parsing_context,
     )
 
-    parser.converter.convert.assert_called_once_with(
-        sample_pdf
-    )
+    parser.converter.convert.assert_called_once_with(sample_pdf)
 
 
 @pytest.mark.asyncio
@@ -109,9 +100,7 @@ async def test_parse_pdf_metadata(
 
     fake_result, _ = mocked_converter_result
 
-    parser.converter.convert = MagicMock(
-        return_value=fake_result
-    )
+    parser.converter.convert = MagicMock(return_value=fake_result)
 
     result = await parser.parse(
         sample_pdf,
@@ -124,25 +113,15 @@ async def test_parse_pdf_metadata(
     assert metadata["mime_type"] == "application/pdf"
     assert metadata["parser"] == "docling"
 
-    assert metadata["tenant_id"] == (
-        str(parsing_context.tenant_id)
-    )
+    assert metadata["tenant_id"] == (str(parsing_context.tenant_id))
 
-    assert metadata["organization_id"] == (
-        str(parsing_context.organization_id)
-    )
+    assert metadata["organization_id"] == (str(parsing_context.organization_id))
 
-    assert metadata["department_id"] == (
-        str(parsing_context.department_id)
-    )
+    assert metadata["department_id"] == (str(parsing_context.department_id))
 
-    assert metadata["member_id"] == (
-        str(parsing_context.member_id)
-    )
+    assert metadata["member_id"] == (str(parsing_context.member_id))
 
-    assert metadata["uploaded_by"] == (
-        str(parsing_context.uploaded_by)
-    )
+    assert metadata["uploaded_by"] == (str(parsing_context.uploaded_by))
 
     assert metadata["tags"] == parsing_context.tags
 
@@ -154,25 +133,17 @@ async def test_parse_pdf_default_language(
 ):
     parser = PdfParser()
 
-    context = parsing_context = {
-        "tenant_id": None
-    }
+    context = parsing_context = {"tenant_id": None}
 
     fake_result, _ = mocked_converter_result
 
-    parser.converter.convert = MagicMock(
-        return_value=fake_result
-    )
+    parser.converter.convert = MagicMock(return_value=fake_result)
 
     # contexto sin idioma
     from parsers.base import ParsingContext
     from uuid import UUID
 
-    context = ParsingContext(
-        tenant_id=UUID(
-            "00000000-0000-0000-0000-000000000001"
-        )
-    )
+    context = ParsingContext(tenant_id=UUID("00000000-0000-0000-0000-000000000001"))
 
     result = await parser.parse(
         sample_pdf,

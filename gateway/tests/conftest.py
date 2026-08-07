@@ -22,7 +22,6 @@ from main import app
 from routes.auth import get_current_user
 from services.database import get_db
 
-
 DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
 
@@ -86,6 +85,7 @@ def ingest_service(session):
 def document_processor(session):
     return DocumentProcessor(session)
 
+
 @pytest.fixture
 def override_db():
     """Mock del generador de sesiones de base de datos."""
@@ -94,10 +94,12 @@ def override_db():
     yield mock_session
     app.dependency_overrides.clear()
 
+
 @pytest.fixture
 def client(override_db):
     """Cliente HTTP síncrono para testear la app de FastAPI."""
     return TestClient(app)
+
 
 @pytest.fixture
 def authenticated_client(client):
@@ -105,7 +107,7 @@ def authenticated_client(client):
     mock_user = MagicMock()
     mock_user.id = "user-123"
     mock_user.tenant_id = "tenant-456"
-    
+
     app.dependency_overrides[get_current_user] = lambda: mock_user
     yield client
     # Se limpia la dependencia al terminar

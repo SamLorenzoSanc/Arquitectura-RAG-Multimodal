@@ -6,9 +6,7 @@ import {
     Ship, 
     Navigation, 
     MapPin, 
-    Clock, 
     CheckCircle2, 
-    AlertTriangle, 
     Search, 
     ChevronRight,
     Compass

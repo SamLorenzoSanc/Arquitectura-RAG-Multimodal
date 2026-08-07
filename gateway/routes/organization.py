@@ -14,6 +14,7 @@ from uuid import UUID
 
 router = APIRouter(prefix="/organization", tags=["Organization"])
 
+
 # ============================================================
 # 1. Crear Organización
 # ============================================================
@@ -46,18 +47,23 @@ async def setup_organization(
 
         # B. Asignar el usuario creador como ORG_ADMIN global
         role_id = await db.scalar(
-            text("SELECT id FROM roles WHERE name = 'ORG_ADMIN' AND organization_id IS NULL LIMIT 1")
+            text(
+                "SELECT id FROM roles WHERE name = 'ORG_ADMIN' AND organization_id IS NULL LIMIT 1"
+            )
         )
-        
+
         if not role_id:
-            raise HTTPException(status_code=500, detail="Error crítico: Rol ORG_ADMIN global no encontrado.")
+            raise HTTPException(
+                status_code=500,
+                detail="Error crítico: Rol ORG_ADMIN global no encontrado.",
+            )
 
         await db.execute(
             text("""
             INSERT INTO organization_members (organization_id, user_id, role_id, active)
             VALUES (:org_id, :user_id, :role_id, true)
             """),
-            {"org_id": org_id, "user_id": current_user.id, "role_id": role_id}
+            {"org_id": org_id, "user_id": current_user.id, "role_id": role_id},
         )
 
         # C. Crear Tenant
@@ -80,7 +86,11 @@ async def setup_organization(
                     :chroma, :user_id)
             RETURNING id
             """),
-            {"tenant_id": tenant_id, "chroma": chroma_collection_name, "user_id": current_user.id},
+            {
+                "tenant_id": tenant_id,
+                "chroma": chroma_collection_name,
+                "user_id": current_user.id,
+            },
         )
 
         await db.commit()
@@ -98,7 +108,10 @@ async def setup_organization(
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al inicializar la infraestructura: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error al inicializar la infraestructura: {e}"
+        )
+
 
 # ============================================================
 # 2. Listar Organizaciones del Usuario Autenticado
@@ -113,15 +126,15 @@ async def list_organizations(
 
     result = await db.execute(
         text("""
-            SELECT 
-                o.id, 
-                o.name, 
-                o.description, 
+            SELECT
+                o.id,
+                o.name,
+                o.description,
                 CASE WHEN o.active THEN 'ACTIVE' ELSE 'INACTIVE' END as status,
                 CASE WHEN o.name = :global_name THEN true ELSE false END as is_global
             FROM organizations o
             -- Hacemos un LEFT JOIN filtrando por el usuario actual
-            LEFT JOIN organization_members om 
+            LEFT JOIN organization_members om
                 ON o.id = om.organization_id AND om.user_id = :user_id
             -- Traemos la organización si el usuario es miembro, o si es la global
             WHERE (om.user_id IS NOT NULL OR o.name = :global_name)
@@ -129,12 +142,10 @@ async def list_organizations(
             -- Ordenamos para que la global salga primero, y luego alfabéticamente
             ORDER BY is_global DESC, o.name
         """),
-        {
-            "user_id": current_user.id, 
-            "global_name": GLOBAL_ORG_NAME
-        }
+        {"user_id": current_user.id, "global_name": GLOBAL_ORG_NAME},
     )
     return result.mappings().all()
+
 
 # ============================================================
 # 3. Obtener Detalles de una Organización
@@ -146,22 +157,29 @@ async def get_organization(
     db: AsyncSession = Depends(get_db),
 ):
     organization = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT
                     o.id, o.name, o.description, o.active
                 FROM organizations o
                 JOIN organization_members om ON o.id = om.organization_id
                 WHERE o.id = :id AND om.user_id = :user_id
             """),
-            {"id": organization_id, "user_id": current_user.id},
+                {"id": organization_id, "user_id": current_user.id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not organization:
-        raise HTTPException(status_code=404, detail="Organización no encontrada o acceso denegado")
+        raise HTTPException(
+            status_code=404, detail="Organización no encontrada o acceso denegado"
+        )
 
     return organization
+
 
 # ============================================================
 # 4. Desactivar Organización
@@ -186,6 +204,7 @@ async def deactivate_organization(
     await db.commit()
     return {"status": "deactivated"}
 
+
 # ============================================================
 # 5. Activar Organización
 # ============================================================
@@ -208,6 +227,7 @@ async def activate_organization(
     await db.commit()
     return {"status": "activated"}
 
+
 # ============================================================
 # 6. Eliminar Organización
 # ============================================================
@@ -227,7 +247,8 @@ async def delete_organization(
         {"id": organization_id, "user_id": current_user.id},
     )
     await db.commit()
-    return {"status":"deleted"}
+    return {"status": "deleted"}
+
 
 # ============================================================
 # 7. Obtener Miembros de una Organización
@@ -240,15 +261,18 @@ async def get_members(
 ):
     # Verificamos seguridad para que no saquen datos sin pertenecer
     check = await db.scalar(
-        text("SELECT 1 FROM organization_members WHERE organization_id = :org_id AND user_id = :user_id"),
-        {"org_id": organization_id, "user_id": current_user.id}
+        text(
+            "SELECT 1 FROM organization_members WHERE organization_id = :org_id AND user_id = :user_id"
+        ),
+        {"org_id": organization_id, "user_id": current_user.id},
     )
     if not check:
         raise HTTPException(status_code=403, detail="No perteneces a esta organización")
 
     members = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT
                     u.id, u.name, u.email, r.name AS role
                 FROM organization_members om
@@ -257,11 +281,15 @@ async def get_members(
                 WHERE om.organization_id = :id
                 ORDER BY u.name
             """),
-            {"id": organization_id},
+                {"id": organization_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     return members
+
 
 # ============================================================
 # 8. Obtener Departamentos de la Organización
@@ -274,22 +302,25 @@ async def get_departments(
 ):
     # Aislamiento de lectura
     check = await db.scalar(
-        text("SELECT 1 FROM organization_members WHERE organization_id = :org_id AND user_id = :user_id"),
-        {"org_id": organization_id, "user_id": current_user.id}
+        text(
+            "SELECT 1 FROM organization_members WHERE organization_id = :org_id AND user_id = :user_id"
+        ),
+        {"org_id": organization_id, "user_id": current_user.id},
     )
     if not check:
         raise HTTPException(status_code=403, detail="No perteneces a esta organización")
 
     result = await db.execute(
         text("""
-            SELECT id, name, description 
-            FROM departments 
-            WHERE organization_id = :org_id 
+            SELECT id, name, description
+            FROM departments
+            WHERE organization_id = :org_id
             ORDER BY name
         """),
         {"org_id": organization_id},
     )
     return result.mappings().all()
+
 
 # ============================================================
 # 9. Knowledge Map (Grafo RAG)
@@ -307,12 +338,14 @@ async def graph(
             JOIN organization_members om ON o.id = om.organization_id
             WHERE o.id = :id AND o.active = true AND om.user_id = :user_id
         """),
-        {"id": organization_id, "user_id": current_user.id}
+        {"id": organization_id, "user_id": current_user.id},
     )
     organization = organization.mappings().first()
 
     if not organization:
-        raise HTTPException(status_code=404, detail="Organización no encontrada o acceso denegado")
+        raise HTTPException(
+            status_code=404, detail="Organización no encontrada o acceso denegado"
+        )
 
     tenant = await db.execute(
         text("""
@@ -320,7 +353,7 @@ async def graph(
             WHERE organization_id = :org_id AND active = true
             LIMIT 1
         """),
-        {"org_id": organization_id}
+        {"org_id": organization_id},
     )
     tenant_id = tenant.scalar()
 
@@ -340,8 +373,10 @@ async def graph(
         "statistics": {
             "nodes": len(graph_data["nodes"]),
             "edges": len(graph_data["edges"]),
-            "documents": len([n for n in graph_data["nodes"] if n["type"] == "document"]),
-            "chunks": len([n for n in graph_data["nodes"] if n["type"] == "chunk"])
+            "documents": len(
+                [n for n in graph_data["nodes"] if n["type"] == "document"]
+            ),
+            "chunks": len([n for n in graph_data["nodes"] if n["type"] == "chunk"]),
         },
-        "graph": graph_data
+        "graph": graph_data,
     }

@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
-
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 load_dotenv()
@@ -22,9 +23,11 @@ engine = create_async_engine(
     DATABASE_URL,
     pool_pre_ping=True,
     pool_size=10,
-    max_overflow=20,
-    # echo=True,  # útil en desarrollo para ver el SQL
+    max_overflow=20
 )
+
+sync_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 
 AsyncSessionLocal = async_sessionmaker(

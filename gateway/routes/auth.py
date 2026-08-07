@@ -7,13 +7,12 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Header, status
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from schemas.auth import RegisterRequest, LoginResponse, LoginRequest
-from argon2 import PasswordHasher
+from schemas.auth import LoginRequest, LoginResponse, RegisterRequest
 from argon2.exceptions import VerifyMismatchError
 import uuid
-from services.database import get_db, AsyncSessionLocal
+from services.database import get_db
 from models.user import User
+from argon2 import PasswordHasher
 
 load_dotenv()
 
@@ -54,7 +53,7 @@ def decode_token(token):
 
 async def get_current_user(
     authorization: str = Header(...),
-    db: AsyncSession = Depends(get_db),   # usa la sesión de la request, no crea otra
+    db: AsyncSession = Depends(get_db),  # usa la sesión de la request, no crea otra
 ) -> User:
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token requerido")
@@ -64,7 +63,9 @@ async def get_current_user(
     user_id = payload.get("sub")
 
     if not user_id:
-        raise HTTPException(status_code=401, detail="Token inválido: falta el identificador de usuario")
+        raise HTTPException(
+            status_code=401, detail="Token inválido: falta el identificador de usuario"
+        )
 
     user = await db.scalar(
         select(User).where(User.id == user_id, User.active.is_(True))
@@ -84,7 +85,7 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         )
         if exists:
             raise HTTPException(status_code=400, detail="El usuario ya existe")
-        
+
         # 2. Crear la Organización por defecto
         org_id = str(uuid.uuid4())
         await db.execute(
@@ -104,31 +105,29 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         password_hash = hash_password(request.password)
         new_user_id = await db.scalar(
             text("""
-                INSERT INTO users (name, email, password_hash) 
+                INSERT INTO users (name, email, password_hash)
                 VALUES (:name, :email, :password) RETURNING id
             """),
             {"name": request.name, "email": request.email, "password": password_hash},
         )
 
         # 4. Obtener el ID del rol global 'ORG_ADMIN'
-        role_id = await db.scalar(
-            text("""
-                SELECT id FROM roles 
-                WHERE name = 'ORG_ADMIN' AND organization_id IS NULL 
+        role_id = await db.scalar(text("""
+                SELECT id FROM roles
+                WHERE name = 'ORG_ADMIN' AND organization_id IS NULL
                 LIMIT 1
-            """)
-        )
+            """))
 
         if not role_id:
             raise HTTPException(
                 status_code=500,
-                detail="Error crítico: No existe el rol ORG_ADMIN global en el sistema."
+                detail="Error crítico: No existe el rol ORG_ADMIN global en el sistema.",
             )
 
         # 5. Asociar el Usuario a la Organización con el rol ORG_ADMIN
         await db.execute(
             text("""
-                INSERT INTO organization_members (organization_id, user_id, role_id, active) 
+                INSERT INTO organization_members (organization_id, user_id, role_id, active)
                 VALUES (:org_id, :user_id, :role_id, true)
             """),
             {"org_id": org_id, "user_id": new_user_id, "role_id": role_id},
@@ -161,24 +160,26 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
                 "tenant_id": tenant_id,
                 "name": "General",
                 "description": "Knowledge Base por defecto",
-                "chroma_collection": f"col_{tenant_id.replace('-', '')}" 
+                "chroma_collection": f"col_{tenant_id.replace('-', '')}",
             },
         )
 
         # =========================================================
         # 8. INSCRIBIR AUTOMÁTICAMENTE EN LA ORG GLOBAL
         # =========================================================
-        GLOBAL_ORG_NAME = "AgroTech" # Cambia esto a "Agrotech" si usaste ese nombre
-        
+        GLOBAL_ORG_NAME = "AgroTech"  # Cambia esto a "Agrotech" si usaste ese nombre
+
         global_org_id = await db.scalar(
             text("SELECT id FROM organizations WHERE name = :global_name LIMIT 1"),
-            {"global_name": GLOBAL_ORG_NAME}
+            {"global_name": GLOBAL_ORG_NAME},
         )
 
         if global_org_id:
             # Buscar el rol global básico de lectura
             basic_role_id = await db.scalar(
-                text("SELECT id FROM roles WHERE name = 'USER' AND organization_id IS NULL LIMIT 1")
+                text(
+                    "SELECT id FROM roles WHERE name = 'USER' AND organization_id IS NULL LIMIT 1"
+                )
             )
 
             # Insertar al usuario como miembro de la organización global si el rol existe
@@ -190,10 +191,10 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
                         ON CONFLICT (organization_id, user_id) DO NOTHING
                     """),
                     {
-                        "org_id": global_org_id, 
-                        "user_id": new_user_id, 
-                        "role_id": basic_role_id
-                    }
+                        "org_id": global_org_id,
+                        "user_id": new_user_id,
+                        "role_id": basic_role_id,
+                    },
                 )
         # =========================================================
 
@@ -211,19 +212,28 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
 @router.post("/login", response_model=LoginResponse)
 async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = (
-        await db.execute(
-            text("SELECT * FROM users WHERE email = :email"), {"email": request.email}
+        (
+            await db.execute(
+                text("SELECT * FROM users WHERE email = :email"),
+                {"email": request.email},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if user is None or not user["active"]:
-        raise HTTPException(status_code=401, detail="Credenciales incorrectas o cuenta inactiva")
+        raise HTTPException(
+            status_code=401, detail="Credenciales incorrectas o cuenta inactiva"
+        )
 
     if not verify_password(request.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
     token = create_access_token(user["id"], user["email"])
-    return LoginResponse(access_token=token, expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    return LoginResponse(
+        access_token=token, expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    )
 
 
 @router.post("/logout")
@@ -232,8 +242,13 @@ async def logout(authorization: str = Header(...), db: AsyncSession = Depends(ge
     payload = decode_token(token)
 
     await db.execute(
-        text("INSERT INTO revoked_tokens (token, expires_at) VALUES (:token, :expires)"),
-        {"token": token, "expires": datetime.fromtimestamp(payload["exp"], tz=timezone.utc)},
+        text(
+            "INSERT INTO revoked_tokens (token, expires_at) VALUES (:token, :expires)"
+        ),
+        {
+            "token": token,
+            "expires": datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+        },
     )
     await db.commit()
     return {"status": "logged out"}

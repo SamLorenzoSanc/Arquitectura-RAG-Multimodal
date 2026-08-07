@@ -15,13 +15,11 @@ from routes.department import router as department_router
 from routes.forecast import router as forecast_router
 from routes.logistic import router as logicstic_router
 from routes.map import router as map_router
-import models
+from routes.crops import router as crop_router
+from routes.speech import router as speech_router
+import models as models
 
-
-app = FastAPI(
-    title="AgroRAG Gateway",
-    version="1.0.0"
-)
+app = FastAPI(title="AgroRAG Gateway", version="1.0.0")
 
 origins = [
     "http://localhost",
@@ -52,6 +50,9 @@ app.include_router(department_router, prefix="/api/v1")
 app.include_router(forecast_router, prefix="/api/v1")
 app.include_router(logicstic_router, prefix="/api/v1")
 app.include_router(map_router, prefix="/api/v1")
+app.include_router(crop_router, prefix="/api/v1")
+app.include_router(speech_router, prefix="/api/v1")
+
 
 def main():
     uvicorn.run(app, host="0.0.0.0", port=8000)

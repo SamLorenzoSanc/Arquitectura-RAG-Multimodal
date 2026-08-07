@@ -11,7 +11,10 @@ async def get_user_tenant_id(user_id: UUID, db: AsyncSession) -> str:
     """Retrieves the active tenant_id for a user through their organization."""
     query = (
         select(Tenant.id)
-        .join(OrganizationMember, OrganizationMember.organization_id == Tenant.organization_id)
+        .join(
+            OrganizationMember,
+            OrganizationMember.organization_id == Tenant.organization_id,
+        )
         .where(
             OrganizationMember.user_id == user_id,
             OrganizationMember.active.is_(True),

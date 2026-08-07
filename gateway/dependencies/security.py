@@ -26,6 +26,7 @@ ALGORITHM = "HS256"
 # 1. ENUMS Y MATRIZ DE PERMISOS
 # ==========================================
 
+
 class Role(str, Enum):
     ADMIN = "admin"
     MEMBER = "user"
@@ -105,18 +106,18 @@ def has_permission(user_role: str, permission: Permission) -> bool:
 # 2. AUTENTICACIÓN Y RESOLUCIÓN DE TENANT
 # ==========================================
 
+
 def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="El token de acceso ha expirado."
+            detail="El token de acceso ha expirado.",
         )
     except jwt.InvalidTokenError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token de acceso inválido."
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de acceso inválido."
         )
 
 
@@ -128,7 +129,7 @@ async def get_current_user(
     if not authorization.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Cabecera Authorization inválida o ausente."
+            detail="Cabecera Authorization inválida o ausente.",
         )
 
     token = authorization.removeprefix("Bearer ").strip()
@@ -138,7 +139,7 @@ async def get_current_user(
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido: falta el identificador del usuario."
+            detail="Token inválido: falta el identificador del usuario.",
         )
 
     user = await db.scalar(
@@ -147,7 +148,7 @@ async def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario inexistente o inactivo."
+            detail="Usuario inexistente o inactivo.",
         )
 
     return user
@@ -157,7 +158,7 @@ async def get_tenant_context(
     x_tenant_id: Optional[str] = Header(None, alias="X-Tenant-ID"),
     x_organization_id: Optional[str] = Header(None, alias="X-Organization-ID"),
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> dict:
     """
     Resuelve la Organización y Tenant activo, verificando la membresía
@@ -169,27 +170,32 @@ async def get_tenant_context(
     # 1. Si sólo se provee X-Tenant-ID, resolver la Organización asociada
     if target_tenant_id and not target_org_id:
         target_org_id = await db.scalar(
-            text("SELECT organization_id FROM tenants WHERE id = :t_id AND active = true"),
-            {"t_id": target_tenant_id}
+            text(
+                "SELECT organization_id FROM tenants WHERE id = :t_id AND active = true"
+            ),
+            {"t_id": target_tenant_id},
         )
 
     # 2. Si sólo se provee X-Organization-ID, resolver el Tenant predeterminado
     if target_org_id and not target_tenant_id:
         target_tenant_id = await db.scalar(
-            text("SELECT id FROM tenants WHERE organization_id = :org_id AND active = true ORDER BY created_at ASC LIMIT 1"),
-            {"org_id": target_org_id}
+            text(
+                "SELECT id FROM tenants WHERE organization_id = :org_id AND active = true ORDER BY created_at ASC LIMIT 1"
+            ),
+            {"org_id": target_org_id},
         )
 
     if not target_org_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Debe proporcionar la cabecera 'X-Tenant-ID' o 'X-Organization-ID'."
+            detail="Debe proporcionar la cabecera 'X-Tenant-ID' o 'X-Organization-ID'.",
         )
 
     # 3. Validar la membresía activa del usuario y obtener su rol
     member_row = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
                 SELECT om.role_id, r.name as role_name
                 FROM organization_members om
                 JOIN roles r ON om.role_id = r.id
@@ -197,21 +203,24 @@ async def get_tenant_context(
                   AND om.user_id = :user_id
                   AND om.active = true
             """),
-            {"org_id": target_org_id, "user_id": current_user.id}
+                {"org_id": target_org_id, "user_id": current_user.id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not member_row:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tienes acceso a esta organización o tu membresía está inactiva."
+            detail="No tienes acceso a esta organización o tu membresía está inactiva.",
         )
 
     return {
         "user_id": str(current_user.id),
         "organization_id": str(target_org_id),
         "tenant_id": str(target_tenant_id) if target_tenant_id else None,
-        "role": member_row["role_name"]
+        "role": member_row["role_name"],
     }
 
 
@@ -225,8 +234,10 @@ async def get_tenant_db(context: dict = Depends(get_tenant_context)):
 # 3. GUARDIÁN DE PERMISOS (DEPENDENCY CLASS)
 # ==========================================
 
+
 class RequirePermission:
     """Dependencia para proteger endpoints según permisos RBAC."""
+
     def __init__(self, required_permission: Permission):
         self.required_permission = required_permission
 
@@ -236,6 +247,6 @@ class RequirePermission:
         if not has_permission(user_role, self.required_permission):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permiso denegado. Se requiere '{self.required_permission.value}'."
+                detail=f"Permiso denegado. Se requiere '{self.required_permission.value}'.",
             )
         return True

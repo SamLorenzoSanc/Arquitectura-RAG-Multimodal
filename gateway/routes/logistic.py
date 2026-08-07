@@ -1,6 +1,6 @@
 import os
 import httpx
-from datetime import datetime 
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +10,7 @@ from models.user import User
 from .auth import get_current_user
 
 router = APIRouter(prefix="/logistics", tags=["Logistics"])
+
 
 class ShipmentCreateRequest(BaseModel):
     id: str
@@ -30,9 +31,9 @@ class ShipmentCreateRequest(BaseModel):
     eta: datetime
     temperature_threshold: float
 
+
 async def init_shipments_table(db: AsyncSession):
-    await db.execute(
-        text("""
+    await db.execute(text("""
             CREATE TABLE IF NOT EXISTS shipments (
                 id VARCHAR(50) PRIMARY KEY,
                 tenant_id VARCHAR(50) NOT NULL,
@@ -53,12 +54,18 @@ async def init_shipments_table(db: AsyncSession):
                 current_step INT DEFAULT 2,
                 temperature_threshold FLOAT NOT NULL
             );
-        """)
+        """))
+    await db.execute(
+        text("ALTER TABLE shipments ADD COLUMN IF NOT EXISTS truck_plate VARCHAR(50);")
     )
-    await db.execute(text("ALTER TABLE shipments ADD COLUMN IF NOT EXISTS truck_plate VARCHAR(50);"))
-    await db.execute(text("ALTER TABLE shipments ADD COLUMN IF NOT EXISTS land_carrier VARCHAR(150);"))
+    await db.execute(
+        text(
+            "ALTER TABLE shipments ADD COLUMN IF NOT EXISTS land_carrier VARCHAR(150);"
+        )
+    )
     await db.commit()
-    
+
+
 async def fetch_real_vessel_position(vessel_name: str) -> list[float]:
     api_key = os.getenv("MARITIME_API_KEY")
     if api_key and vessel_name:
@@ -66,7 +73,7 @@ async def fetch_real_vessel_position(vessel_name: str) -> list[float]:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 response = await client.get(
                     "https://api.marinetraffic.com/v1/vessel/position",
-                    params={"vessel": vessel_name, "key": api_key}
+                    params={"vessel": vessel_name, "key": api_key},
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -75,6 +82,7 @@ async def fetch_real_vessel_position(vessel_name: str) -> list[float]:
             print(f"[WARN] Falló la API externa de barcos (Usando respaldo): {e}")
     return [31.2000, -15.5000]
 
+
 async def fetch_reefer_telemetry(container_id: str, threshold: float) -> dict:
     api_key = os.getenv("REEFER_IOT_API_KEY")
     if api_key and container_id:
@@ -82,7 +90,7 @@ async def fetch_reefer_telemetry(container_id: str, threshold: float) -> dict:
             async with httpx.AsyncClient(timeout=3.0) as client:
                 response = await client.get(
                     f"https://api.naviera-logistics.com/v1/containers/{container_id}/telemetry",
-                    headers={"Authorization": f"Bearer {api_key}"}
+                    headers={"Authorization": f"Bearer {api_key}"},
                 )
                 if response.status_code == 200:
                     data = response.json()
@@ -92,28 +100,23 @@ async def fetch_reefer_telemetry(container_id: str, threshold: float) -> dict:
                     return {
                         "current_temp": current_temp,
                         "is_alert": is_alert,
-                        "history": history
+                        "history": history,
                     }
         except Exception as e:
             print(f"[WARN] Falló la API de telemetría IoT (Usando respaldo): {e}")
 
     history = [
         {"time": "23/07 08h", "temp": threshold - 0.8},
-        {"time": "24/07 08h", "temp": threshold - 0.2}
+        {"time": "24/07 08h", "temp": threshold - 0.2},
     ]
     current_temp = history[-1]["temp"]
     is_alert = current_temp > threshold
 
-    return {
-        "current_temp": current_temp,
-        "is_alert": is_alert,
-        "history": history
-    }
+    return {"current_temp": current_temp, "is_alert": is_alert, "history": history}
+
 
 @router.get("/catalog/agricultural-options")
-async def get_agricultural_catalog(
-    current_user: User = Depends(get_current_user)
-):
+async def get_agricultural_catalog(current_user: User = Depends(get_current_user)):
     return [
         {
             "product": "Plátano de Canarias IGP",
@@ -123,7 +126,7 @@ async def get_agricultural_catalog(
             "originCoords": [28.6478, -17.9255],
             "destinationName": "Plataforma Logística - Cádiz",
             "destinationCoords": [36.5271, -6.2886],
-            "temperatureThreshold": 14.0
+            "temperatureThreshold": 14.0,
         },
         {
             "product": "Aguacate Hass",
@@ -133,7 +136,7 @@ async def get_agricultural_catalog(
             "originCoords": [27.8833, -15.7667],
             "destinationName": "Mercamadrid - Madrid",
             "destinationCoords": [40.3833, -3.6833],
-            "temperatureThreshold": 6.0
+            "temperatureThreshold": 6.0,
         },
         {
             "product": "Tomate Canario",
@@ -143,7 +146,7 @@ async def get_agricultural_catalog(
             "originCoords": [28.5200, -16.3800],
             "destinationName": "Mercavalència - Valencia",
             "destinationCoords": [39.4699, -0.3763],
-            "temperatureThreshold": 10.0
+            "temperatureThreshold": 10.0,
         },
         {
             "product": "Papaya Tropical",
@@ -153,18 +156,19 @@ async def get_agricultural_catalog(
             "originCoords": [28.3185, -16.4053],
             "destinationName": "Mercabarna - Barcelona",
             "destinationCoords": [41.3257, 2.1156],
-            "temperatureThreshold": 12.0
-        }
+            "temperatureThreshold": 12.0,
+        },
     ]
+
+
 @router.get("/shipments/{shipment_id}/alerts")
 async def get_shipment_alerts(
     shipment_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     shipment_query = await db.execute(
-        text("SELECT * FROM shipments WHERE id = :id"),
-        {"id": shipment_id}
+        text("SELECT * FROM shipments WHERE id = :id"), {"id": shipment_id}
     )
     row = shipment_query.mappings().first()
     if not row:
@@ -176,21 +180,25 @@ async def get_shipment_alerts(
     # Generar alertas estructuradas para el agricultor
     alerts = []
     if telemetry["is_alert"]:
-        alerts.append({
-            "level": "CRITICAL",
-            "title": "Alerta de Desviación Térmica",
-            "message": f"El contenedor {row['container_id']} ({row['product']}) superó los {threshold}ºC en la {row['air_chamber']}.",
-            "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "status": "Pendiente de revisión por naviera"
-        })
+        alerts.append(
+            {
+                "level": "CRITICAL",
+                "title": "Alerta de Desviación Térmica",
+                "message": f"El contenedor {row['container_id']} ({row['product']}) superó los {threshold}ºC en la {row['air_chamber']}.",
+                "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "status": "Pendiente de revisión por naviera",
+            }
+        )
     else:
-        alerts.append({
-            "level": "SUCCESS",
-            "title": "Cadena de Frío Garantizada",
-            "message": f"El lote de {row['product']} avanza sin incidencias hacia Mercamadrid bajo el umbral de {threshold}ºC.",
-            "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
-            "status": "Tranquilidad operativa confirmada"
-        })
+        alerts.append(
+            {
+                "level": "SUCCESS",
+                "title": "Cadena de Frío Garantizada",
+                "message": f"El lote de {row['product']} avanza sin incidencias hacia Mercamadrid bajo el umbral de {threshold}ºC.",
+                "timestamp": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "status": "Tranquilidad operativa confirmada",
+            }
+        )
 
     return {
         "shipmentId": row["id"],
@@ -198,23 +206,23 @@ async def get_shipment_alerts(
         "currentTemp": telemetry["current_temp"],
         "threshold": threshold,
         "hasAlert": telemetry["is_alert"],
-        "notificationsLog": alerts
+        "notificationsLog": alerts,
     }
-    
+
+
 @router.get("/fleet")
 async def get_tenant_vessels(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     member_info = await db.execute(
         text("""
-            SELECT t.id AS tenant_id 
+            SELECT t.id AS tenant_id
             FROM organization_members om
             JOIN tenants t ON t.organization_id = om.organization_id
             WHERE om.user_id = :user_id AND om.active = true
             LIMIT 1
         """),
-        {"user_id": current_user.id}
+        {"user_id": current_user.id},
     )
     tenant = member_info.mappings().first()
     if not tenant:
@@ -222,53 +230,55 @@ async def get_tenant_vessels(
             {"vesselName": "MSC Canarias", "status": "En ruta comercial activa"},
             {"vesselName": "Volcán de Teneguía", "status": "En puerto de origen"},
             {"vesselName": "Boluda Express", "status": "Tránsito marítimo"},
-            {"vesselName": "MSC Tenerife", "status": "Operativa peninsular"}
+            {"vesselName": "MSC Tenerife", "status": "Operativa peninsular"},
         ]
 
     vessels_query = await db.execute(
         text("""
             SELECT DISTINCT vessel_name, COUNT(id) as total_shipments
-            FROM shipments 
+            FROM shipments
             WHERE tenant_id = :tenant_id
             GROUP BY vessel_name
         """),
-        {"tenant_id": tenant["tenant_id"]}
+        {"tenant_id": tenant["tenant_id"]},
     )
-    
+
     fleet = []
     for row in vessels_query.mappings():
         vessel_name = row["vessel_name"]
-        fleet.append({
-            "vesselName": vessel_name,
-            "activeShipmentsCount": row["total_shipments"],
-            "status": "En ruta comercial activa"
-        })
+        fleet.append(
+            {
+                "vesselName": vessel_name,
+                "activeShipmentsCount": row["total_shipments"],
+                "status": "En ruta comercial activa",
+            }
+        )
 
     if not fleet:
         fleet = [
             {"vesselName": "MSC Canarias", "status": "Línea Regular"},
             {"vesselName": "Volcán de Teneguía", "status": "Línea Regular"},
-            {"vesselName": "Boluda Express", "status": "Línea Regular"}
+            {"vesselName": "Boluda Express", "status": "Línea Regular"},
         ]
 
     return fleet
 
+
 @router.get("/shipments")
 async def get_tenant_shipments(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     await init_shipments_table(db)
 
     member_info = await db.execute(
         text("""
-            SELECT t.id AS tenant_id 
+            SELECT t.id AS tenant_id
             FROM organization_members om
             JOIN tenants t ON t.organization_id = om.organization_id
             WHERE om.user_id = :user_id AND om.active = true
             LIMIT 1
         """),
-        {"user_id": current_user.id}
+        {"user_id": current_user.id},
     )
     tenant = member_info.mappings().first()
     if not tenant:
@@ -278,53 +288,56 @@ async def get_tenant_shipments(
 
     shipments = await db.execute(
         text("SELECT * FROM shipments WHERE tenant_id = :tenant_id"),
-        {"tenant_id": tenant_id}
+        {"tenant_id": tenant_id},
     )
-    
+
     result = []
     for row in shipments.mappings():
         vessel_coords = await fetch_real_vessel_position(row["vessel_name"])
         threshold = float(row["temperature_threshold"])
         telemetry = await fetch_reefer_telemetry(row["container_id"], threshold)
 
-        result.append({
-            "id": row["id"],
-            "product": row["product"],
-            "containerId": row["container_id"],
-            "originName": row["origin_name"],
-            "originCoords": [row["origin_lat"], row["origin_lng"]],
-            "destinationName": row["destination_name"],
-            "destinationCoords": [row["destination_lat"], row["destination_lng"]],
-            "vessel": row["vessel_name"],
-            "air_chamber": row.get("air_chamber", "Cámara Proa - Zona Fría A"),
-            "departureDate": str(row["departure_date"]),
-            "eta": str(row["eta"]),
-            "currentStep": row["current_step"],
-            "temperatureThreshold": threshold,
-            "vesselCoords": vessel_coords, 
-            "temperatureHistory": telemetry["history"],
-            "hasAlert": telemetry["is_alert"]
-        })
-    
+        result.append(
+            {
+                "id": row["id"],
+                "product": row["product"],
+                "containerId": row["container_id"],
+                "originName": row["origin_name"],
+                "originCoords": [row["origin_lat"], row["origin_lng"]],
+                "destinationName": row["destination_name"],
+                "destinationCoords": [row["destination_lat"], row["destination_lng"]],
+                "vessel": row["vessel_name"],
+                "air_chamber": row.get("air_chamber", "Cámara Proa - Zona Fría A"),
+                "departureDate": str(row["departure_date"]),
+                "eta": str(row["eta"]),
+                "currentStep": row["current_step"],
+                "temperatureThreshold": threshold,
+                "vesselCoords": vessel_coords,
+                "temperatureHistory": telemetry["history"],
+                "hasAlert": telemetry["is_alert"],
+            }
+        )
+
     return result
+
 
 @router.post("/shipments")
 async def create_shipment(
     request: ShipmentCreateRequest,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     await init_shipments_table(db)
 
     member_info = await db.execute(
         text("""
-            SELECT t.id AS tenant_id 
+            SELECT t.id AS tenant_id
             FROM organization_members om
             JOIN tenants t ON t.organization_id = om.organization_id
             WHERE om.user_id = :user_id AND om.active = true
             LIMIT 1
         """),
-        {"user_id": current_user.id}
+        {"user_id": current_user.id},
     )
     tenant = member_info.mappings().first()
     if not tenant:
@@ -360,17 +373,30 @@ async def create_shipment(
             "air_chamber": request.air_chamber,
             "departure_date": request.departure_date,
             "eta": request.eta,
-            "temperature_threshold": request.temperature_threshold
-        }
+            "temperature_threshold": request.temperature_threshold,
+        },
     )
     await db.commit()
-    return {"message": "Envío registrado correctamente en la base de datos", "id": request.id}
+    return {
+        "message": "Envío registrado correctamente en la base de datos",
+        "id": request.id,
+    }
 
-async def send_temperature_alert_whatsapp(phone_number: str, product: str, container_id: str, current_temp: float, threshold: float):
+
+async def send_temperature_alert_whatsapp(
+    phone_number: str,
+    product: str,
+    container_id: str,
+    current_temp: float,
+    threshold: float,
+):
     # Variables de entorno para WhatsApp Cloud API / Twilio
-    whatsapp_api_url = os.getenv("WHATSAPP_API_URL", "https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages")
+    whatsapp_api_url = os.getenv(
+        "WHATSAPP_API_URL",
+        "https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages",
+    )
     whatsapp_token = os.getenv("WHATSAPP_ACCESS_TOKEN", "tu_token_de_meta")
-    
+
     message_body = (
         f"*¡ALERTA CRÍTICA EN CADENA DE FRÍO!*\n\n"
         f"Estimado productor, el contenedor *{container_id}* con *{product}* ha registrado una temperatura de *{current_temp}ºC*.\n\n"
@@ -389,25 +415,29 @@ async def send_temperature_alert_whatsapp(phone_number: str, product: str, conta
                         "messaging_product": "whatsapp",
                         "to": phone_number,
                         "type": "text",
-                        "text": {"body": message_body}
-                    }
+                        "text": {"body": message_body},
+                    },
                 )
                 if response.status_code == 200:
-                    print(f"[INFO] Alerta de WhatsApp enviada con éxito a {phone_number}")
+                    print(
+                        f"[INFO] Alerta de WhatsApp enviada con éxito a {phone_number}"
+                    )
         except Exception as e:
             print(f"[ERROR] Falló el envío de WhatsApp: {e}")
     else:
-        print(f"[SIMULACIÓN WHATSAPP] Mensaje enviado a {phone_number}:\n{message_body}")
+        print(
+            f"[SIMULACIÓN WHATSAPP] Mensaje enviado a {phone_number}:\n{message_body}"
+        )
+
 
 @router.post("/shipments/{shipment_id}/force-alert")
 async def force_shipment_alert(
     shipment_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     shipment_query = await db.execute(
-        text("SELECT * FROM shipments WHERE id = :id"),
-        {"id": shipment_id}
+        text("SELECT * FROM shipments WHERE id = :id"), {"id": shipment_id}
     )
     row = shipment_query.mappings().first()
     if not row:
@@ -425,30 +455,30 @@ async def force_shipment_alert(
         product=row["product"],
         container_id=row["container_id"],
         current_temp=forced_temp,
-        threshold=threshold
+        threshold=threshold,
     )
 
     return {
         "success": True,
         "message": f"¡Alerta de WhatsApp simulada y enviada correctamente al número {farmer_phone}!",
         "forcedTemp": forced_temp,
-        "threshold": threshold
+        "threshold": threshold,
     }
-    
+
+
 @router.get("/alerts/summary")
 async def get_logistics_alerts_summary(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     member_info = await db.execute(
         text("""
-            SELECT t.id AS tenant_id 
+            SELECT t.id AS tenant_id
             FROM organization_members om
             JOIN tenants t ON t.organization_id = om.organization_id
             WHERE om.user_id = :user_id AND om.active = true
             LIMIT 1
         """),
-        {"user_id": current_user.id}
+        {"user_id": current_user.id},
     )
     tenant = member_info.mappings().first()
     if not tenant:
@@ -456,25 +486,24 @@ async def get_logistics_alerts_summary(
 
     shipments = await db.execute(
         text("SELECT * FROM shipments WHERE tenant_id = :tenant_id"),
-        {"tenant_id": tenant["tenant_id"]}
+        {"tenant_id": tenant["tenant_id"]},
     )
-    
+
     active_alerts = []
     for row in shipments.mappings():
         threshold = float(row["temperature_threshold"])
         telemetry = await fetch_reefer_telemetry(row["container_id"], threshold)
-        
-        if telemetry["is_alert"]:
-            active_alerts.append({
-                "id": row["id"],
-                "product": row["product"],
-                "containerId": row["container_id"],
-                "currentTemp": telemetry["current_temp"],
-                "threshold": threshold,
-                "message": f"¡Alerta térmica! {row['product']} a {telemetry['current_temp']}ºC (Máx: {threshold}ºC)"
-            })
 
-    return {
-        "totalAlerts": len(active_alerts),
-        "alerts": active_alerts
-    }
+        if telemetry["is_alert"]:
+            active_alerts.append(
+                {
+                    "id": row["id"],
+                    "product": row["product"],
+                    "containerId": row["container_id"],
+                    "currentTemp": telemetry["current_temp"],
+                    "threshold": threshold,
+                    "message": f"¡Alerta térmica! {row['product']} a {telemetry['current_temp']}ºC (Máx: {threshold}ºC)",
+                }
+            )
+
+    return {"totalAlerts": len(active_alerts), "alerts": active_alerts}

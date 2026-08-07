@@ -65,7 +65,10 @@ async def create_knowledge_base(
         }
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error al crear la Base de Conocimiento: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Error al crear la Base de Conocimiento: {e}"
+        )
+
 
 @router.get("/current")
 async def get_current_knowledge_base(
@@ -81,8 +84,9 @@ async def get_current_knowledge_base(
         )
 
     kb = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
             SELECT
                 id,
                 tenant_id,
@@ -96,9 +100,12 @@ async def get_current_knowledge_base(
             ORDER BY created_at ASC
             LIMIT 1
             """),
-            {"tenant_id": tenant_id},
+                {"tenant_id": tenant_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not kb:
         raise HTTPException(
@@ -116,6 +123,7 @@ async def get_current_knowledge_base(
         "created_at": kb["created_at"],
     }
 
+
 @router.get("/{knowledge_base_id}")
 async def get_knowledge_base(
     knowledge_base_id: str,
@@ -124,20 +132,30 @@ async def get_knowledge_base(
 ):
     tenant_id = await _resolve_tenant_id(db, current_user.id)
     if not tenant_id:
-        raise HTTPException(status_code=404, detail="Base de Conocimiento no encontrada o no tienes permisos para verla.")
+        raise HTTPException(
+            status_code=404,
+            detail="Base de Conocimiento no encontrada o no tienes permisos para verla.",
+        )
 
     kb = (
-        await db.execute(
-            text("""
+        (
+            await db.execute(
+                text("""
             SELECT id, tenant_id, name, description, created_at
             FROM knowledge_bases
             WHERE id = :kb_id AND tenant_id = :tenant_id
             """),
-            {"kb_id": knowledge_base_id, "tenant_id": tenant_id},
+                {"kb_id": knowledge_base_id, "tenant_id": tenant_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not kb:
-        raise HTTPException(status_code=404, detail="Base de Conocimiento no encontrada o no tienes permisos para verla.")
+        raise HTTPException(
+            status_code=404,
+            detail="Base de Conocimiento no encontrada o no tienes permisos para verla.",
+        )
 
     return kb

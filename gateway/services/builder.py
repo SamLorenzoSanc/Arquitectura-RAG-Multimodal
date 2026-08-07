@@ -15,6 +15,7 @@ from models.knowledge_assets import (
     AssetMetadata,
     KnowledgeAsset,
 )
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,7 +57,6 @@ class KnowledgeBuilder:
 
         return asset
 
-
     def _build_asset(
         self,
         document: Document,
@@ -66,67 +66,39 @@ class KnowledgeBuilder:
         root = self._document_root(document)
 
         context = AssetContext(
-
             tenant_id=document.tenant_id,
-
             knowledge_base_id=document.knowledge_base_id,
-
         )
 
         metadata = AssetMetadata(
-
             asset_id=document.id,
-
             tenant_id=document.tenant_id,
-
             knowledge_base_id=document.knowledge_base_id,
-
             uploaded_by=document.owner_id,
-
             source=document.storage_path,
-
             mime_type=parsed.metadata.get("mime_type", ""),
-
             parser=parsed.metadata.get("parser", ""),
-
             language=parsed.language,
-
             checksum=parsed.metadata.get("checksum", ""),
-
             size=document.size or 0,
-
         )
 
         content = AssetContent(
-
             title=parsed.title or document.filename,
-
             markdown=parsed.markdown,
-
             summary=parsed.summary,
-
             language=parsed.language,
-
             word_count=parsed.word_count,
-
             character_count=parsed.character_count,
-
             page_count=parsed.page_count,
-
             tags=[],
-
         )
 
         return KnowledgeAsset(
-
             context=context,
-
             metadata=metadata,
-
             content=content,
-
             root=root,
-
         )
 
     def _create_structure(
@@ -161,9 +133,7 @@ class KnowledgeBuilder:
         if not source.exists():
             return
 
-        destination = asset.root / (
-            "original" + source.suffix.lower()
-        )
+        destination = asset.root / ("original" + source.suffix.lower())
 
         shutil.copy2(
             source,
@@ -178,11 +148,8 @@ class KnowledgeBuilder:
     ) -> None:
 
         asset.markdown.write_text(
-
             self._render_markdown(asset),
-
             encoding="utf8",
-
         )
 
     ###########################################################################
@@ -193,23 +160,14 @@ class KnowledgeBuilder:
     ) -> None:
 
         asset.metadata_file.write_text(
-
             json.dumps(
-
                 asdict(asset),
-
                 indent=4,
-
                 ensure_ascii=False,
-
                 default=str,
-
             ),
-
             encoding="utf8",
-
         )
-
 
     def _render_markdown(
         self,
@@ -267,15 +225,10 @@ created_at: {m.created_at.isoformat()}
         )
 
         lines = [
-
             "# Knowledge Base",
-
             "",
-
             "## Documents",
-
             "",
-
         ]
 
         for doc in sorted(documents.iterdir()):
@@ -283,16 +236,11 @@ created_at: {m.created_at.isoformat()}
             if not doc.is_dir():
                 continue
 
-            lines.append(
-                f"- [{doc.name}](documents/{doc.name}/document.md)"
-            )
+            lines.append(f"- [{doc.name}](documents/{doc.name}/document.md)")
 
         (kb_root / "index.md").write_text(
-
             "\n".join(lines),
-
             encoding="utf8",
-
         )
 
     ###########################################################################
@@ -305,15 +253,9 @@ created_at: {m.created_at.isoformat()}
     ) -> Path:
 
         return (
-
             self.storage_root
-
             / str(document.tenant_id)
-
             / str(document.knowledge_base_id)
-
             / "documents"
-
             / str(document.id)
-
         )
