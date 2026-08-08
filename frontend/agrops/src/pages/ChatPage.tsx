@@ -329,24 +329,8 @@ export default function ChatPage() {
     };
 
     const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
 
-    const updateRagStep = (
-      id: string,
-      status: RagStep["status"],
-      detail?: string,
-    ) => {
-      setRagPipeline((prev) =>
-        prev.map((step) =>
-          step.id === id
-            ? {
-                ...step,
-                status,
-                detail,
-              }
-            : step,
-        ),
-      );
-    };
     setInputValue("");
     setIsLoading(true);
 
@@ -631,141 +615,106 @@ export default function ChatPage() {
           </div>
         </div>
 
-        <aside className="w-[380px] lg:w-[420px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-6">
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-900">
-                Documentos de la Organización
-              </h3>
-              {knowledgeBaseId && (
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="text-xs font-semibold text-amber-600 hover:text-amber-700 flex items-center gap-1 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200 transition-colors cursor-pointer"
-                >
-                  + Añadir documento
-                </button>
-              )}
-            </div>
+        <aside className="w-[380px] lg:w-[420px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-6 flex flex-col justify-between">
+          <div>
+            {retrieval && (
+              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+                <h3 className="mb-3 font-semibold text-amber-800">
+                  Retrieval (Tenant Context)
+                </h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-xs font-medium text-amber-600">
+                      Chunks
+                    </span>
+                    <p className="font-semibold text-slate-700">
+                      {retrieval.final_chunks}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-amber-600">
+                      Caracteres
+                    </span>
+                    <p className="font-semibold text-slate-700">
+                      {contextCharacters.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-amber-600">
+                      Tokens
+                    </span>
+                    <p className="font-semibold text-slate-700">
+                      {estimatedTokens.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-medium text-amber-600">
+                      Uso
+                    </span>
+                    <p className="font-semibold text-slate-700">
+                      {Math.round((estimatedTokens / 8192) * 100)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            {!knowledgeBaseId ? (
-              <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-lg border border-dashed border-gray-200">
-                Selecciona una KB específica para gestionar tus documentos.
-              </p>
-            ) : documents.length === 0 ? (
-              <p className="text-sm text-gray-400">
-                No hay documentos en esta Base de Conocimiento.
-              </p>
+            <h3 className="mb-4 text-lg font-semibold text-slate-900">
+              Chunks recuperados
+            </h3>
+            {context.length === 0 ? (
+              <p className="text-sm text-gray-400">Todavía no hay contexto.</p>
             ) : (
-              <div className="space-y-2">
-                {documents.map((doc) => (
+              <div className="space-y-4">
+                {context.map((chunk, index) => (
                   <div
-                    key={doc.id}
-                    className="rounded-lg border border-gray-200 p-3 transition hover:bg-gray-50 flex items-center gap-3"
+                    key={index}
+                    className="rounded-lg border border-gray-200 bg-gray-50 p-4"
                   >
-                    <FileText size={18} className="text-amber-600 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p
-                        className="font-medium text-sm truncate"
-                        title={doc.title || doc.filename}
-                      >
-                        {doc.title || doc.filename}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-0.5 shrink-0">
-                        {doc.size
-                          ? `${(doc.size / 1024).toFixed(1)} KB`
-                          : "Documento activo"}
-                      </p>
+                    <div className="mb-3">
+                      <span className="rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
+                        {chunk.metadata?.type || "Fragmento"}
+                      </span>
                     </div>
+                    <p className="whitespace-pre-wrap text-sm text-gray-700 break-words leading-relaxed">
+                      {chunk.page_content}
+                    </p>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {retrieval && (
-            <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
-              <h3 className="mb-3 font-semibold text-amber-800">
-                Retrieval (Tenant Context)
-              </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-xs font-medium text-amber-600">
-                    Chunks
-                  </span>
-                  <p className="font-semibold text-slate-700">
-                    {retrieval.final_chunks}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-amber-600">
-                    Caracteres
-                  </span>
-                  <p className="font-semibold text-slate-700">
-                    {contextCharacters.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-amber-600">
-                    Tokens
-                  </span>
-                  <p className="font-semibold text-slate-700">
-                    {estimatedTokens.toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-xs font-medium text-amber-600">
-                    Uso
-                  </span>
-                  <p className="font-semibold text-slate-700">
-                    {Math.round((estimatedTokens / 8192) * 100)}%
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <h3 className="mb-4 text-lg font-semibold text-slate-900">
-            Chunks recuperados
-          </h3>
-          {context.length === 0 ? (
-            <p className="text-sm text-gray-400">Todavía no hay contexto.</p>
-          ) : (
-            <div className="space-y-4">
-              {context.map((chunk, index) => (
-                <div
-                  key={index}
-                  className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+          {/* ===================================================
+              NUEVAS OPCIONES AL FINAL DE LOS FRAGMENTOS
+          =================================================== */}
+          {context.length > 0 && (
+            <div className="mt-8 pt-4 border-t border-gray-200">
+              <p className="text-xs font-semibold text-slate-500 mb-3">
+                ¿Qué tal fue la recuperación de información?
+              </p>
+              <div className="flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Aquí manejas la acción de información distinta
+                    console.log("Seleccionado: Devolvió información distinta");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
                 >
-                  <div className="mb-3">
-                    <span className="rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                      {chunk.metadata?.type || "Fragmento"}
-                    </span>
-                  </div>
-                  <p className="mb-3 whitespace-pre-wrap text-sm text-gray-700 break-words leading-relaxed">
-                    {chunk.page_content}
-                  </p>
-                  <div className="border-t border-gray-200 pt-3 text-xs text-gray-500 space-y-1.5">
-                    {chunk.metadata?.source && (
-                      <p className="truncate">
-                        <strong className="text-gray-700">Fuente:</strong>{" "}
-                        {chunk.metadata.source}
-                      </p>
-                    )}
-                    {chunk.metadata?.page && (
-                      <p>
-                        <strong className="text-gray-700">Página:</strong>{" "}
-                        {chunk.metadata.page}
-                      </p>
-                    )}
-                    {chunk.metadata?.score && (
-                      <p>
-                        <strong className="text-gray-700">Score:</strong>{" "}
-                        {(chunk.metadata.score * 100).toFixed(1)}%
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                  Devolvió información distinta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Aquí manejas la acción de fuera de conocimiento
+                    console.log("Seleccionado: Fuera de conocimiento");
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Fuera de conocimiento
+                </button>
+              </div>
             </div>
           )}
         </aside>

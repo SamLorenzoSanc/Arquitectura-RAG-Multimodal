@@ -13,7 +13,16 @@ from typing import (
     TYPE_CHECKING,
 )  # Para análisis estático de tipos sin importaciones circulares
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    text,
+    Column,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -96,6 +105,7 @@ class Document(Base):
         default=1,
     )
 
+    file_hash = Column(String(64), nullable=False, index=True)
     # Fecha y hora con zona horaria del registro del archivo, automatizado por el motor SQL (NOW)
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

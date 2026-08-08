@@ -8,6 +8,8 @@ from fastapi import (
     BackgroundTasks,
     status,
 )
+from models.eval import AnswerEval
+from services.rag_service import RetrievalEval
 from fastapi.responses import StreamingResponse
 from schemas.chat import ChatRequest, ChatResponse, ContextChunk
 from services import rag_service
@@ -29,8 +31,196 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, Tool
 from services.tool import agent_executor
 import json
 from models.chunk import Chunk
+from datetime import datetime, timezone
+from services.rag_service import RAGService
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+
+from pydantic import BaseModel
+from typing import List, Optional, Dict
+import time
+
+
+class QuestionBankItem(BaseModel):
+    question: str
+    keywords: list[str] = []
+    reference_answer: str | None = None
+    category: str = "general"
+
+
+class QuestionBankImportRequest(BaseModel):
+    questions: list[QuestionBankItem]
+
+
+class SimulatorSearchRequest(BaseModel):
+    question: str
+
+
+class SimulatorFlags(BaseModel):
+    different_info: bool = False
+    out_of_knowledge: bool = False
+
+
+class DatasetEvaluationRequest(BaseModel):
+    model_name: str = "llama3.2"
+    embedding_model: str = "qwen3-embedding:latest"
+    top_k: int = 5
+    retrieval_k: int = 10
+    bm25_k: int = 10
+    rrf_k: int = 60
+    candidate_k: int = 15
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    reranker_batch_size: int = 16
+
+
+class DatasetEvaluationResponse(BaseModel):
+    run_id: int
+    model_name: str
+    embedding_model: str
+    dataset_size: int
+    normal_questions: int
+    different_info_questions: int
+    out_of_knowledge_questions: int
+    recall_1: float
+    recall_k: float
+    mrr: float
+    false_positives: int
+    failures: int
+    duration_ms: float
+    status: str
+    parameters: dict
+
+
+class SimulatorSaveRequest(BaseModel):
+    question: str
+    selected_chunk_id: str
+    flags: SimulatorFlags
+
+    keywords: list[str] = []
+    reference_answer: str | None = None
+    category: str = "general"
+
+
+class EvaluationHistoryItem(BaseModel):
+    id: int
+    created_at: str
+    model_name: str
+    embedding_model: str
+    dataset_size: int
+    top_k: int
+    recall_1: float
+    recall_k: float
+    mrr: float
+    false_positives: int
+    failures: int
+    duration_ms: float
+    status: str
+
+
+class EvaluationResultItem(BaseModel):
+    id: int
+    dataset_id: int
+    question: str
+    expected_chunk_id: str | None
+    retrieved_chunk_ids: list[str]
+    retrieved_scores: list[float]
+    expected_rank: int | None
+    hit_at_1: bool
+    hit_at_k: bool
+    reciprocal_rank: float
+    false_positive: bool
+    failure: bool
+    flag_different_info: bool
+    flag_out_of_knowledge: bool
+    retrieval_latency_ms: float | None
+
+
+def normalize_text(value: str) -> str:
+    import unicodedata
+
+    value = value.lower().strip()
+
+    value = unicodedata.normalize(
+        "NFD",
+        value,
+    )
+
+    value = "".join(c for c in value if unicodedata.category(c) != "Mn")
+
+    return value
+
+
+def calculate_keyword_mrr(
+    keywords: list[str],
+    chunks: list,
+) -> float:
+
+    if not keywords:
+        return 0.0
+
+    scores = []
+
+    for keyword in keywords:
+
+        rank_found = None
+
+        for rank, chunk in enumerate(
+            chunks,
+            start=1,
+        ):
+            content = getattr(
+                chunk,
+                "page_content",
+                "",
+            )
+
+            if keyword_found(
+                keyword,
+                content,
+            ):
+                rank_found = rank
+                break
+
+        scores.append(1.0 / rank_found if rank_found else 0.0)
+
+    return sum(scores) / len(scores)
+
+
+def calculate_keyword_coverage(
+    keywords: list[str],
+    chunks: list,
+) -> float:
+
+    if not keywords:
+        return 0.0
+
+    full_text = "\n".join(
+        getattr(
+            chunk,
+            "page_content",
+            "",
+        )
+        for chunk in chunks
+    )
+
+    found = sum(
+        1
+        for keyword in keywords
+        if keyword_found(
+            keyword,
+            full_text,
+        )
+    )
+
+    return found / len(keywords)
+
+
+def keyword_found(
+    keyword: str,
+    text: str,
+) -> bool:
+
+    return normalize_text(keyword) in normalize_text(text)
 
 
 def calculate_averages(results: list[dict[str, any]]) -> dict[str, float]:
@@ -42,13 +232,17 @@ def calculate_averages(results: list[dict[str, any]]) -> dict[str, float]:
             "accuracy": 0.0,
             "completeness": 0.0,
             "relevance": 0.0,
+            "false_positives": 0.0,
         }
 
-    df = pd.DataFrame(results)
-    return {
-        col: float(df[col].mean()) if col in df.columns else 0.0
-        for col in ["mrr", "ndcg", "precision", "accuracy", "completeness", "relevance"]
-    }
+    sums = {}
+    count = len(results)
+    for res in results:
+        for key, val in res.items():
+            if isinstance(val, (int, float)):
+                sums[key] = sums.get(key, 0.0) + val
+
+    return {k: v / count for k, v in sums.items() if isinstance(v, (int, float))}
 
 
 @router.get("/list-all-documents")
@@ -72,6 +266,746 @@ async def list_all_documents(
             for chunk in chunks
         ],
     }
+
+
+@router.post("/simulator/import-question-bank")
+async def import_question_bank(
+    request: QuestionBankImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = await get_user_tenant_id(
+        current_user.id,
+        db,
+    )
+
+    if not request.questions:
+        raise HTTPException(
+            status_code=400,
+            detail="El banco de preguntas está vacío.",
+        )
+
+    imported = 0
+    skipped = 0
+
+    try:
+        for item in request.questions:
+
+            question = item.question.strip()
+
+            if not question:
+                skipped += 1
+                continue
+
+            # Evitar duplicados
+            existing = await db.execute(
+                text("""
+                    SELECT id
+                    FROM public.retrieval_dataset
+                    WHERE tenant_id = :tenant_id
+                      AND question = :question
+                    LIMIT 1
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "question": question,
+                },
+            )
+
+            if existing.scalar_one_or_none() is not None:
+                skipped += 1
+                continue
+
+            await db.execute(
+                text("""
+                    INSERT INTO public.retrieval_dataset (
+                        tenant_id,
+                        question,
+                        expected_chunk_id,
+                        keywords,
+                        reference_answer,
+                        category,
+                        flag_different_info,
+                        flag_out_of_knowledge
+                    )
+                    VALUES (
+                        :tenant_id,
+                        :question,
+                        NULL,
+                        CAST(:keywords AS JSONB),
+                        :reference_answer,
+                        :category,
+                        FALSE,
+                        FALSE
+                    )
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "question": question,
+                    "keywords": json.dumps(item.keywords),
+                    "reference_answer": item.reference_answer,
+                    "category": item.category,
+                },
+            )
+
+            imported += 1
+
+        await db.commit()
+
+        return {
+            "status": "success",
+            "imported": imported,
+            "skipped": skipped,
+            "total": len(request.questions),
+        }
+
+    except Exception as e:
+        await db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error importando banco de preguntas: {str(e)}",
+        )
+
+
+@router.post(
+    "/simulator/evaluate-dataset",
+    response_model=DatasetEvaluationResponse,
+)
+async def evaluate_dataset(
+    request: DatasetEvaluationRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Evalúa TODO el retrieval_dataset utilizando exactamente
+    el mismo RAGService que utiliza la aplicación.
+
+    NO genera respuestas de llama3.2.
+
+    Evalúa:
+
+        question
+            ↓
+        RAGService.fetch_context()
+            ↓
+        Dense + BM25
+            ↓
+        RRF
+            ↓
+        Cross-Encoder
+            ↓
+        top_k
+            ↓
+        expected_chunk_id
+
+    Métricas:
+
+        Recall@1
+        Recall@K
+        MRR
+        False Positives
+        Failures
+
+    Además almacena:
+
+        retrieval_evaluation_runs
+        retrieval_evaluation_results
+    """
+
+    start_time = time.time()
+
+    tenant_id = await get_user_tenant_id(
+        current_user.id,
+        db,
+    )
+
+    # ============================================================
+    # 1. VALIDACIÓN
+    # ============================================================
+
+    if request.top_k < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="top_k debe ser >= 1",
+        )
+
+    if request.retrieval_k < request.top_k:
+        raise HTTPException(
+            status_code=400,
+            detail="retrieval_k debe ser >= top_k",
+        )
+
+    if request.bm25_k < 1:
+        raise HTTPException(
+            status_code=400,
+            detail="bm25_k debe ser >= 1",
+        )
+
+    if request.candidate_k < request.top_k:
+        raise HTTPException(
+            status_code=400,
+            detail="candidate_k debe ser >= top_k",
+        )
+
+    # ============================================================
+    # 2. LEER DATASET
+    # ============================================================
+
+    dataset_result = await db.execute(
+        text("""
+            SELECT
+                id,
+                question,
+                expected_chunk_id,
+                flag_different_info,
+                flag_out_of_knowledge,
+                created_at
+            FROM public.retrieval_dataset
+            WHERE tenant_id = :tenant_id
+            ORDER BY id ASC
+            """),
+        {
+            "tenant_id": tenant_id,
+        },
+    )
+
+    dataset_records = dataset_result.mappings().all()
+
+    for row in dataset_records:
+        keywords = row["keywords"] or []
+
+        if isinstance(keywords, str):
+            keywords = json.loads(keywords)
+
+        reference_answer = row["reference_answer"]
+        category = row["category"]
+
+    if not dataset_records:
+        raise HTTPException(
+            status_code=400,
+            detail=("No hay preguntas en retrieval_dataset " "para este tenant."),
+        )
+
+    dataset_size = len(dataset_records)
+
+    # ============================================================
+    # 3. CLASIFICACIÓN DEL DATASET
+    # ============================================================
+
+    normal_questions = sum(
+        1
+        for row in dataset_records
+        if not row["flag_different_info"] and not row["flag_out_of_knowledge"]
+    )
+
+    different_info_questions = sum(
+        1 for row in dataset_records if row["flag_different_info"]
+    )
+
+    out_of_knowledge_questions = sum(
+        1 for row in dataset_records if row["flag_out_of_knowledge"]
+    )
+
+    # Preguntas que tienen un expected_chunk_id
+    # y por tanto participan en Recall/MRR.
+    retrieval_questions = sum(
+        1
+        for row in dataset_records
+        if not row["flag_out_of_knowledge"] and row["expected_chunk_id"]
+    )
+
+    # ============================================================
+    # 4. CONFIGURACIÓN DEL EXPERIMENTO
+    # ============================================================
+
+    parameters = {
+        "model_name": request.model_name,
+        "embedding_model": request.embedding_model,
+        "top_k": request.top_k,
+        "retrieval_k": request.retrieval_k,
+        "bm25_k": request.bm25_k,
+        "rrf_k": request.rrf_k,
+        "candidate_k": request.candidate_k,
+        "reranker_model": request.reranker_model,
+        "reranker_batch_size": request.reranker_batch_size,
+        "evaluation_type": "retrieval",
+        "rag_service": "RAGService.fetch_context",
+    }
+
+    # ============================================================
+    # 5. CREAR RUN
+    # ============================================================
+
+    run_result = await db.execute(
+        text("""
+            INSERT INTO public.retrieval_evaluation_runs (
+                tenant_id,
+                model_name,
+                embedding_model,
+                top_k,
+                retrieval_k,
+                bm25_k,
+                rrf_k,
+                candidate_k,
+                reranker_model,
+                reranker_batch_size,
+                dataset_size,
+                normal_questions,
+                different_info_questions,
+                out_of_knowledge_questions,
+                parameters,
+                status
+            )
+            VALUES (
+                :tenant_id,
+                :model_name,
+                :embedding_model,
+                :top_k,
+                :retrieval_k,
+                :bm25_k,
+                :rrf_k,
+                :candidate_k,
+                :reranker_model,
+                :reranker_batch_size,
+                :dataset_size,
+                :normal_questions,
+                :different_info_questions,
+                :out_of_knowledge_questions,
+                CAST(:parameters AS JSONB),
+                'running'
+            )
+            RETURNING id
+            """),
+        {
+            "tenant_id": tenant_id,
+            "model_name": request.model_name,
+            "embedding_model": request.embedding_model,
+            "top_k": request.top_k,
+            "retrieval_k": request.retrieval_k,
+            "bm25_k": request.bm25_k,
+            "rrf_k": request.rrf_k,
+            "candidate_k": request.candidate_k,
+            "reranker_model": request.reranker_model,
+            "reranker_batch_size": request.reranker_batch_size,
+            "dataset_size": dataset_size,
+            "normal_questions": normal_questions,
+            "different_info_questions": (different_info_questions),
+            "out_of_knowledge_questions": (out_of_knowledge_questions),
+            "parameters": json.dumps(parameters),
+        },
+    )
+
+    run_id = run_result.scalar_one()
+
+    await db.commit()
+
+    # ============================================================
+    # 6. CREAR RAG SERVICE
+    # ============================================================
+
+    evaluator = RAGService(
+        model=request.model_name,
+        embedding_model=request.embedding_model,
+        retrieval_k=request.retrieval_k,
+        bm25_k=request.bm25_k,
+        rrf_k=request.rrf_k,
+        candidate_k=request.candidate_k,
+        final_k=request.top_k,
+        reranker_model=request.reranker_model,
+        reranker_batch_size=request.reranker_batch_size,
+    )
+
+    # ============================================================
+    # 7. MÉTRICAS
+    # ============================================================
+
+    hits_at_1 = 0
+    hits_at_k = 0
+    mrr_sum = 0.0
+
+    false_positives = 0
+    failures = 0
+
+    try:
+
+        # ========================================================
+        # 8. EVALUAR CADA PREGUNTA
+        # ========================================================
+
+        for row in dataset_records:
+
+            question_start = time.time()
+
+            dataset_id = int(row["id"])
+
+            question = (row["question"] or "").strip()
+
+            expected_chunk_id = (
+                str(row["expected_chunk_id"]) if row["expected_chunk_id"] else None
+            )
+
+            different_info = bool(row["flag_different_info"])
+
+            out_of_knowledge = bool(row["flag_out_of_knowledge"])
+
+            # ----------------------------------------------------
+            # Llamada al RAG REAL
+            # ----------------------------------------------------
+
+            rag_result = await evaluator.fetch_context(
+                question=question,
+                tenant_id=str(tenant_id),
+            )
+
+            # ----------------------------------------------------
+            # Chunks finales
+            # ----------------------------------------------------
+
+            final_chunks = rag_result.get("chunks", []) or []
+
+            keyword_mrr = calculate_keyword_mrr(
+                keywords,
+                final_chunks,
+            )
+
+            keyword_coverage = calculate_keyword_coverage(
+                keywords,
+                final_chunks,
+            )
+
+            # ----------------------------------------------------
+            # Candidatos antes del reranker
+            # ----------------------------------------------------
+
+            candidates = (
+                rag_result.get(
+                    "candidates",
+                    [],
+                )
+                or []
+            )
+
+            # ----------------------------------------------------
+            # IDs finales
+            # ----------------------------------------------------
+
+            retrieved_ids = []
+            retrieved_scores = []
+
+            for chunk in final_chunks:
+
+                metadata = (
+                    getattr(
+                        chunk,
+                        "metadata",
+                        None,
+                    )
+                    or {}
+                )
+
+                chunk_id = metadata.get("chunk_id")
+
+                if not chunk_id:
+                    continue
+
+                retrieved_ids.append(str(chunk_id))
+
+                score = metadata.get("cross_encoder_score")
+
+                if score is None:
+                    score = metadata.get(
+                        "rrf_score",
+                        0.0,
+                    )
+
+                try:
+                    score = float(score)
+                except (
+                    TypeError,
+                    ValueError,
+                ):
+                    score = 0.0
+
+                retrieved_scores.append(score)
+
+            # ====================================================
+            # MÉTRICAS DE ESTA PREGUNTA
+            # ====================================================
+
+            expected_rank = None
+
+            hit_at_1 = False
+            hit_at_k = False
+
+            reciprocal_rank = 0.0
+
+            false_positive = False
+            failure = False
+
+            # ----------------------------------------------------
+            # OUT OF KNOWLEDGE
+            # ----------------------------------------------------
+
+            if out_of_knowledge:
+
+                # Una pregunta OOK NO tiene expected chunk.
+                #
+                # Si el RAG devuelve chunks, tenemos un
+                # falso positivo.
+                #
+                # Si no devuelve ninguno, es correcto.
+                if retrieved_ids:
+                    false_positive = True
+                    false_positives += 1
+
+            # ----------------------------------------------------
+            # PREGUNTA CON EXPECTED CHUNK
+            # ----------------------------------------------------
+
+            elif expected_chunk_id:
+
+                try:
+
+                    expected_rank = retrieved_ids.index(expected_chunk_id) + 1
+
+                    # Recall@1
+                    if expected_rank == 1:
+                        hit_at_1 = True
+                        hits_at_1 += 1
+
+                    # Recall@K
+                    if expected_rank <= request.top_k:
+                        hit_at_k = True
+                        hits_at_k += 1
+
+                    # MRR
+                    reciprocal_rank = 1.0 / expected_rank
+
+                    mrr_sum += reciprocal_rank
+
+                except ValueError:
+
+                    failure = True
+                    failures += 1
+
+            # ----------------------------------------------------
+            # DATASET MAL FORMADO
+            # ----------------------------------------------------
+
+            else:
+
+                failure = True
+                failures += 1
+
+            # ====================================================
+            # LATENCIA
+            # ====================================================
+
+            latency_ms = (time.time() - question_start) * 1000
+
+            # ====================================================
+            # METADATA DEL RAG
+            # ====================================================
+
+            retrieval_metadata = (
+                rag_result.get(
+                    "retrieval",
+                    {},
+                )
+                or {}
+            )
+
+            retrieval_metadata = {
+                **retrieval_metadata,
+                "evaluation_type": "retrieval",
+                "candidate_count": len(candidates),
+                "final_count": len(final_chunks),
+                "expected_chunk_id": (expected_chunk_id),
+                "different_info": (different_info),
+                "out_of_knowledge": (out_of_knowledge),
+            }
+
+            # ====================================================
+            # GUARDAR RESULTADO INDIVIDUAL
+            # ====================================================
+
+            await db.execute(
+                text("""
+                    INSERT INTO public.retrieval_evaluation_results (
+                        evaluation_run_id,
+                        dataset_id,
+                        question,
+                        expected_chunk_id,
+                        retrieved_chunk_ids,
+                        retrieved_scores,
+                        expected_rank,
+                        hit_at_1,
+                        hit_at_k,
+                        reciprocal_rank,
+                        false_positive,
+                        failure,
+                        flag_different_info,
+                        flag_out_of_knowledge,
+                        retrieval_latency_ms,
+                        retrieval_metadata
+                    )
+                    VALUES (
+                        :run_id,
+                        :dataset_id,
+                        :question,
+                        :expected_chunk_id,
+                        CAST(:retrieved_chunk_ids AS JSONB),
+                        CAST(:retrieved_scores AS JSONB),
+                        :expected_rank,
+                        :hit_at_1,
+                        :hit_at_k,
+                        :reciprocal_rank,
+                        :false_positive,
+                        :failure,
+                        :flag_different_info,
+                        :flag_out_of_knowledge,
+                        :retrieval_latency_ms,
+                        CAST(:retrieval_metadata AS JSONB)
+                    )
+                    """),
+                {
+                    "run_id": run_id,
+                    "dataset_id": dataset_id,
+                    "question": question,
+                    "expected_chunk_id": (expected_chunk_id),
+                    "retrieved_chunk_ids": json.dumps(retrieved_ids),
+                    "retrieved_scores": json.dumps(retrieved_scores),
+                    "expected_rank": expected_rank,
+                    "hit_at_1": hit_at_1,
+                    "hit_at_k": hit_at_k,
+                    "reciprocal_rank": (reciprocal_rank),
+                    "false_positive": (false_positive),
+                    "failure": failure,
+                    "flag_different_info": (different_info),
+                    "flag_out_of_knowledge": (out_of_knowledge),
+                    "retrieval_latency_ms": (latency_ms),
+                    "retrieval_metadata": json.dumps(
+                        retrieval_metadata,
+                        default=str,
+                    ),
+                },
+            )
+
+            # Commit por pregunta.
+            await db.commit()
+
+        # ========================================================
+        # 9. MÉTRICAS GLOBALES
+        # ========================================================
+
+        if retrieval_questions > 0:
+
+            recall_1 = hits_at_1 / retrieval_questions
+
+            recall_k = hits_at_k / retrieval_questions
+
+            mrr = mrr_sum / retrieval_questions
+
+        else:
+
+            recall_1 = 0.0
+            recall_k = 0.0
+            mrr = 0.0
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        # ========================================================
+        # 10. ACTUALIZAR RUN
+        # ========================================================
+
+        await db.execute(
+            text("""
+                UPDATE public.retrieval_evaluation_runs
+                SET
+                    recall_1 = :recall_1,
+                    recall_k = :recall_k,
+                    mrr = :mrr,
+                    false_positives = :false_positives,
+                    failures = :failures,
+                    duration_ms = :duration_ms,
+                    status = 'completed',
+                    finished_at = CURRENT_TIMESTAMP
+                WHERE id = :run_id
+                """),
+            {
+                "run_id": run_id,
+                "recall_1": recall_1,
+                "recall_k": recall_k,
+                "mrr": mrr,
+                "false_positives": (false_positives),
+                "failures": failures,
+                "duration_ms": duration_ms,
+            },
+        )
+
+        await db.commit()
+
+        # ========================================================
+        # 11. RESPUESTA
+        # ========================================================
+
+        return DatasetEvaluationResponse(
+            run_id=run_id,
+            model_name=request.model_name,
+            embedding_model=request.embedding_model,
+            dataset_size=dataset_size,
+            normal_questions=(normal_questions),
+            different_info_questions=(different_info_questions),
+            out_of_knowledge_questions=(out_of_knowledge_questions),
+            recall_1=recall_1,
+            recall_k=recall_k,
+            mrr=mrr,
+            false_positives=(false_positives),
+            failures=failures,
+            duration_ms=duration_ms,
+            status="completed",
+            parameters=parameters,
+        )
+
+    except Exception as exc:
+
+        # ========================================================
+        # ERROR
+        # ========================================================
+
+        await db.rollback()
+
+        duration_ms = (time.time() - start_time) * 1000
+
+        try:
+
+            await db.execute(
+                text("""
+                    UPDATE public.retrieval_evaluation_runs
+                    SET
+                        duration_ms = :duration_ms,
+                        status = 'failed',
+                        error_message = :error_message,
+                        finished_at = CURRENT_TIMESTAMP
+                    WHERE id = :run_id
+                    """),
+                {
+                    "run_id": run_id,
+                    "duration_ms": duration_ms,
+                    "error_message": str(exc)[:4000],
+                },
+            )
+
+            await db.commit()
+
+        except Exception:
+            await db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=("Error ejecutando la evaluación: " f"{str(exc)}"),
+        )
 
 
 @router.post("/", response_model=ChatResponse)
@@ -241,6 +1175,106 @@ async def chat(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/simulator/import-question-bank")
+async def import_question_bank(
+    request: QuestionBankImportRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = await get_user_tenant_id(
+        current_user.id,
+        db,
+    )
+
+    if not request.questions:
+        raise HTTPException(
+            status_code=400,
+            detail="El banco de preguntas está vacío.",
+        )
+
+    imported = 0
+    skipped = 0
+
+    try:
+        for item in request.questions:
+
+            question = item.question.strip()
+
+            if not question:
+                skipped += 1
+                continue
+
+            # Evitar duplicados
+            existing = await db.execute(
+                text("""
+                    SELECT id
+                    FROM public.retrieval_dataset
+                    WHERE tenant_id = :tenant_id
+                      AND question = :question
+                    LIMIT 1
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "question": question,
+                },
+            )
+
+            if existing.scalar_one_or_none() is not None:
+                skipped += 1
+                continue
+
+            await db.execute(
+                text("""
+                    INSERT INTO public.retrieval_dataset (
+                        tenant_id,
+                        question,
+                        expected_chunk_id,
+                        keywords,
+                        reference_answer,
+                        category,
+                        flag_different_info,
+                        flag_out_of_knowledge
+                    )
+                    VALUES (
+                        :tenant_id,
+                        :question,
+                        NULL,
+                        CAST(:keywords AS JSONB),
+                        :reference_answer,
+                        :category,
+                        FALSE,
+                        FALSE
+                    )
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "question": question,
+                    "keywords": json.dumps(item.keywords),
+                    "reference_answer": item.reference_answer,
+                    "category": item.category,
+                },
+            )
+
+            imported += 1
+
+        await db.commit()
+
+        return {
+            "status": "success",
+            "imported": imported,
+            "skipped": skipped,
+            "total": len(request.questions),
+        }
+
+    except Exception as e:
+        await db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error importando banco de preguntas: {str(e)}",
+        )
+
+
 @router.get("/conversations")
 async def get_conversations(
     current_user: User = Depends(get_current_user),
@@ -378,72 +1412,6 @@ async def delete_conversation(
         )
 
 
-@router.post("/run-evaluation")
-async def run_evaluation(
-    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
-):
-    print(f"\n[AUDITORÍA] Iniciando proceso para usuario: {current_user.id}")
-
-    # 1. Obtener el resultado de la ejecución
-    query_result = await db.execute(
-        text("""
-            SELECT t.id
-            FROM tenants t
-            JOIN organization_members om ON t.organization_id = om.organization_id
-            WHERE om.user_id = :user_id AND om.active = true
-            LIMIT 1
-        """),
-        {"user_id": current_user.id},
-    )
-
-    tenant_val = query_result.scalar_one_or_none()
-
-    tenant_id = str(tenant_val) if tenant_val else "global"
-
-    print(f"[AUDITORÍA] Tenant identificado: {tenant_id}")
-
-    tests = load_tests()
-    print(f"[AUDITORÍA] Se han cargado {len(tests)} casos de prueba.")
-
-    results = []
-
-    # 3. Procesar evaluación
-    for i, test in enumerate(tests):
-        print(f"[TEST {i+1}/{len(tests)}] Evaluando: {test.question[:50]}...")
-
-        # Llamada directa usando await
-        response = await rag_service.answer(test.question, tenant_id=tenant_id)
-
-        # Log de resultados parciales
-        chunks_found = len(response["chunks"])
-        print(f"  -> Chunks recuperados: {chunks_found}")
-        print(
-            f"  -> Respuesta recibida (longitud): {len(response['answer'])} caracteres"
-        )
-
-        results.append(
-            {
-                "question": test.question,
-                "category": test.category,
-                "system_answer": response["answer"],
-                "retrieved_count": chunks_found,
-            }
-        )
-
-    # 5. Calcular promedios
-    total_chunks = sum(r["retrieved_count"] for r in results)
-    avg_chunks = total_chunks / len(results) if results else 0
-
-    print(f"\n[AUDITORÍA] Proceso finalizado.")
-    print(f"[RESULTADOS] Total Tests: {len(results)} | Avg Chunks: {avg_chunks:.2f}\n")
-
-    return {
-        "retrieval": {"Total Tests": len(results), "Avg Chunks": avg_chunks},
-        "quality": {"Success Rate": 1.0},
-        "details": results,
-    }
-
-
 @router.get("/evaluation/tests")
 async def get_evaluation_tests(
     current_user: User = Depends(get_current_user),
@@ -496,17 +1464,16 @@ async def evaluate_retrieval_route(
     tenant_id = await get_user_tenant_id(current_user.id, db)
     test = tests[test_id]
 
-    # Llamada directa usando await
-    result = await rag_service.evaluate_retrieval(
-        test,
-        tenant_id,
-    )
+    # Ejecutar evaluación de recuperación (Retrieval)
+    result = await rag_service.evaluate_retrieval(test, str(tenant_id))
+
+    retrieval_data = result.model_dump() if hasattr(result, "model_dump") else result
 
     return {
         "test_id": test_id,
         "question": test.question,
         "category": test.category,
-        "retrieval": result.model_dump() if hasattr(result, "model_dump") else result,
+        "retrieval": retrieval_data,
     }
 
 
@@ -516,38 +1483,33 @@ async def evaluate_answer_route(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # 1. Cargar la lista actualizada de tests en cada petición
     tests = load_tests()
-
-    # 2. Validar que el test_id esté dentro del rango
     if test_id < 0 or test_id >= len(tests):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Test no encontrado (ID: {test_id})",
         )
 
-    # 3. Obtener el tenant_id del usuario y seleccionar el test
     tenant_id = await get_user_tenant_id(current_user.id, db)
     test = tests[test_id]
 
-    # Llamada directa usando await
+    # Ejecutar evaluación de generación (Answer)
     eval_result, generated_answer, chunks = await rag_service.evaluate_answer(
         test=test,
         tenant_id=str(tenant_id),
     )
 
-    # 5. Formatear los datos para el renderizado en frontend
+    eval_data = (
+        eval_result.model_dump() if hasattr(eval_result, "model_dump") else eval_result
+    )
+
     return {
         "test_id": test_id,
         "question": test.question,
         "category": getattr(test, "category", "general"),
         "reference_answer": test.reference_answer,
         "generated_answer": generated_answer,
-        "evaluation": (
-            eval_result.model_dump()
-            if hasattr(eval_result, "model_dump")
-            else eval_result
-        ),
+        "evaluation": eval_data,
         "retrieved_chunks": [
             {
                 "content": getattr(chunk, "page_content", str(chunk)),
@@ -558,65 +1520,233 @@ async def evaluate_answer_route(
     }
 
 
-@router.post("/evaluation/run")
-async def run_full_evaluation(
-    background_tasks: BackgroundTasks,
+@router.post("/simulator/evaluate-dataset", response_model=DatasetEvaluationResponse)
+async def evaluate_dataset(
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+):
+    """
+    3. Evalúa el dataset completo comparando el chunk esperado con los resultados reales de búsqueda.
+    """
+    tenant_id = await get_user_tenant_id(current_user.id, db)
+
+    start_time = time.time()
+
+    # 1. Obtener todas las preguntas guardadas en el dataset
+    dataset_records = (
+        (
+            await db.execute(
+                text("""
+            SELECT question, expected_chunk_id, flag_different_info, flag_out_of_knowledge
+            FROM public.retrieval_dataset
+            WHERE tenant_id = :tenant
+        """),
+                {"tenant": tenant_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+
+    if not dataset_records:
+        raise HTTPException(
+            status_code=400, detail="El dataset está vacío. Guarda preguntas primero."
+        )
+
+    total_queries = len(dataset_records)
+    hits_at_1 = 0
+    hits_at_k = 0
+    mrr_sum = 0.0
+    false_positives = 0
+    failures = 0
+
+    K = 5  # Definimos K para Recall@K
+
+    # 2. Iterar y evaluar cada pregunta
+    for record in dataset_records:
+        question = record["question"]
+        expected_chunk = str(record["expected_chunk_id"])
+        should_be_empty = record["flag_out_of_knowledge"]
+
+        # Volver a realizar la búsqueda (mock, llama a tu servicio real)
+        search_results = await rag_service.search_with_scores(
+            question=question, tenant_id=str(tenant_id), k=K
+        )
+
+        # Extraer IDs de los chunks devueltos
+        retrieved_ids = []
+        for chunk, _ in search_results:
+            metadata = getattr(chunk, "metadata", {})
+            retrieved_ids.append(str(metadata.get("chunk_id", "")))
+
+        # Evaluar flags: Si no debía devolver nada pero devolvió, es falso positivo
+        if should_be_empty and len(retrieved_ids) > 0:
+            false_positives += 1
+            failures += 1
+            continue
+
+        if should_be_empty and len(retrieved_ids) == 0:
+            # Caso de éxito: No devolvió nada y no debía devolver nada
+            hits_at_1 += 1
+            hits_at_k += 1
+            mrr_sum += 1.0
+            continue
+
+        # Encontrar en qué posición (rank) aparece el esperado (1-indexed)
+        try:
+            rank = retrieved_ids.index(expected_chunk) + 1
+
+            if rank == 1:
+                hits_at_1 += 1
+            if rank <= K:
+                hits_at_k += 1
+
+            mrr_sum += 1.0 / rank
+
+        except ValueError:
+            # El chunk esperado no se encontró entre los top K
+            failures += 1
+
+    # 3. Calcular métricas finales
+    recall_1 = hits_at_1 / total_queries
+    recall_k = hits_at_k / total_queries
+    mrr = mrr_sum / total_queries
+    duration_ms = (time.time() - start_time) * 1000
+
+    return DatasetEvaluationResponse(
+        model_date=time.strftime("%Y-%m-%d"),
+        dataset_name="Retrieval Eval v1",
+        recall_1=recall_1,
+        recall_k=recall_k,
+        mrr=mrr,
+        false_positives=false_positives,
+        failures=failures,
+        duration_ms=duration_ms,
+    )
+
+
+@router.post("/simulator/save-dataset")
+async def save_to_dataset(
+    request: SimulatorSaveRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    tenant_id = await get_user_tenant_id(current_user.id, db)
-    tests = load_tests()
+    tenant_id = await get_user_tenant_id(
+        current_user.id,
+        db,
+    )
 
-    # Convertimos la función de background a async para poder utilizar await
-    async def _run():
-        retrieval_results = []
-        answer_results = []
+    try:
 
-        for idx, test in enumerate(tests):
-            retrieval = await rag_service.evaluate_retrieval(test, str(tenant_id))
-            answer_eval, generated_answer, _ = await rag_service.evaluate_answer(
-                test, str(tenant_id)
-            )
+        await db.execute(
+            text("""
+                INSERT INTO public.retrieval_dataset (
+                    tenant_id,
+                    question,
+                    expected_chunk_id,
+                    keywords,
+                    reference_answer,
+                    category,
+                    flag_different_info,
+                    flag_out_of_knowledge
+                )
+                VALUES (
+                    :tenant_id,
+                    :question,
+                    :expected_chunk_id,
+                    CAST(:keywords AS JSONB),
+                    :reference_answer,
+                    :category,
+                    :different_info,
+                    :out_of_knowledge
+                )
+            """),
+            {
+                "tenant_id": tenant_id,
+                "question": request.question,
+                "expected_chunk_id": request.selected_chunk_id,
+                "keywords": json.dumps(request.keywords),
+                "reference_answer": request.reference_answer,
+                "category": request.category,
+                "different_info": request.flags.different_info,
+                "out_of_knowledge": request.flags.out_of_knowledge,
+            },
+        )
 
-            retrieval_results.append(
-                {
-                    "test_id": idx,
-                    "question": test.question,
-                    "category": test.category,
-                    "mrr": retrieval.mrr,
-                    "ndcg": retrieval.ndcg,
-                    "keywords_found": retrieval.keywords_found,
-                    "total_keywords": retrieval.total_keywords,
-                    "keyword_coverage": retrieval.keyword_coverage,
-                }
-            )
-
-            answer_results.append(
-                {
-                    "test_id": idx,
-                    "question": test.question,
-                    "category": test.category,
-                    "accuracy": answer_eval.accuracy,
-                    "completeness": answer_eval.completeness,
-                    "relevance": answer_eval.relevance,
-                    "feedback": answer_eval.feedback,
-                    "generated_answer": generated_answer,
-                }
-            )
+        await db.commit()
 
         return {
-            "retrieval_averages": calculate_averages(retrieval_results),
-            "answer_averages": calculate_averages(answer_results),
-            "retrieval_details": retrieval_results,
-            "answer_details": answer_results,
+            "status": "success",
+            "message": "Pregunta guardada correctamente.",
         }
 
-    background_tasks.add_task(_run)
+    except Exception as e:
+
+        await db.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+
+@router.post("/simulator/search")
+async def simulator_search(
+    request: SimulatorSearchRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = await get_user_tenant_id(
+        current_user.id,
+        db,
+    )
+
+    evaluator = RAGService(
+        model="llama3.2",
+        embedding_model="qwen3-embedding:latest",
+        retrieval_k=10,
+        bm25_k=10,
+        rrf_k=60,
+        candidate_k=15,
+        final_k=5,
+        reranker_model="BAAI/bge-reranker-v2-m3",
+        reranker_batch_size=16,
+    )
+
+    rag_result = await evaluator.fetch_context(
+        question=request.question,
+        tenant_id=str(tenant_id),
+    )
+
+    chunks = rag_result.get("chunks", []) or []
+
+    results = []
+
+    for rank, chunk in enumerate(chunks, start=1):
+
+        metadata = getattr(chunk, "metadata", {}) or {}
+
+        results.append(
+            {
+                "id": str(metadata.get("chunk_id")),
+                "rank": rank,
+                "title": metadata.get(
+                    "source",
+                    "Documento General",
+                ),
+                "description": chunk.page_content[:1000],
+                "score": metadata.get(
+                    "cross_encoder_score",
+                    metadata.get("rrf_score", 0.0),
+                ),
+                "distance": metadata.get("distance"),
+                "content": chunk.page_content,
+            }
+        )
 
     return {
-        "status": "accepted",
-        "detail": "La evaluación se ha lanzado en segundo plano",
-        "total_tests": len(tests),
+        "question": request.question,
+        "chunks": results,
+        "retrieval": rag_result.get("retrieval", {}),
     }
 
 
@@ -684,6 +1814,6 @@ async def stream_evaluation(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Desactiva buffering en Nginx / Traefik
+            "X-Accel-Buffering": "no",
         },
     )

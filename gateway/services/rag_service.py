@@ -43,6 +43,70 @@ class AnswerEval(BaseModel):
     relevance: float = Field(description="Pertinencia de 1 a 5")
 
 
+class DatasetEvaluationRequest(BaseModel):
+    model_name: str = "llama3.2"
+    embedding_model: str = "qwen3-embedding:latest"
+    top_k: int = 5
+    retrieval_k: int = 10
+    bm25_k: int = 10
+    rrf_k: int = 60
+    candidate_k: int = 15
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    reranker_batch_size: int = 16
+
+
+class DatasetEvaluationResponse(BaseModel):
+    run_id: int
+    model_name: str
+    embedding_model: str
+    dataset_size: int
+    normal_questions: int
+    different_info_questions: int
+    out_of_knowledge_questions: int
+    recall_1: float
+    recall_k: float
+    mrr: float
+    false_positives: int
+    failures: int
+    duration_ms: float
+    status: str
+    parameters: dict
+
+
+class EvaluationHistoryItem(BaseModel):
+    id: int
+    created_at: str
+    model_name: str
+    embedding_model: str
+    dataset_size: int
+    top_k: int
+    recall_1: float
+    recall_k: float
+    mrr: float
+    false_positives: int
+    failures: int
+    duration_ms: float
+    status: str
+
+
+class EvaluationResultItem(BaseModel):
+    id: int
+    dataset_id: int
+    question: str
+    expected_chunk_id: str | None
+    retrieved_chunk_ids: list[str]
+    retrieved_scores: list[float]
+    expected_rank: int | None
+    hit_at_1: bool
+    hit_at_k: bool
+    reciprocal_rank: float
+    false_positive: bool
+    failure: bool
+    flag_different_info: bool
+    flag_out_of_knowledge: bool
+    retrieval_latency_ms: float | None
+
+
 class RAGService:
     """RAG híbrido multitenant: Dense + BM25 + RRF + Cross-Encoder."""
 
@@ -1039,32 +1103,12 @@ class RAGService:
         )
 
     async def evaluate_answer(
-        self, test, tenant_id: str
+        self, question: str, generated_answer: str, retrieved_docs: list
     ) -> tuple[AnswerEval, str, list]:
-        generated_answer_result = await self.answer(
-            test.question,
-            history=[],
-            tenant_id=tenant_id,
-        )
-        generated_answer = generated_answer_result["answer"]
-        retrieved_docs = generated_answer_result["chunks"]
-
         prompt = f"""
-        Pregunta:
-        {test.question}
-
-        Respuesta generada:
-        {generated_answer}
-
-        Respuesta de referencia:
-        {test.reference_answer}
-
-        Evalúa:
-        1. Precisión (accuracy).
-        2. Exhaustividad (completeness).
-        3. Pertinencia (relevance).
-
-        Devuelve JSON con feedback, accuracy, completeness y relevance.
+        Pregunta: {question}
+        Respuesta Generada: {generated_answer}
+        Evalúa la respuesta basándote en la precisión factual, exhaustividad y relevancia (escala de 1 a 5).
         """
         completion = self.client.beta.chat.completions.parse(
             model=self.model,
