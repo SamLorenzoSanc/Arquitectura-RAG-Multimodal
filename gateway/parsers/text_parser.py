@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from .base import FileParser
+from .base import FileParser, ParsingContext
 from .parsed_document import ParsedDocument
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ class TextParser(FileParser):
     async def parse(
         self,
         file: Path,
+        context: ParsingContext | None = None,
     ) -> ParsedDocument:
 
         if not file.exists():
@@ -45,7 +46,7 @@ class TextParser(FileParser):
             extension=file.suffix.lower(),
             title=file.stem,
             markdown=markdown,
-            language="es",
+            language=(context.language if context and context.language else "es"),
             word_count=len(markdown.split()),
             character_count=len(markdown),
             metadata={
@@ -55,5 +56,10 @@ class TextParser(FileParser):
                 "size": file.stat().st_size,
                 "checksum": checksum,
                 "created_at": datetime.utcnow().isoformat(),
+                **(
+                    {"tenant_id": str(context.tenant_id)}
+                    if context and getattr(context, "tenant_id", None)
+                    else {}
+                ),
             },
         )

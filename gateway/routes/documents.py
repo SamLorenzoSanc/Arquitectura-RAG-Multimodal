@@ -39,6 +39,7 @@ from services.ingest_service import (
     MODEL,
     IngestService,
 )
+from services.queue_service import enqueue_ingest_job
 from services.storage_service import StorageService
 from .auth import get_current_user
 from models.chunk import Chunk
@@ -737,11 +738,12 @@ async def index_document(
     # LAUNCH BACKGROUND JOB
     # ---------------------------------------------------------
 
-    background_tasks.add_task(
-        _run_processing,
-        document.id,
-        job.id,
-    )
+    if not enqueue_ingest_job(document.id, job.id):
+        background_tasks.add_task(
+            _run_processing,
+            document.id,
+            job.id,
+        )
 
     logger.info(
         "[RAG INDEX] Queued document=%s job=%s",
@@ -991,11 +993,12 @@ async def upload_document(
     # 8. LANZAR PROCESAMIENTO AUTOMÁTICAMENTE
     # ---------------------------------------------------------
 
-    background_tasks.add_task(
-        _run_processing,
-        doc_id,
-        job_id,
-    )
+    if not enqueue_ingest_job(doc_id, job_id):
+        background_tasks.add_task(
+            _run_processing,
+            doc_id,
+            job_id,
+        )
 
     logger.info(
         "[UPLOAD] Document created document=%s job=%s "

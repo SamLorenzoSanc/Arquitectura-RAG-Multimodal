@@ -17,9 +17,13 @@ from routes.logistic import router as logicstic_router
 from routes.map import router as map_router
 from routes.crops import router as crop_router
 from routes.speech import router as speech_router
+from routes.recogida import router as recogida_router
+from routes.internal import router as internal_router
 import models as models
+from middleware.timing import register_logging_middleware
 
 app = FastAPI(title="AgroRAG Gateway", version="1.0.0")
+register_logging_middleware(app)
 
 origins = [
     "http://localhost",
@@ -52,6 +56,8 @@ app.include_router(logicstic_router, prefix="/api/v1")
 app.include_router(map_router, prefix="/api/v1")
 app.include_router(crop_router, prefix="/api/v1")
 app.include_router(speech_router, prefix="/api/v1")
+app.include_router(recogida_router, prefix="/api/v1")
+app.include_router(internal_router, prefix="/api/v1")
 
 
 def main():

@@ -6,35 +6,27 @@ import {
   ChevronDown,
   AlertTriangle,
   CheckCircle2,
+  Menu,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useShell } from "@/context/ShellContext";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
 import api from "@/api";
-
-// Obtener los roles del usuario autenticado en todas sus organizaciones
-export const getMyRoles = async () => {
-  const { data } = await api.get("/users/me/roles");
-  return data;
-};
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { toggleSidebar } = useShell();
   const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [alertCount, setAlertCount] = useState(0);
+  const [alertsList, setAlertsList] = useState<
+    Array<{ product: string; message: string; containerId: string }>
+  >([]);
+  const [showAlertsDropdown, setShowAlertsDropdown] = useState(false);
 
-  // Estado para almacenar el rol del usuario
-  const [userRoleLabel, setUserRoleLabel] = useState("Miembro");
-
-  // Estados para las alertas dinámicas en la campana
-  const [alertCount, setAlertCount] = useState<number>(0);
-  const [alertsList, setAlertsList] = useState<any[]>([]);
-  const [showAlertsDropdown, setShowAlertsDropdown] = useState<boolean>(false);
-
-  // Obtener las iniciales del usuario para el avatar
   const initials =
     user?.name
       ?.split(" ")
@@ -42,73 +34,47 @@ export default function Header() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "US";
-
-  // Obtener el primer nombre para el saludo
   const firstName = user?.name?.split(" ")[0] || "Usuario";
 
-  // Cargar el rol del usuario al montar el componente
-  useEffect(() => {
-    const fetchUserRole = async () => {
-      try {
-        const rolesData = await getMyRoles();
-        if (rolesData) {
-          if (Array.isArray(rolesData) && rolesData.length > 0) {
-            setUserRoleLabel(rolesData[0].role_name || "Miembro");
-          } else if (typeof rolesData === "object" && rolesData.role_name) {
-            setUserRoleLabel(rolesData.role_name);
-          } else if (typeof rolesData === "string") {
-            setUserRoleLabel(rolesData);
-          }
-        }
-      } catch (error) {
-        console.error("Error al obtener el rol del usuario:", error);
-        setUserRoleLabel("Miembro");
-      }
-    };
-
-    fetchUserRole();
-  }, []);
-
-  // Sincronizar alertas dinámicas desde el backend de logística para la campana
   useEffect(() => {
     const fetchAlertsSummary = async () => {
       try {
         const res = await api.get("/logistics/alerts/summary");
         if (res.data) {
-          setAlertCount(res.data.totalAlerts);
-          setAlertsList(res.data.alerts);
+          setAlertCount(res.data.totalAlerts ?? 0);
+          setAlertsList(res.data.alerts ?? []);
         }
-      } catch (error) {
-        console.error("Error al obtener el resumen de alertas:", error);
+      } catch {
+        /* no bloquear shell */
       }
     };
 
-    fetchAlertsSummary();
-    const interval = setInterval(fetchAlertsSummary, 30000); // Actualización cada 30 segundos
+    void fetchAlertsSummary();
+    const interval = setInterval(fetchAlertsSummary, 120000); // 2 min: menos ruido que health/RAG
+
     return () => clearInterval(interval);
   }, []);
 
-  // Sincronizar fecha y hora con la zona horaria de Canarias (Atlantic/Canary)
   useEffect(() => {
     const updateDateTime = () => {
       const now = new Date();
-      const dateFormatter = new Intl.DateTimeFormat("es-ES", {
-        timeZone: "Atlantic/Canary",
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-      const timeFormatter = new Intl.DateTimeFormat("es-ES", {
-        timeZone: "Atlantic/Canary",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-      setCurrentDate(dateFormatter.format(now));
-      setCurrentTime(timeFormatter.format(now));
+      setCurrentDate(
+        new Intl.DateTimeFormat("es-ES", {
+          timeZone: "Atlantic/Canary",
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        }).format(now),
+      );
+      setCurrentTime(
+        new Intl.DateTimeFormat("es-ES", {
+          timeZone: "Atlantic/Canary",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(now),
+      );
     };
-
     updateDateTime();
     const interval = setInterval(updateDateTime, 1000);
     return () => clearInterval(interval);
@@ -120,96 +86,87 @@ export default function Header() {
   };
 
   return (
-    <header className="h-24 bg-white/90 backdrop-blur-md border-b-4 border-[#FCD116] flex justify-between items-center px-8 sticky top-0 z-40 shadow-sm">
-      {/* Izquierda - Saludo y Fecha/Hora */}
-      <div className="flex-1 flex flex-col justify-center">
-        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
-          Hola,{" "}
-          <span className="bg-gradient-to-r from-[#0038A8] to-[#0055FF] bg-clip-text text-transparent">
-            {firstName}
-          </span>
-        </h2>
-        <div className="flex items-center gap-2 mt-1">
-          <p className="text-sm font-medium text-[#0038A8] capitalize">
-            {currentDate}
-          </p>
-          <span className="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-          <p className="text-sm font-semibold text-slate-500 font-mono tracking-tight">
-            {currentTime}
-          </p>
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between gap-3 border-b border-[color:var(--agro-border)] bg-white/90 px-3 backdrop-blur-md sm:h-20 sm:px-5 lg:px-6">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 lg:hidden"
+          aria-label="Abrir menú"
+        >
+          <Menu size={20} />
+        </button>
+        <div className="min-w-0">
+          <h2 className="truncate text-lg font-bold tracking-tight text-slate-800 sm:text-2xl">
+            Hola,{" "}
+            <span className="bg-gradient-to-r from-[color:var(--agro-primary)] to-blue-500 bg-clip-text text-transparent">
+              {firstName}
+            </span>
+          </h2>
+          <div className="mt-0.5 hidden items-center gap-2 sm:flex">
+            <p className="truncate text-sm font-medium capitalize text-[color:var(--agro-primary)]">
+              {currentDate}
+            </p>
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+            <p className="font-mono text-sm font-semibold text-slate-500">
+              {currentTime}
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Derecha - Notificaciones y Perfil */}
-      <div className="flex-1 flex items-center justify-end gap-5">
-        {/* Notificaciones (Campana Dinámica de Cadena de Frío) */}
+      <div className="flex shrink-0 items-center gap-2 sm:gap-4">
         <div className="relative">
           <button
-            onClick={() => setShowAlertsDropdown(!showAlertsDropdown)}
-            className="relative p-2.5 rounded-full text-slate-500 hover:bg-blue-50 hover:text-[#0038A8] transition-colors focus:outline-none cursor-pointer"
-            title="Alertas de Cadena de Frío"
+            type="button"
+            onClick={() => setShowAlertsDropdown((v) => !v)}
+            className="relative rounded-full p-2.5 text-slate-500 transition hover:bg-blue-50 hover:text-[color:var(--agro-primary)]"
+            title="Alertas de cadena de frío"
           >
-            <Bell size={22} />
+            <Bell size={20} />
             {alertCount > 0 && (
-              <span className="absolute top-1 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#D91424] text-[10px] font-black text-white border-2 border-white animate-bounce">
+              <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[color:var(--agro-danger)] text-[9px] font-black text-white">
                 {alertCount}
               </span>
             )}
           </button>
 
-          {/* Dropdown de Alertas Dinámicas */}
           {showAlertsDropdown && (
-            <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                <p className="text-sm font-bold text-slate-800">
-                  Alertas de Cadena de Frío
-                </p>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    alertCount > 0
-                      ? "bg-red-50 text-[#D91424] border-red-200"
-                      : "bg-blue-50 text-[#0038A8] border-blue-200"
-                  }`}
-                >
-                  {alertCount > 0 ? `${alertCount} Críticas` : "Todo Estable"}
+            <div className="absolute right-0 z-50 mt-3 w-[min(20rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 p-4">
+                <p className="text-sm font-bold text-slate-800">Alertas</p>
+                <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[color:var(--agro-primary)]">
+                  {alertCount > 0 ? `${alertCount} críticas` : "Estable"}
                 </span>
               </div>
-
-              <div className="p-2 space-y-2 max-h-72 overflow-y-auto">
+              <div className="max-h-72 space-y-2 overflow-y-auto p-2">
                 {alertsList.length === 0 ? (
-                  <div className="p-4 text-center space-y-1">
+                  <div className="space-y-1 p-4 text-center">
                     <CheckCircle2
                       size={24}
-                      className="mx-auto text-[#0038A8]"
+                      className="mx-auto text-[color:var(--agro-primary)]"
                     />
                     <p className="text-xs font-semibold text-slate-700">
                       Sin alertas térmicas
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      Todos los contenedores reefer operan dentro de los
-                      umbrales seguros.
                     </p>
                   </div>
                 ) : (
                   alertsList.map((alert, idx) => (
                     <div
                       key={idx}
-                      className="p-3 rounded-xl bg-red-50/60 border border-red-200 flex gap-3 items-start text-left"
+                      className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50/60 p-3"
                     >
                       <AlertTriangle
                         size={16}
-                        className="text-[#D91424] shrink-0 mt-0.5"
+                        className="mt-0.5 shrink-0 text-[color:var(--agro-danger)]"
                       />
                       <div>
                         <p className="text-xs font-bold text-red-900">
                           {alert.product}
                         </p>
-                        <p className="text-[11px] text-red-800 mt-0.5 leading-snug">
+                        <p className="mt-0.5 text-[11px] leading-snug text-red-800">
                           {alert.message}
                         </p>
-                        <span className="inline-block mt-1 font-mono text-[9px] bg-red-100 text-red-900 px-2 py-0.5 rounded font-bold">
-                          Contenedor: {alert.containerId}
-                        </span>
                       </div>
                     </div>
                   ))
@@ -219,70 +176,51 @@ export default function Header() {
           )}
         </div>
 
-        {/* Separador vertical */}
-        <div className="w-px h-8 bg-slate-200"></div>
-
-        {/* Perfil de Usuario */}
         <div className="relative">
           <button
-            onClick={() => setShowUserMenu(!showUserMenu)}
-            className={`flex items-center gap-3 p-1.5 pr-4 rounded-full border transition-all duration-200 cursor-pointer ${
+            type="button"
+            onClick={() => setShowUserMenu((v) => !v)}
+            className={`flex items-center gap-2 rounded-full border p-1.5 pr-2 transition sm:pr-3 ${
               showUserMenu
-                ? "bg-blue-50/50 border-[#0038A8] shadow-sm"
-                : "bg-white border-slate-200 hover:border-[#0038A8] hover:shadow-sm"
+                ? "border-[color:var(--agro-primary)] bg-blue-50/50"
+                : "border-slate-200 bg-white hover:border-[color:var(--agro-primary)]"
             }`}
           >
-            <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#0038A8] to-[#0055FF] flex items-center justify-center text-sm font-bold text-white shadow-inner">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--agro-primary)] text-sm font-bold text-white">
               {initials}
             </div>
-            <div className="text-left hidden lg:block">
-              <p className="text-sm font-bold text-slate-700 leading-tight">
+            <div className="hidden text-left md:block">
+              <p className="text-sm font-bold leading-tight text-slate-700">
                 {user?.name || "Usuario"}
               </p>
-              <p className="text-xs font-medium text-slate-500 leading-tight mt-0.5 capitalize">
-                {userRoleLabel}
+              <p className="mt-0.5 text-xs font-medium leading-tight text-slate-500">
+                Sesión activa
               </p>
             </div>
             <ChevronDown
               size={16}
-              className={`text-slate-400 transition-transform duration-200 hidden lg:block ${showUserMenu ? "rotate-180" : ""}`}
+              className={`hidden text-slate-400 transition md:block ${showUserMenu ? "rotate-180" : ""}`}
             />
           </button>
 
           {showUserMenu && (
-            <div className="absolute right-0 mt-3 w-56 bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-              <div className="p-4 border-b border-slate-100 bg-slate-50/50 text-left">
-                <p className="font-bold text-slate-800 truncate">
+            <div className="absolute right-0 z-50 mt-3 w-56 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
+              <div className="border-b border-slate-100 bg-slate-50/50 p-4 text-left">
+                <p className="truncate font-bold text-slate-800">
                   {user?.name || "Usuario"}
                 </p>
-                <p className="text-xs font-medium text-slate-500 truncate mt-0.5">
-                  {user?.email || "usuario@email.com"}
+                <p className="mt-0.5 truncate text-xs text-slate-500">
+                  {user?.email}
                 </p>
-                <span className="inline-block mt-2 bg-blue-50 text-[#0038A8] text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100 capitalize">
-                  {userRoleLabel}
-                </span>
               </div>
-              <div className="p-2 space-y-0.5">
-                <button className="w-full text-left px-3 py-2.5 text-sm font-medium text-slate-600 hover:text-[#0038A8] hover:bg-blue-50 rounded-xl transition-colors cursor-pointer">
-                  Mi Perfil
-                </button>
-                <button className="w-full text-left px-3 py-2.5 text-sm font-medium text-slate-600 hover:text-[#0038A8] hover:bg-blue-50 rounded-xl transition-colors cursor-pointer">
-                  Preferencias
-                </button>
-                <button className="w-full text-left px-3 py-2.5 text-sm font-medium text-slate-600 hover:text-[#0038A8] hover:bg-blue-50 rounded-xl transition-colors cursor-pointer">
-                  Centro de Ayuda
-                </button>
-              </div>
-              <div className="p-2 border-t border-slate-100">
+              <div className="border-t border-slate-100 p-2">
                 <button
+                  type="button"
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium text-[#D91424] hover:bg-red-50 rounded-xl transition-colors group cursor-pointer"
+                  className="group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-[color:var(--agro-danger)] hover:bg-red-50"
                 >
-                  <span>Cerrar Sesión</span>
-                  <LogOut
-                    size={16}
-                    className="group-hover:translate-x-1 transition-transform"
-                  />
+                  <span>Cerrar sesión</span>
+                  <LogOut size={16} />
                 </button>
               </div>
             </div>

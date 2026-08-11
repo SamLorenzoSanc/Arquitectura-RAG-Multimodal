@@ -1,29 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from uuid import uuid4
+from uuid import uuid4, UUID
 
 from services.database import get_db
 
 from .auth import get_current_user
 from models.user import User
 from schemas.knowledge_base import KnowledgeBaseCreate
+from utils.tenant import get_user_tenant_id
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
-
-
-async def _resolve_tenant_id(db: AsyncSession, user_id) -> str | None:
-    """Tenant activo del usuario vía su organización. None si no tiene."""
-    return await db.scalar(
-        text("""
-        SELECT t.id
-        FROM organization_members om
-        JOIN tenants t ON t.organization_id = om.organization_id
-        WHERE om.user_id = :user_id AND om.active = true AND t.active = true
-        LIMIT 1
-        """),
-        {"user_id": user_id},
-    )
 
 
 @router.post("/", status_code=status.HTTP_201_CREATED)
@@ -31,13 +18,11 @@ async def create_knowledge_base(
     kb: KnowledgeBaseCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    organization_id: UUID | None = Query(None),
 ):
-    tenant_id = await _resolve_tenant_id(db, current_user.id)
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="El usuario no tiene un Tenant activo asignado para crear una Base de Conocimiento.",
-        )
+    tenant_id = await get_user_tenant_id(
+        current_user.id, db, organization_id=organization_id
+    )
 
     kb_id = str(uuid4())
     try:
@@ -70,18 +55,57 @@ async def create_knowledge_base(
         )
 
 
+@router.get("/")
+async def list_knowledge_bases(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    organization_id: UUID | None = Query(None),
+):
+    """Lista KBs del tenant. Preferir organization_id para aislamiento multitenant."""
+    tenant_id = await get_user_tenant_id(
+        current_user.id, db, organization_id=organization_id
+    )
+
+    result = await db.execute(
+        text("""
+            SELECT
+                id,
+                tenant_id,
+                name,
+                description,
+                chroma_collection,
+                created_by,
+                created_at
+            FROM knowledge_bases
+            WHERE tenant_id = :tenant_id
+            ORDER BY created_at ASC
+        """),
+        {"tenant_id": tenant_id},
+    )
+    rows = result.mappings().all()
+    return [
+        {
+            "id": str(row["id"]),
+            "tenant_id": str(row["tenant_id"]),
+            "name": row["name"],
+            "description": row["description"],
+            "chroma_collection": row["chroma_collection"],
+            "created_by": str(row["created_by"]) if row["created_by"] else None,
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
 @router.get("/current")
 async def get_current_knowledge_base(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    organization_id: UUID | None = Query(None),
 ):
-    tenant_id = await _resolve_tenant_id(db, current_user.id)
-
-    if not tenant_id:
-        raise HTTPException(
-            status_code=403,
-            detail="El usuario no tiene un Tenant activo asignado.",
-        )
+    tenant_id = await get_user_tenant_id(
+        current_user.id, db, organization_id=organization_id
+    )
 
     kb = (
         (
@@ -129,13 +153,11 @@ async def get_knowledge_base(
     knowledge_base_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    organization_id: UUID | None = Query(None),
 ):
-    tenant_id = await _resolve_tenant_id(db, current_user.id)
-    if not tenant_id:
-        raise HTTPException(
-            status_code=404,
-            detail="Base de Conocimiento no encontrada o no tienes permisos para verla.",
-        )
+    tenant_id = await get_user_tenant_id(
+        current_user.id, db, organization_id=organization_id
+    )
 
     kb = (
         (

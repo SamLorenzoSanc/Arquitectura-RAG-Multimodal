@@ -28,9 +28,17 @@ ALGORITHM = "HS256"
 
 
 class Role(str, Enum):
+    """Roles legacy + operativos del seed."""
+
     ADMIN = "admin"
     MEMBER = "user"
     VIEWER = "viewer"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    ORG_ADMIN = "ORG_ADMIN"
+    FARM_MANAGER = "FARM_MANAGER"
+    LOGISTICS_OPERATOR = "LOGISTICS_OPERATOR"
+    QUALITY_CONTROLLER = "QUALITY_CONTROLLER"
+    USER = "USER"
 
 
 class Permission(str, Enum):
@@ -66,39 +74,82 @@ class Permission(str, Enum):
     CHAT_CREATE = "chat:create"
     CHAT_READ = "chat:read"
 
+    # Dominios operativos
+    FARM_READ = "farm:read"
+    FARM_MANAGE = "farm:manage"
+    LOGISTICS_READ = "logistics:read"
+    LOGISTICS_MANAGE = "logistics:manage"
+    ANALYTICS_READ = "analytics:read"
+    EVAL_READ = "eval:read"
+    EVAL_MANAGE = "eval:manage"
+    SETTINGS_MANAGE = "settings:manage"
+    DEBUG_ACCESS = "debug:access"
+
     # Métricas
     METRICS_READ = "metrics:read"
 
 
-# Mapa global de permisos por rol
+_ALL = list(Permission)
+
+_BASE_READ = [
+    Permission.ORG_READ,
+    Permission.KB_READ,
+    Permission.DOC_READ,
+    Permission.CHAT_CREATE,
+    Permission.CHAT_READ,
+]
+
+# Mapa global de permisos por rol (legacy + seed operativo)
 ROLE_PERMISSIONS: Dict[str, List[Permission]] = {
-    "admin": list(Permission),  # El rol 'admin' posee todos los permisos
-    "user": [
-        Permission.ORG_READ,
-        Permission.TENANT_READ,
-        Permission.DEPT_READ,
-        Permission.KB_READ,
+    "admin": _ALL,
+    "super_admin": _ALL,
+    "org_admin": [p for p in _ALL if p != Permission.DEBUG_ACCESS],
+    "farm_manager": _BASE_READ
+    + [
         Permission.DOC_CREATE,
-        Permission.DOC_READ,
-        Permission.CHAT_CREATE,
-        Permission.CHAT_READ,
+        Permission.FARM_READ,
+        Permission.FARM_MANAGE,
+        Permission.ANALYTICS_READ,
+        Permission.EVAL_READ,
         Permission.METRICS_READ,
+        Permission.DEPT_READ,
     ],
+    "logistics_operator": _BASE_READ
+    + [
+        Permission.LOGISTICS_READ,
+        Permission.LOGISTICS_MANAGE,
+        Permission.ANALYTICS_READ,
+        Permission.METRICS_READ,
+        Permission.DEPT_READ,
+    ],
+    "quality_controller": _BASE_READ
+    + [
+        Permission.LOGISTICS_READ,
+        Permission.FARM_READ,
+        Permission.EVAL_READ,
+        Permission.ANALYTICS_READ,
+        Permission.METRICS_READ,
+        Permission.DEPT_READ,
+    ],
+    "user": _BASE_READ + [Permission.DEPT_READ],
     "viewer": [
         Permission.ORG_READ,
-        Permission.TENANT_READ,
-        Permission.DEPT_READ,
         Permission.KB_READ,
         Permission.DOC_READ,
         Permission.CHAT_CREATE,
         Permission.CHAT_READ,
+        Permission.DEPT_READ,
     ],
 }
 
 
+def _normalize_role_key(user_role: str) -> str:
+    return (user_role or "user").strip().lower()
+
+
 def has_permission(user_role: str, permission: Permission) -> bool:
     """Verifica si el rol posee el permiso requerido."""
-    allowed_permissions = ROLE_PERMISSIONS.get(user_role.lower(), [])
+    allowed_permissions = ROLE_PERMISSIONS.get(_normalize_role_key(user_role), [])
     return permission in allowed_permissions
 
 

@@ -39,7 +39,7 @@ def get_color_theme(value: float, metric_type: str) -> tuple[str, str]:
     elif is_amber:
         return "rgba(245, 158, 11, 0.15)", "#f59e0b"  # Amber Orange
     else:
-        return "rgba(239, 68, 68, 0.15)", "#ef4444"   # Rose Red
+        return "rgba(239, 68, 68, 0.15)", "#ef4444"  # Rose Red
 
 
 def format_metric_html(
@@ -51,21 +51,23 @@ def format_metric_html(
 ) -> str:
     """Format a metric into a futuristic glassmorphism KPI card."""
     bg_color, border_color = get_color_theme(value, metric_type)
-    
+
     if is_percentage:
         value_str = f"{value:.1f}%"
     elif score_format:
-        value_str = f"{value:.2f} <span style='font-size: 16px; color: #6b7280;'>/ 5.0</span>"
+        value_str = (
+            f"{value:.2f} <span style='font-size: 16px; color: #6b7280;'>/ 5.0</span>"
+        )
     else:
         value_str = f"{value:.4f}"
 
     return f"""
     <div style="
-        margin: 12px 0; 
-        padding: 20px; 
-        background: {bg_color}; 
-        border-radius: 12px; 
-        border: 1px solid {border_color}; 
+        margin: 12px 0;
+        padding: 20px;
+        background: {bg_color};
+        border-radius: 12px;
+        border: 1px solid {border_color};
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         backdrop-filter: blur(10px);
         transition: transform 0.2s ease;
@@ -105,7 +107,7 @@ def run_retrieval_evaluation(progress=gr.Progress()):
         {format_metric_html("Mean Reciprocal Rank (MRR)", avg_mrr, "mrr")}
         {format_metric_html("Normalized DCG (nDCG)", avg_ndcg, "ndcg")}
         {format_metric_html("Cobertura de Palabras Clave", avg_coverage, "coverage", is_percentage=True)}
-        
+
         <div style="margin-top: 15px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; text-align: center; border: 1px solid #10b981; color: #34d399; font-weight: 600;">
          Evaluación de Recuperación Completada: {count} Tests Ejecutados
         </div>
@@ -145,7 +147,7 @@ def run_answer_evaluation(progress=gr.Progress()):
         {format_metric_html("Precisión Fáctica (Accuracy)", avg_accuracy, "accuracy", score_format=True)}
         {format_metric_html("Exhaustividad (Completeness)", avg_completeness, "completeness", score_format=True)}
         {format_metric_html("Pertinencia (Relevance)", avg_relevance, "relevance", score_format=True)}
-        
+
         <div style="margin-top: 15px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; text-align: center; border: 1px solid #3b82f6; color: #60a5fa; font-weight: 600;">
             Auditoría Humana/LLM Finalizada: {count} Evaluaciones Completadas
         </div>
@@ -209,6 +211,7 @@ button.primary-btn:hover {
 }
 """
 
+
 def main():
     theme = gr.themes.Monochrome(
         primary_hue="purple",
@@ -216,24 +219,32 @@ def main():
     )
 
     with gr.Blocks(title="AgroRAG Performance Lab", theme=theme, css=CUSTOM_CSS) as app:
-        
+
         # HEADER PRINCIPAL
         with gr.Row():
             with gr.Column():
                 gr.Markdown("#AGRO-RAG AUDIT DASHBOARD")
-                gr.Markdown("<span style='color: #6b7280; font-size: 14px;'>Sistema de Monitoreo e Insights para el Pipeline AgroTech RAG</span>")
+                gr.Markdown(
+                    "<span style='color: #6b7280; font-size: 14px;'>Sistema de Monitoreo e Insights para el Pipeline AgroTech RAG</span>"
+                )
 
-        gr.HTML("<hr style='border: 0; height: 1px; background: #1f2937; margin: 15px 0;'>")
+        gr.HTML(
+            "<hr style='border: 0; height: 1px; background: #1f2937; margin: 15px 0;'>"
+        )
 
         # PANEL DE EVALUACIÓN CON PESTAÑAS (TABS)
         with gr.Tabs():
-            
+
             # PESTAÑA 1: RETRIEVAL
             with gr.TabItem("Métrica de Recuperación (IR)"):
                 with gr.Row():
                     with gr.Column(scale=1):
                         gr.Markdown("### Indicadores de Contexto")
-                        retrieval_button = gr.Button("▶ Ejecutar Auditoría IR", elem_classes=["primary-btn"], size="lg")
+                        retrieval_button = gr.Button(
+                            "▶ Ejecutar Auditoría IR",
+                            elem_classes=["primary-btn"],
+                            size="lg",
+                        )
                         retrieval_metrics = gr.HTML(
                             "<div style='padding: 40px; text-align: center; color: #4b5563; border: 1px dashed #1f2937; border-radius: 12px; margin-top: 15px;'>Haz clic en <b>Ejecutar Auditoría IR</b> para procesar la métrica de contexto.</div>"
                         )
@@ -246,7 +257,7 @@ def main():
                             title="",
                             y_lim=[0, 1],
                             height=380,
-                            color_accent="#8b5cf6"
+                            color_accent="#8b5cf6",
                         )
 
             # PESTAÑA 2: ANSWER EVALUATION
@@ -254,7 +265,11 @@ def main():
                 with gr.Row():
                     with gr.Column(scale=1):
                         gr.Markdown("### Calificación LLM-as-a-Judge")
-                        answer_button = gr.Button("▶ Ejecutar Auditoría de Calidad", elem_classes=["primary-btn"], size="lg")
+                        answer_button = gr.Button(
+                            "▶ Ejecutar Auditoría de Calidad",
+                            elem_classes=["primary-btn"],
+                            size="lg",
+                        )
                         answer_metrics = gr.HTML(
                             "<div style='padding: 40px; text-align: center; color: #4b5563; border: 1px dashed #1f2937; border-radius: 12px; margin-top: 15px;'>Haz clic en <b>Ejecutar Auditoría de Calidad</b> para comenzar la evaluación del modelo.</div>"
                         )
@@ -267,7 +282,7 @@ def main():
                             title="",
                             y_lim=[1, 5],
                             height=380,
-                            color_accent="#38bdf8"
+                            color_accent="#38bdf8",
                         )
 
         # BINDINGS / EVENTOS

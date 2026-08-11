@@ -35,6 +35,10 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import api from "@/api";
+import {
+  useInvalidateLogistics,
+  useLogisticsBundle,
+} from "@/hooks/useCachedApi";
 
 function MapBoundsOptimizer({ coords }: { coords: [number, number][] }) {
   const map = useMap();
@@ -109,13 +113,17 @@ export default function LogisticsTracker({
   >({});
   const [catalog, setCatalog] = useState<any[]>([]);
   const [fleetCatalog, setFleetCatalog] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-
   const [internalShipmentId, setInternalShipmentId] = useState<string>("");
   const [activeOverlayIds, setActiveOverlayIds] = useState<string[]>([]);
 
   const [showForm, setShowForm] = useState<boolean>(false);
   const [formLoading, setFormLoading] = useState<boolean>(false);
+
+  const {
+    data: logisticsBundle,
+    isLoading: loading,
+  } = useLogisticsBundle();
+  const invalidateLogistics = useInvalidateLogistics();
 
   const [formData, setFormData] = useState({
     id: "LOTE-438",
@@ -139,54 +147,38 @@ export default function LogisticsTracker({
     temperature_threshold: 14,
   });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-
-      const [shipmentsRes, catalogRes, fleetRes] = await Promise.all([
-        api.get("/logistics/shipments"),
-        api.get("/logistics/catalog/agricultural-options"),
-        api.get("/logistics/fleet"),
-      ]);
-
-      const items = shipmentsRes.data;
-      if (catalogRes.data) setCatalog(catalogRes.data);
-      if (fleetRes.data) setFleetCatalog(fleetRes.data);
-
-      if (Array.isArray(items) && items.length > 0) {
-        const formattedMap: Record<string, ShipmentDetails> = {};
-        items.forEach((item, index) => {
-          formattedMap[item.id] = {
-            ...item,
-            farmerName:
-              item.farmerName || item.originName || "Agricultor Local",
-            coopName: item.coopName || "Cooperativa Agrícola Insular",
-            coopCoords: item.coopCoords || [
-              item.originCoords[0] + 0.02,
-              item.originCoords[1] + 0.02,
-            ],
-            routeColor: COLORS_PALETTE[index % COLORS_PALETTE.length],
-          };
-        });
-
-        setShipmentsData(formattedMap);
-        if (!internalShipmentId && items[0]) {
-          setInternalShipmentId(items[0].id);
-        }
-        setActiveOverlayIds(items.map((i: any) => i.id));
-      } else {
-        setShipmentsData({});
-      }
-    } catch (err) {
-      console.error("Error al sincronizar datos con el backend:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!logisticsBundle) return;
+    const items = logisticsBundle.shipments;
+    if (logisticsBundle.catalog) setCatalog(logisticsBundle.catalog);
+    if (logisticsBundle.fleet) setFleetCatalog(logisticsBundle.fleet);
+
+    if (Array.isArray(items) && items.length > 0) {
+      const formattedMap: Record<string, ShipmentDetails> = {};
+      items.forEach((item: any, index: number) => {
+        formattedMap[item.id] = {
+          ...item,
+          farmerName:
+            item.farmerName || item.originName || "Agricultor Local",
+          coopName: item.coopName || "Cooperativa Agrícola Insular",
+          coopCoords: item.coopCoords || [
+            item.originCoords[0] + 0.02,
+            item.originCoords[1] + 0.02,
+          ],
+          routeColor: COLORS_PALETTE[index % COLORS_PALETTE.length],
+        };
+      });
+      setShipmentsData(formattedMap);
+      setInternalShipmentId((prev) => prev || items[0].id);
+      setActiveOverlayIds(items.map((i: any) => i.id));
+    } else {
+      setShipmentsData({});
+    }
+  }, [logisticsBundle]);
+
+  const refreshLogistics = async () => {
+    await invalidateLogistics();
+  };
 
   const handleProductSelect = (productName: string) => {
     const selected = catalog.find((item) => item.product === productName);
@@ -217,7 +209,7 @@ export default function LogisticsTracker({
       setFormLoading(true);
       await api.post("/logistics/shipments", formData);
       setShowForm(false);
-      await fetchData();
+      await refreshLogistics();
     } catch (err) {
       console.error("Error al registrar el envío:", err);
       alert("Error al registrar el lote en la base de datos.");

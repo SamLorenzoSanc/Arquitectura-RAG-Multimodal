@@ -1,0 +1,5 @@
+dataset_id,category,question,reciprocal_rank,precision_at_k,ndcg,false_positive,failure,rag_accuracy,rag_completeness,rag_relevance,vanilla_accuracy,vanilla_completeness,vanilla_relevance
+1,,¿Cuales son los productos mas utiles de agrotech?,1.0,0.2,1.0,False,False,3.0,2.8,4.0,4.0,4.0,5.0
+2,general,¿Cuales son los productos de agrotech?,1.0,0.2,1.0,False,False,3.0,4.0,2.0,5.0,4.0,5.0
+3,general,¿Cuales son los productos de agrotech?,0.2,0.2,0.38685280723454163,False,False,2.0,3.0,4.0,4.0,3.0,5.0
+4,general,¿Cuales son las relaciones coperativos de los sistemas agrícolas inteligentes?,1.0,0.2,1.0,False,False,4.0,3.0,5.0,4.0,5.0,4.0

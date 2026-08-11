@@ -1,0 +1,100 @@
+name: Quality (tests, coverage, Coveralls, Doxygen)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  unit-coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test + coverage deps
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-asyncio pytest-cov coverage coveralls pydantic httpx
+
+      - name: Run unit tests with coverage
+        working-directory: gateway
+        env:
+          PYTHONPATH: ${{ github.workspace }}/gateway
+        run: |
+          pytest -q tests/unit -m unit \
+            --confcutdir=tests/unit \
+            --cov=services.geo_polygon \
+            --cov=services.evaluation_metrics \
+            --cov=services.farmer_context_service \
+            --cov=services.queue_service \
+            --cov=clients \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --cov-fail-under=40
+
+      - name: Upload coverage XML artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: gateway/coverage.xml
+
+      - name: Upload HTML coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: gateway/htmlcov
+
+      - name: Publish to Coveralls
+        continue-on-error: true
+        uses: coverallsapp/github-action@v2
+        with:
+          file: gateway/coverage.xml
+          format: cobertura
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+
+  doxygen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Doxygen
+        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
+
+      - name: Generate API docs
+        run: doxygen Doxyfile
+
+      - name: Upload Doxygen HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: doxygen-html
+          path: docs/doxygen/html
+
+  # Conserva el job unit legacy del workflow anterior (rápido, sin cov completa)
+  unit-legacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip && python -m pip install pytest pytest-asyncio pydantic
+      - name: Run pytest unit
+        env:
+          PYTHONPATH: ${{ github.workspace }}/gateway
+        run: pytest -q gateway/tests/unit -m unit --confcutdir=gateway/tests/unit

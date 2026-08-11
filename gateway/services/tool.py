@@ -24,7 +24,7 @@ class ForecastInput(BaseModel):
 def search_documents_tool(query: str, tenant_id: str, knowledge_base_id: str | None = None):
     """Busca regulaciones (PAC), manuales y datos históricos textuales en la base de datos."""
     # Importar aquí para evitar referencias circulares si es necesario
-    from services import rag_service 
+    from services import rag as rag_service
     results = rag_service.retrieve(query, tenant_id, knowledge_base_id)
     return results
 

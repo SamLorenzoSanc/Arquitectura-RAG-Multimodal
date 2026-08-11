@@ -20,10 +20,7 @@ if DATABASE_URL.startswith("postgresql://"):
 
 # 1. Motor async
 engine = create_async_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20
+    DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20
 )
 
 sync_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -36,6 +33,7 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
     expire_on_commit=False,
 )
+
 
 # 3. Dependencia para las rutas
 async def get_db():

@@ -16,11 +16,22 @@ import {
 } from "lucide-react";
 import ChatService from "@/services/chat.service";
 import DocumentService from "@/services/document.service";
-import KnowledgeService from "../services/knowledge.service";
 import { useOrganization } from "@/context/OrganizationContext";
 import AvatarPanel from "@/components/AvatarPanel";
 import type { DocumentItem } from "@/types/document";
-import type { ChatContext, RetrievalInfo, Message } from "@/types/chat";
+import {
+  useCrops,
+  useDocuments,
+  useInvalidateDocuments,
+  useKnowledgeBases,
+} from "@/hooks/useCachedApi";
+import type {
+  ChatContext,
+  RetrievalInfo,
+  Message,
+  ModeComparisonSide,
+  AgentTraceStep,
+} from "@/types/chat";
 
 // Modelos de lenguaje gratuitos disponibles en Ollama
 const OLLAMA_MODELS = [
@@ -31,6 +42,33 @@ const OLLAMA_MODELS = [
   { id: "phi3:latest", name: "Phi-3 (Eficiente)" },
   { id: "llama3.2-vision:latest", name: "Llama 3.2 Vision (Multimodal)" },
 ];
+
+const CROPS = [
+  { id: "platano_canarias", name: "Plátano" },
+  { id: "aguacate_hass", name: "Aguacate" },
+  { id: "papa_bonita", name: "Papa" },
+  { id: "tomate_canario", name: "Tomate" },
+];
+
+const ISLANDS = [
+  { id: "La_Palma", name: "La Palma" },
+  { id: "Tenerife_Norte", name: "Tenerife Norte" },
+  { id: "Gran_Canaria_Sur", name: "Gran Canaria Sur" },
+];
+
+type RagMode = "hybrid" | "agentic" | "compare";
+
+const MAX_VISIBLE_CONVERSATIONS = 5;
+
+function takeRecentConversations(list: any[]) {
+  return [...list]
+    .sort(
+      (a, b) =>
+        new Date(b.updated_at ?? 0).getTime() -
+        new Date(a.updated_at ?? 0).getTime(),
+    )
+    .slice(0, MAX_VISIBLE_CONVERSATIONS);
+}
 
 type RagStep = {
   id: string;
@@ -58,16 +96,71 @@ export default function ChatPage() {
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
 
   const [isUploadingModal, setIsUploadingModal] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [context, setContext] = useState<ChatContext[]>([]);
   const [retrieval, setRetrieval] = useState<RetrievalInfo | null>(null);
+  const [retrievalDetails, setRetrievalDetails] = useState<any | null>(null);
+
+  type StepState = "pending" | "running" | "completed" | "error";
+
+  const [pipelineSteps, setPipelineSteps] = useState<
+    { id: string; label: string; state: StepState; items?: any[] }[]
+  >([]);
 
   const [kbs, setKbs] = useState<any[]>([]);
   const [knowledgeBaseId, setKnowledgeBaseId] = useState<string>("");
 
+  const { data: kbsCached } = useKnowledgeBases(selectedOrg?.id);
+  const { data: documentsCached } = useDocuments(
+    knowledgeBaseId || undefined,
+  );
+  const invalidateDocuments = useInvalidateDocuments();
+
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [useRag, setUseRag] = useState(true);
+  const [ragMode, setRagMode] = useState<RagMode>("compare");
+  const [crop, setCrop] = useState("platano_canarias");
+  const [island, setIsland] = useState("La_Palma");
+  const [selectedCropId, setSelectedCropId] = useState<string>("");
+  const { data: farmerCrops } = useCrops(true);
+  const [comparison, setComparison] = useState<{
+    hybrid?: ModeComparisonSide;
+    agentic?: ModeComparisonSide;
+    note?: string;
+  } | null>(null);
+  const [agentTrace, setAgentTrace] = useState<AgentTraceStep[] | null>(null);
+  const [architectureLabel, setArchitectureLabel] = useState<string | null>(
+    null,
+  );
+
+  // Mostrar parámetros RAG
+  interface RagParams {
+    embedding_model: string;
+    distance_metric: string;
+    retrieval_k: number;
+    bm25_k: number;
+    rrf_k: number;
+    candidate_k: number;
+    final_k: number;
+    reranker_model?: string;
+    reranker_batch_size?: number;
+  }
+
+  const [ragParams, setRagParams] = useState<RagParams>({
+    embedding_model: "qwen3-embedding:latest",
+    distance_metric: "cosine",
+    retrieval_k: 10,
+    bm25_k: 10,
+    rrf_k: 60,
+    candidate_k: 15,
+    final_k: 5,
+    reranker_model: "BAAI/bge-reranker-v2-m3",
+    reranker_batch_size: 16,
+  });
+
+  const [showRagParams, setShowRagParams] = useState(false);
 
   const INITIAL_RAG_STEPS: RagStep[] = [
     {
@@ -110,6 +203,48 @@ export default function ChatPage() {
   const [ragPipeline, setRagPipeline] = useState<RagStep[]>([]);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const [relatedQuestions, setRelatedQuestions] = useState<string[]>([]);
+
+  const generateQuestionFromSnippet = (text?: string | null) => {
+    if (!text) return null;
+    const cleaned = text.replace(/\s+/g, " ").trim();
+    const first = cleaned.split(/[\.\?\!\n]/)[0] || cleaned;
+    const words = first.split(/\s+/).slice(0, 10).join(" ");
+    const noPdf = words.replace(/\.pdf/gi, "");
+    const trimmed = noPdf.trim();
+    if (!trimmed) return null;
+    return `¿Qué información hay sobre "${trimmed}"?`;
+  };
+
+  const getRelatedQuestions = (
+    rd: any,
+    fromApi?: string[] | null,
+  ): string[] => {
+    if (fromApi && fromApi.length > 0) {
+      return [...new Set(fromApi.map(String))].slice(0, 6);
+    }
+    if (!rd) return [];
+    if (Array.isArray(rd.related_questions) && rd.related_questions.length > 0) {
+      const fromDetails: string[] = rd.related_questions.map((q: unknown) =>
+        String(q),
+      );
+      return [...new Set(fromDetails)].slice(0, 6);
+    }
+    const items: any[] = rd.candidates ?? rd.dense_original ?? [];
+    const qs: string[] = items
+      .map((c) => {
+        const txt =
+          c.page_content ??
+          c.metadata?.text ??
+          c.metadata?.snippet ??
+          c.metadata?.title ??
+          "";
+        return generateQuestionFromSnippet(txt);
+      })
+      .filter((q): q is string => typeof q === "string" && q.length > 0);
+    return [...new Set(qs)].slice(0, 6);
   };
 
   const updateRagStep = (
@@ -161,15 +296,45 @@ export default function ChatPage() {
     setMessages([]);
     setContext([]);
     setRetrieval(null);
+    setRetrievalDetails(null);
+    setRelatedQuestions([]);
   };
 
   useEffect(() => {
     if (selectedOrg?.id) {
       createNewChat();
-      initialize(selectedOrg.id);
       loadConversations();
     }
   }, [selectedOrg?.id]);
+
+  useEffect(() => {
+    if (kbsCached) {
+      setKbs(kbsCached);
+      if (!knowledgeBaseId && kbsCached.length > 0) {
+        setKnowledgeBaseId(kbsCached[0].id);
+      }
+    }
+  }, [kbsCached, knowledgeBaseId]);
+
+  useEffect(() => {
+    setDocuments(documentsCached ?? []);
+  }, [documentsCached]);
+
+  useEffect(() => {
+    if (!selectedOrg?.id) {
+      setKbs([]);
+      setKnowledgeBaseId("");
+      setDocuments([]);
+    }
+  }, [selectedOrg?.id]);
+
+  useEffect(() => {
+    if (!farmerCrops?.length) return;
+    if (!selectedCropId || !farmerCrops.some((c) => c.id === selectedCropId)) {
+      const first = farmerCrops[0];
+      setSelectedCropId(first.id || "");
+    }
+  }, [farmerCrops, selectedCropId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -182,40 +347,9 @@ export default function ChatPage() {
   const loadConversations = async () => {
     try {
       const data = await ChatService.listConversations();
-      setConversations(data);
+      setConversations(takeRecentConversations(data ?? []));
     } catch (error) {
       console.error("Error al listar conversaciones:", error);
-    }
-  };
-
-  const initialize = async (orgId: string) => {
-    try {
-      let kbList = [];
-      if (
-        "list" in KnowledgeService &&
-        typeof (KnowledgeService as any).list === "function"
-      ) {
-        kbList = await (KnowledgeService as any).list(orgId);
-      } else if (
-        "getCurrent" in KnowledgeService &&
-        typeof (KnowledgeService as any).getCurrent === "function"
-      ) {
-        const currentKb = await (KnowledgeService as any).getCurrent();
-        if (currentKb) kbList = [currentKb];
-      }
-
-      setKbs(kbList || []);
-
-      if (kbList && kbList.length > 0) {
-        const defaultKbId = kbList[0].id;
-        setKnowledgeBaseId(defaultKbId);
-        fetchDocumentsForKb(defaultKbId);
-      } else {
-        setKnowledgeBaseId("");
-        setDocuments([]);
-      }
-    } catch (err) {
-      console.error("Error al inicializar KBs:", err);
     }
   };
 
@@ -224,18 +358,12 @@ export default function ChatPage() {
       setDocuments([]);
       return;
     }
-    try {
-      const docs = await DocumentService.list(kbId);
-      setDocuments(docs || []);
-    } catch (err) {
-      console.error("Error al obtener documentos:", err);
-      setDocuments([]);
-    }
+    setKnowledgeBaseId(kbId);
+    await invalidateDocuments(kbId);
   };
 
   const handleKbChange = (newKbId: string) => {
-    setKnowledgeBaseId(newKbId);
-    fetchDocumentsForKb(newKbId);
+    void fetchDocumentsForKb(newKbId);
   };
 
   const handleUploadFilesModal = async () => {
@@ -261,51 +389,26 @@ export default function ChatPage() {
           description: selectedCategory,
         });
 
-        updateRagStep("upload", "completed", "Documento subido correctamente");
-
+        updateRagStep("upload", "completed", "Documento encolado");
         updateRagStep(
           "extract",
-          "running",
-          "Extrayendo texto del documento...",
+          "completed",
+          "Procesamiento en segundo plano (parser → chunks → embeddings)",
         );
-
-        // Simulación temporal hasta conectar SSE/backend
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        updateRagStep("extract", "completed", "Texto extraído");
-
-        updateRagStep("chunk", "running", "Generando fragmentos...");
-
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        updateRagStep("chunk", "completed", "Chunks generados");
-
+        updateRagStep("chunk", "completed", "Sin esperas artificiales en UI");
         updateRagStep(
           "embedding",
-          "running",
-          "Calculando embeddings con qwen3...",
+          "completed",
+          "Ingesta rápida: sin enriquecimiento LLM por chunk",
         );
-
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-
-        updateRagStep("embedding", "completed", "Embeddings creados");
-
-        updateRagStep("vector", "running", "Guardando vectores en pgvector...");
-
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        updateRagStep("vector", "completed", "Vectores almacenados");
-
-        updateRagStep("finish", "completed", "Documento disponible para RAG");
+        updateRagStep("vector", "completed", "Persistencia en curso en API");
+        updateRagStep("finish", "completed", "Documento enviado a la pipeline");
       }
 
       await fetchDocumentsForKb(knowledgeBaseId);
 
       setUploadedFiles([]);
-
-      setTimeout(() => {
-        setShowUploadModal(false);
-      }, 1500);
+      setShowUploadModal(false);
     } catch (err) {
       console.error("Error procesando documentos:", err);
 
@@ -333,67 +436,215 @@ export default function ChatPage() {
 
     setInputValue("");
     setIsLoading(true);
+    setIsGenerating(false);
 
     setThinkingStep(
-      `Cargando modelo ${selectedModel} y analizando consulta en "${selectedOrg.name}"...`,
+      !useRag
+        ? `Generando sin RAG con ${selectedModel}...`
+        : ragMode === "compare"
+          ? `Comparación Hybrid vs Agentic (${selectedModel})...`
+          : ragMode === "agentic"
+            ? `Agentic RAG · tools KB/clima/precios...`
+            : `Hybrid RAG · Dense+BM25+RRF...`,
     );
 
     try {
-      await new Promise((r) => setTimeout(r, 400));
-      if (useRag) {
-        setThinkingStep(
-          "Recuperando vectores optimizados con qwen3-embedding...",
-        );
-        await new Promise((r) => setTimeout(r, 600));
-        setThinkingStep(
-          `Sintetizando contexto documental con el modelo ${selectedModel}...`,
-        );
-        await new Promise((r) => setTimeout(r, 500));
-      }
-
       const history = updatedMessages.map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
 
-      const response = await ChatService.send({
+      setPipelineSteps([
+        { id: "rewrite", label: "Query Rewriting", state: "running" },
+        { id: "embed", label: "Embedding + Dense Retrieval", state: "running" },
+        { id: "bm25", label: "BM25 Retrieval", state: "running" },
+        { id: "rrf", label: "RRF Fusion", state: "running" },
+        { id: "rerank", label: "Cross-Encoder Rerank", state: "running" },
+        { id: "final", label: "Final Top-K", state: "running" },
+      ]);
+      setIsGenerating(true);
+      setRelatedQuestions([]);
+
+      // Una sola llamada: evita /retrieve + /chat (ahorra latencia duplicada).
+      ChatService.send({
         question,
         conversation_id: conversationId,
         history,
         knowledge_base_id: useRag ? knowledgeBaseId || undefined : undefined,
+        organization_id: selectedOrg?.id,
+        organization_name: selectedOrg?.name,
         use_rag: useRag,
+        rag_mode: useRag ? ragMode : "hybrid",
+        island,
+        crop,
+        crop_id: selectedCropId || undefined,
         model: selectedModel,
-      });
+      })
+        .then((response) => {
+          if (response.conversation_id) {
+            setConversationId(response.conversation_id);
+            setConversations((prev) => {
+              const exists = prev.some(
+                (c) => c.id === response.conversation_id,
+              );
+              if (exists) {
+                return takeRecentConversations(
+                  prev.map((c) =>
+                    c.id === response.conversation_id
+                      ? { ...c, updated_at: new Date().toISOString() }
+                      : c,
+                  ),
+                );
+              }
+              return takeRecentConversations([
+                {
+                  id: response.conversation_id,
+                  title: question.substring(0, 40),
+                  updated_at: new Date().toISOString(),
+                },
+                ...prev,
+              ]);
+            });
+          }
 
-      if (response.conversation_id) {
-        setConversationId(response.conversation_id);
-        setConversations((prev) => {
-          const exists = prev.some((c) => c.id === response.conversation_id);
-          if (exists) return prev;
-          return [
+          setContext(response.context ?? []);
+          setRetrieval(response.retrieval ?? null);
+          setRetrievalDetails(response.retrieval_details ?? null);
+          setComparison(response.comparison ?? null);
+          setAgentTrace(response.agent_trace ?? null);
+          setArchitectureLabel(response.architecture ?? response.rag_mode ?? null);
+          setRelatedQuestions(
+            getRelatedQuestions(
+              response.retrieval_details,
+              response.related_questions,
+            ),
+          );
+
+          if (response.retrieval_details) {
+            const rd = response.retrieval_details;
+            const updated = [
+              {
+                id: "rewrite",
+                label: "Query Rewriting",
+                state: "completed",
+                items: [
+                  {
+                    original: rd.retrieval?.original_query ?? rd.original_query,
+                    rewritten: rd.rewritten_query,
+                  },
+                ],
+              },
+              {
+                id: "embed",
+                label: "Embedding + Dense Retrieval",
+                state: "completed",
+                items:
+                  rd.dense_original?.slice?.(0, rd.retrieval_k) ??
+                  rd.dense_original ??
+                  [],
+              },
+              {
+                id: "bm25",
+                label: "BM25 Retrieval",
+                state: "completed",
+                items:
+                  rd.bm25_original?.slice?.(0, rd.bm25_k) ??
+                  rd.bm25_original ??
+                  [],
+              },
+              {
+                id: "rrf",
+                label: "RRF Fusion",
+                state: "completed",
+                items: rd.candidates ?? [],
+              },
+              {
+                id: "rerank",
+                label: "Cross-Encoder Rerank",
+                state: "completed",
+                items: rd.candidates?.slice?.(0, rd.candidate_k) ?? [],
+              },
+              {
+                id: "final",
+                label: "Final Top-K",
+                state: "completed",
+                items: response.context ?? [],
+              },
+            ];
+
+            setPipelineSteps(updated as any);
+          } else {
+            setPipelineSteps((prev) =>
+              prev.map((s) => ({ ...s, state: "completed" })),
+            );
+          }
+
+          const assistantMessage: Message = {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content:
+              response.comparison?.hybrid && response.comparison?.agentic
+                ? [
+                    "### Comparación controlada Hybrid vs Agentic",
+                    "",
+                    `**Hybrid RAG** (${response.comparison.hybrid.architecture ?? "Dense+BM25+RRF"} · ${response.comparison.hybrid.latency_ms ?? "—"} ms)`,
+                    "",
+                    response.comparison.hybrid.answer?.trim() || "(sin respuesta)",
+                    "",
+                    "---",
+                    "",
+                    `**Agentic RAG** (${response.comparison.agentic.architecture ?? "tools"} · ${response.comparison.agentic.latency_ms ?? "—"} ms)`,
+                    "",
+                    response.comparison.agentic.answer?.trim() || "(sin respuesta)",
+                    "",
+                    response.comparison.note
+                      ? `_${response.comparison.note}_`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join("\n")
+                : response.answer?.trim() ||
+                  "El asistente no devolvió ninguna respuesta.",
+            timestamp: new Date(),
+            sources: [],
+          };
+
+          const rd = response.retrieval_details;
+          if (rd) {
+            const sources = (rd.candidates ?? rd.dense_original ?? [])
+              .slice(0, 4)
+              .map((c: any) => ({
+                source:
+                  c.metadata?.source ?? c.source ?? c.metadata?.document_id,
+                score:
+                  c.metadata?.distance ??
+                  c.metadata?.cross_encoder_score ??
+                  c.metadata?.bm25_score,
+                chunk_id: c.metadata?.chunk_id,
+                snippet: (c.page_content || "").substring(0, 200),
+              }));
+            assistantMessage.sources = sources;
+          }
+
+          setMessages((prev) => [...prev, assistantMessage]);
+        })
+        .catch((error) => {
+          console.error("Error enviando mensaje:", error);
+          setMessages((prev) => [
             ...prev,
             {
-              id: response.conversation_id,
-              title: question.substring(0, 40),
-              updated_at: new Date().toISOString(),
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "No se pudo obtener respuesta del asistente.",
+              timestamp: new Date(),
             },
-          ];
+          ]);
+        })
+        .finally(() => {
+          setIsGenerating(false);
+          setIsLoading(false);
+          setThinkingStep("");
         });
-      }
-
-      setContext(response.context ?? []);
-      setRetrieval(response.retrieval ?? null);
-
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content:
-          response.answer?.trim() ||
-          "El asistente no devolvió ninguna respuesta.",
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error("Error enviando mensaje:", error);
       setMessages((prev) => [
@@ -406,8 +657,8 @@ export default function ChatPage() {
         },
       ]);
       setContext([]);
-    } finally {
       setIsLoading(false);
+      setIsGenerating(false);
       setThinkingStep("");
     }
   };
@@ -434,8 +685,8 @@ export default function ChatPage() {
     );
   }
   return (
-    <div className="flex h-full w-full flex-col bg-gray-50 overflow-hidden">
-      <div className="border-b border-gray-200 bg-white px-8 py-4 shrink-0">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-gray-50">
+      <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <svg
@@ -457,6 +708,11 @@ export default function ChatPage() {
                   <Building size={10} />
                   Aislamiento Activo
                 </span>
+                {architectureLabel && (
+                  <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                    {architectureLabel}
+                  </span>
+                )}
               </div>
               <h1 className="mt-1 text-2xl font-bold text-slate-900">
                 {selectedOrg.name}
@@ -466,6 +722,71 @@ export default function ChatPage() {
 
           {/* SELECTORES DE MODELO LLM Y KNOWLEDGE BASE */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Arquitectura RAG: Hybrid / Agentic / Compare */}
+            <div className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/80 p-1 shadow-xs">
+              {(
+                [
+                  ["hybrid", "Hybrid"],
+                  ["agentic", "Agentic"],
+                  ["compare", "Comparar"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={!useRag}
+                  onClick={() => setRagMode(id)}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${
+                    ragMode === id && useRag
+                      ? "bg-emerald-700 text-white shadow-sm"
+                      : "text-emerald-900/70 hover:bg-white/80"
+                  } disabled:opacity-40`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <select
+              value={selectedCropId}
+              onChange={(e) => setSelectedCropId(e.target.value)}
+              className="max-w-[220px] rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-900"
+              title="Parcela operativa del agricultor"
+            >
+              {(farmerCrops || []).length === 0 && (
+                <option value="">Sin parcelas — usa cultivo/isla</option>
+              )}
+              {(farmerCrops || []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre} · {c.cultivo}
+                </option>
+              ))}
+            </select>
+            <select
+              value={crop}
+              onChange={(e) => setCrop(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+              title="Cultivo fallback (si no hay parcela)"
+            >
+              {CROPS.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={island}
+              onChange={(e) => setIsland(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
+              title="Zona fallback"
+            >
+              {ISLANDS.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                </option>
+              ))}
+            </select>
+
             {/* Selector de Modelos Ollama */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shrink-0 shadow-xs">
               <Cpu size={15} className="text-amber-600 shrink-0" />
@@ -488,6 +809,51 @@ export default function ChatPage() {
                 ))}
               </select>
             </div>
+            {/* RAG parameters quick view */}
+            <div className="hidden sm:flex flex-col gap-1 rounded-md border border-slate-100 bg-white px-3 py-2 text-xs text-slate-700">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">RAG</span>
+                <button
+                  onClick={() => setShowRagParams((v) => !v)}
+                  className="ml-2 text-xs text-slate-500 hover:text-slate-700"
+                >
+                  {showRagParams ? "Ocultar" : "Mostrar"}
+                </button>
+              </div>
+              {showRagParams && (
+                <div className="grid grid-cols-2 gap-2 text-[12px]">
+                  <div className="text-slate-500">Embedding</div>
+                  <div className="text-slate-700 truncate">
+                    {ragParams.embedding_model}
+                  </div>
+
+                  <div className="text-slate-500">Distance</div>
+                  <div className="text-slate-700">
+                    {ragParams.distance_metric}
+                  </div>
+
+                  <div className="text-slate-500">Retrieval K</div>
+                  <div className="text-slate-700">{ragParams.retrieval_k}</div>
+
+                  <div className="text-slate-500">BM25 K</div>
+                  <div className="text-slate-700">{ragParams.bm25_k}</div>
+
+                  <div className="text-slate-500">RRF K</div>
+                  <div className="text-slate-700">{ragParams.rrf_k}</div>
+
+                  <div className="text-slate-500">Candidate K</div>
+                  <div className="text-slate-700">{ragParams.candidate_k}</div>
+
+                  <div className="text-slate-500">Final K</div>
+                  <div className="text-slate-700">{ragParams.final_k}</div>
+
+                  <div className="text-slate-500">Reranker</div>
+                  <div className="text-slate-700 truncate">
+                    {ragParams.reranker_model}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -505,7 +871,7 @@ export default function ChatPage() {
             Conversaciones ({selectedOrg.name})
           </h3>
 
-          <div className="space-y-2 overflow-y-auto flex-1 min-h-0 pr-2">
+          <div className="min-h-0 flex-1 space-y-2 overflow-hidden pr-1">
             {conversations.length === 0 && (
               <p className="text-sm text-gray-400">No hay chats todavía</p>
             )}
@@ -523,8 +889,8 @@ export default function ChatPage() {
             ))}
           </div>
         </aside>
-        <div className="flex flex-1 flex-col min-w-0 bg-gray-50">
-          <div className="flex-1 overflow-y-auto px-8 py-8 min-h-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-gray-50">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6">
             {messages.length === 0 && !isLoading ? (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center max-w-md">
@@ -532,13 +898,27 @@ export default function ChatPage() {
                     Asistente de {selectedOrg.name}
                   </h2>
                   <p className="text-sm text-gray-500 leading-relaxed">
-                    Este chat está limitado exclusivamente a la información y
-                    documentos de esta organización utilizando el modelo{" "}
+                    Comparación controlada para el TFM:{" "}
+                    <span className="font-semibold text-emerald-700">
+                      Hybrid RAG
+                    </span>{" "}
+                    (Dense+BM25+RRF) frente a{" "}
+                    <span className="font-semibold text-indigo-700">
+                      Agentic RAG
+                    </span>{" "}
+                    (tools KB/clima/precios). Modelo{" "}
                     <span className="font-semibold text-amber-600">
                       {selectedModel}
                     </span>
-                    .
-                  </p>
+                    · parcela{" "}
+                    {(farmerCrops || []).find((c) => c.id === selectedCropId)
+                      ?.nombre ||
+                      CROPS.find((c) => c.id === crop)?.name}{" "}
+                    ·{" "}
+                    {(farmerCrops || []).find((c) => c.id === selectedCropId)
+                      ?.isla ||
+                      ISLANDS.find((i) => i.id === island)?.name}
+                    .                  </p>
                 </div>
               </div>
             ) : (
@@ -557,18 +937,52 @@ export default function ChatPage() {
                           : "border border-gray-200 bg-white text-gray-800"
                       }`}
                     >
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">
-                        {message.content}
-                      </p>
-                      <p
-                        className={`mt-3 text-[11px] ${
-                          message.role === "user"
-                            ? "text-amber-100"
-                            : "text-gray-400"
-                        }`}
-                      >
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
+                      <div className="flex items-start gap-4">
+                        <div className="flex-1">
+                          <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">
+                            {message.content}
+                          </p>
+                          <p
+                            className={`mt-3 text-[11px] ${
+                              message.role === "user"
+                                ? "text-amber-100"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            {message.timestamp.toLocaleTimeString()}
+                          </p>
+                        </div>
+
+                        {/* Inline sources for assistant messages */}
+                        {message.role === "assistant" &&
+                          message.sources &&
+                          message.sources.length > 0 && (
+                            <div className="w-48 shrink-0">
+                              <div className="rounded-md border bg-gray-50 p-2 text-xs">
+                                <div className="font-semibold text-slate-700 mb-2">
+                                  Fuentes
+                                </div>
+                                <div className="space-y-2">
+                                  {message.sources.map((s, i) => (
+                                    <div key={i} className="truncate">
+                                      <div className="font-medium text-slate-800 truncate">
+                                        {s.source}
+                                      </div>
+                                      <div className="text-gray-500 text-[11px] truncate">
+                                        {s.score
+                                          ? typeof s.score === "number"
+                                            ? s.score.toFixed(4)
+                                            : String(s.score)
+                                          : ""}{" "}
+                                        {s.chunk_id ? `· ${s.chunk_id}` : ""}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -609,115 +1023,114 @@ export default function ChatPage() {
                     </div>
                   </div>
                 )}
+                {/* Related questions (from retrievalDetails) */}
+                {comparison && (
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-bold text-emerald-900">
+                          Hybrid RAG
+                        </h3>
+                        <span className="text-[10px] font-semibold text-emerald-700">
+                          {comparison.hybrid?.latency_ms ?? "—"} ms
+                        </span>
+                      </div>
+                      <p className="mb-2 text-[11px] text-emerald-800/80">
+                        {comparison.hybrid?.architecture ??
+                          "hybrid_dense_bm25_rrf"}
+                      </p>
+                      <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-800">
+                        {comparison.hybrid?.answer}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-bold text-indigo-900">
+                          Agentic RAG
+                        </h3>
+                        <span className="text-[10px] font-semibold text-indigo-700">
+                          {comparison.agentic?.latency_ms ?? "—"} ms
+                        </span>
+                      </div>
+                      <p className="mb-2 text-[11px] text-indigo-800/80">
+                        {comparison.agentic?.architecture ?? "agentic_tool_rag"}
+                      </p>
+                      <p className="mb-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-800">
+                        {comparison.agentic?.answer}
+                      </p>
+                      {(comparison.agentic?.agent_trace?.length ?? 0) > 0 && (
+                        <div className="space-y-1.5 border-t border-indigo-100 pt-2">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-700">
+                            Tools ejecutadas
+                          </p>
+                          {comparison.agentic?.agent_trace?.map((step, idx) => (
+                            <div
+                              key={`${step.tool}-${idx}`}
+                              className="rounded-lg bg-white/80 px-2 py-1.5 text-[11px]"
+                            >
+                              <span className="font-semibold text-indigo-900">
+                                {step.tool}
+                              </span>
+                              <span className="text-slate-500">
+                                {" "}
+                                · {step.latency_ms} ms ·{" "}
+                                {step.ok ? "ok" : "error"}
+                              </span>
+                              <p className="mt-0.5 line-clamp-2 text-slate-600">
+                                {step.reason}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!comparison && agentTrace && agentTrace.length > 0 && (
+                  <div className="rounded-xl border border-indigo-200 bg-white p-4">
+                    <h3 className="mb-2 text-sm font-bold text-indigo-900">
+                      Traza Agentic
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {agentTrace.map((step, idx) => (
+                        <span
+                          key={`${step.tool}-${idx}`}
+                          className="rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-800"
+                        >
+                          {step.tool} · {step.latency_ms} ms
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {relatedQuestions.length > 0 && (
+                  <div className="mt-6 rounded-lg border bg-white p-4">
+                    <h4 className="font-semibold mb-2">
+                      Preguntas relacionadas
+                    </h4>
+                    <div className="flex flex-col gap-2 text-sm">
+                      {relatedQuestions.map((q: string, idx: number) => (
+                          <button
+                            key={idx}
+                            className="text-left p-2 rounded hover:bg-gray-50"
+                            onClick={() => setInputValue(q)}
+                          >
+                            {q}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </div>
             )}
           </div>
         </div>
 
-        <aside className="w-[380px] lg:w-[420px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-6 flex flex-col justify-between">
-          <div>
-            {retrieval && (
-              <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
-                <h3 className="mb-3 font-semibold text-amber-800">
-                  Retrieval (Tenant Context)
-                </h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="text-xs font-medium text-amber-600">
-                      Chunks
-                    </span>
-                    <p className="font-semibold text-slate-700">
-                      {retrieval.final_chunks}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-amber-600">
-                      Caracteres
-                    </span>
-                    <p className="font-semibold text-slate-700">
-                      {contextCharacters.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-amber-600">
-                      Tokens
-                    </span>
-                    <p className="font-semibold text-slate-700">
-                      {estimatedTokens.toLocaleString()}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-medium text-amber-600">
-                      Uso
-                    </span>
-                    <p className="font-semibold text-slate-700">
-                      {Math.round((estimatedTokens / 8192) * 100)}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <h3 className="mb-4 text-lg font-semibold text-slate-900">
-              Chunks recuperados
-            </h3>
-            {context.length === 0 ? (
-              <p className="text-sm text-gray-400">Todavía no hay contexto.</p>
-            ) : (
-              <div className="space-y-4">
-                {context.map((chunk, index) => (
-                  <div
-                    key={index}
-                    className="rounded-lg border border-gray-200 bg-gray-50 p-4"
-                  >
-                    <div className="mb-3">
-                      <span className="rounded bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700">
-                        {chunk.metadata?.type || "Fragmento"}
-                      </span>
-                    </div>
-                    <p className="whitespace-pre-wrap text-sm text-gray-700 break-words leading-relaxed">
-                      {chunk.page_content}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ===================================================
-              NUEVAS OPCIONES AL FINAL DE LOS FRAGMENTOS
-          =================================================== */}
-          {context.length > 0 && (
-            <div className="mt-8 pt-4 border-t border-gray-200">
-              <p className="text-xs font-semibold text-slate-500 mb-3">
-                ¿Qué tal fue la recuperación de información?
-              </p>
-              <div className="flex flex-col gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Aquí manejas la acción de información distinta
-                    console.log("Seleccionado: Devolvió información distinta");
-                  }}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs font-medium text-amber-800 hover:bg-amber-100 transition-colors cursor-pointer"
-                >
-                  Devolvió información distinta
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Aquí manejas la acción de fuera de conocimiento
-                    console.log("Seleccionado: Fuera de conocimiento");
-                  }}
-                  className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-slate-50 px-4 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-                >
-                  Fuera de conocimiento
-                </button>
-              </div>
-            </div>
-          )}
-        </aside>
+        {/* Right-side retrieval panel removed: sources now shown inline next to the assistant message and related questions appear under the chat. */}
       </div>
 
       {showUploadModal && (
@@ -842,7 +1255,7 @@ export default function ChatPage() {
         </div>
       )}
 
-      <div className="border-t border-gray-200 bg-white px-8 py-4 shrink-0">
+      <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
         <form
           onSubmit={handleSendMessage}
           className="flex items-center gap-4 max-w-5xl mx-auto"

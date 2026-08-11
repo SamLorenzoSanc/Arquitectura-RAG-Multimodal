@@ -9,7 +9,7 @@ from routes.auth import get_current_user
 from models.user import User
 from schemas.knowledge_base import KnowledgeBaseCreate
 from services.knowledge_graph_service import KnowledgeGraphService
-from services.rag_service import RAGService
+from utils.global_org import GLOBAL_ORG_NAME, ensure_agrotech_membership
 from uuid import UUID
 
 router = APIRouter(prefix="/organization", tags=["Organization"])
@@ -116,13 +116,19 @@ async def setup_organization(
 # ============================================================
 # 2. Listar Organizaciones del Usuario Autenticado
 # ============================================================
+async def _ensure_global_org_membership(db: AsyncSession, user_id) -> None:
+    """Garantiza que el usuario sea miembro de AgroTech (org global por defecto)."""
+    await ensure_agrotech_membership(db, user_id)
+    await db.commit()
+
+
 @router.get("", status_code=200)
 async def list_organizations(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Nombre de tu organización global comunitaria
-    GLOBAL_ORG_NAME = "AgroTech"
+    # Auto-inscripción en AgroTech para que todos la vean y puedan usarla.
+    await _ensure_global_org_membership(db, current_user.id)
 
     result = await db.execute(
         text("""
@@ -131,15 +137,13 @@ async def list_organizations(
                 o.name,
                 o.description,
                 CASE WHEN o.active THEN 'ACTIVE' ELSE 'INACTIVE' END as status,
-                CASE WHEN o.name = :global_name THEN true ELSE false END as is_global
+                CASE WHEN lower(o.name) = lower(:global_name) THEN true ELSE false END as is_global
             FROM organizations o
-            -- Hacemos un LEFT JOIN filtrando por el usuario actual
-            LEFT JOIN organization_members om
-                ON o.id = om.organization_id AND om.user_id = :user_id
-            -- Traemos la organización si el usuario es miembro, o si es la global
-            WHERE (om.user_id IS NOT NULL OR o.name = :global_name)
-              AND o.active = true
-            -- Ordenamos para que la global salga primero, y luego alfabéticamente
+            INNER JOIN organization_members om
+                ON o.id = om.organization_id
+               AND om.user_id = :user_id
+               AND om.active = true
+            WHERE o.active = true
             ORDER BY is_global DESC, o.name
         """),
         {"user_id": current_user.id, "global_name": GLOBAL_ORG_NAME},
@@ -156,6 +160,8 @@ async def get_organization(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    await _ensure_global_org_membership(db, current_user.id)
+
     organization = (
         (
             await db.execute(
@@ -163,10 +169,22 @@ async def get_organization(
                 SELECT
                     o.id, o.name, o.description, o.active
                 FROM organizations o
-                JOIN organization_members om ON o.id = om.organization_id
-                WHERE o.id = :id AND om.user_id = :user_id
+                LEFT JOIN organization_members om
+                    ON o.id = om.organization_id
+                   AND om.user_id = :user_id
+                   AND om.active = true
+                WHERE o.id = :id
+                  AND o.active = true
+                  AND (
+                    om.user_id IS NOT NULL
+                    OR lower(o.name) = lower(:global_name)
+                  )
             """),
-                {"id": organization_id, "user_id": current_user.id},
+                {
+                    "id": organization_id,
+                    "user_id": current_user.id,
+                    "global_name": GLOBAL_ORG_NAME,
+                },
             )
         )
         .mappings()
@@ -323,6 +341,74 @@ async def get_departments(
 
 
 # ============================================================
+# 8b. Knowledge Bases de la Organización
+# ============================================================
+@router.get("/{organization_id}/knowledge-bases", status_code=200)
+async def list_organization_knowledge_bases(
+    organization_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    check = await db.scalar(
+        text(
+            """
+            SELECT 1 FROM organization_members
+            WHERE organization_id = :org_id AND user_id = :user_id AND active = true
+            """
+        ),
+        {"org_id": organization_id, "user_id": current_user.id},
+    )
+    if not check:
+        raise HTTPException(status_code=403, detail="No perteneces a esta organización")
+
+    tenant_id = await db.scalar(
+        text(
+            """
+            SELECT id FROM tenants
+            WHERE organization_id = :org_id AND active = true
+            LIMIT 1
+            """
+        ),
+        {"org_id": organization_id},
+    )
+    if not tenant_id:
+        return []
+
+    result = await db.execute(
+        text(
+            """
+            SELECT
+                id,
+                tenant_id,
+                name,
+                description,
+                chroma_collection,
+                created_by,
+                created_at
+            FROM knowledge_bases
+            WHERE tenant_id = :tenant_id
+            ORDER BY created_at ASC
+            """
+        ),
+        {"tenant_id": tenant_id},
+    )
+    rows = result.mappings().all()
+    return [
+        {
+            "id": str(row["id"]),
+            "tenant_id": str(row["tenant_id"]),
+            "name": row["name"],
+            "description": row["description"],
+            "chroma_collection": row["chroma_collection"],
+            "created_by": str(row["created_by"]) if row["created_by"] else None,
+            "created_at": row["created_at"],
+            "organization_id": str(organization_id),
+        }
+        for row in rows
+    ]
+
+
+# ============================================================
 # 9. Knowledge Map (Grafo RAG)
 # ============================================================
 @router.get("/{organization_id}/knowledge-map")
@@ -330,6 +416,10 @@ async def graph(
     organization_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    preview: bool = False,
+    knowledge_base_id: UUID | None = None,
+    similarity_threshold: float = 0.45,
+    max_neighbors: int = 8,
 ):
     organization = await db.execute(
         text("""
@@ -360,9 +450,41 @@ async def graph(
     if not tenant_id:
         raise HTTPException(status_code=404, detail="Tenant no encontrado")
 
-    rag = RAGService()
-    graph_service = KnowledgeGraphService(rag.collection)
-    graph_data = await graph_service.build_graph()
+    kb_id = str(knowledge_base_id) if knowledge_base_id else None
+    if kb_id:
+        kb_ok = await db.scalar(
+            text(
+                """
+                SELECT 1 FROM knowledge_bases
+                WHERE id = :kb_id AND tenant_id = :tenant_id
+                """
+            ),
+            {"kb_id": kb_id, "tenant_id": tenant_id},
+        )
+        if not kb_ok:
+            raise HTTPException(
+                status_code=404,
+                detail="Knowledge base no encontrada en esta organización",
+            )
+
+    # No pasar collection Chroma: forzar lectura pgvector filtrada por tenant/KB
+    graph_service = KnowledgeGraphService(collection=None)
+    graph_data = await graph_service.build_graph(
+        tenant_id=str(tenant_id),
+        preview=preview,
+        knowledge_base_id=kb_id,
+        similarity_threshold=similarity_threshold,
+        max_neighbors=max_neighbors,
+    )
+
+    stats = graph_data.get("stats") or {}
+    chunk_nodes = [n for n in graph_data["nodes"] if n.get("type") == "chunk"]
+    doc_nodes = [n for n in graph_data["nodes"] if n.get("type") == "document"]
+    documents_count = stats.get("documents") or (
+        len(doc_nodes)
+        if doc_nodes
+        else len({n.get("document") for n in chunk_nodes if n.get("document")})
+    )
 
     return {
         "organization": {
@@ -371,12 +493,17 @@ async def graph(
             "description": organization["description"],
         },
         "statistics": {
-            "nodes": len(graph_data["nodes"]),
-            "edges": len(graph_data["edges"]),
-            "documents": len(
-                [n for n in graph_data["nodes"] if n["type"] == "document"]
+            "nodes": stats.get("nodes", len(graph_data["nodes"])),
+            "edges": stats.get("edges", len(graph_data["edges"])),
+            "documents": documents_count,
+            "chunks": stats.get("chunks", len(chunk_nodes)),
+            "chunks_with_embedding": stats.get("chunks_with_embedding", 0),
+            "chunks_without_embedding": stats.get("chunks_without_embedding", 0),
+            "similarity_threshold": stats.get(
+                "similarity_threshold", similarity_threshold
             ),
-            "chunks": len([n for n in graph_data["nodes"] if n["type"] == "chunk"]),
+            "average_similarity": stats.get("average_similarity", 0),
+            "knowledge_base_id": kb_id,
         },
         "graph": graph_data,
     }

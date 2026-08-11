@@ -43,8 +43,13 @@ export default function AvatarPanel({
         audio: true,
       });
 
+      const apiBase =
+        import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
+      const wsBase = apiBase
+        .replace(/^http/, "ws")
+        .replace(/\/api\/v1\/?$/, "");
       const ws = new WebSocket(
-        `ws://localhost:8000/speech/transcribe?tenant_id=${tenantId}&knowledge_base_id=${knowledgeBaseId}`,
+        `${wsBase}/speech/transcribe?tenant_id=${tenantId}&knowledge_base_id=${knowledgeBaseId}`,
       );
 
       websocket.current = ws;

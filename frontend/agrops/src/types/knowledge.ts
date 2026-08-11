@@ -54,6 +54,11 @@ export interface KnowledgeMap {
         edges: number;
         documents: number;
         chunks: number;
+        chunks_with_embedding?: number;
+        chunks_without_embedding?: number;
+        similarity_threshold?: number;
+        average_similarity?: number;
+        knowledge_base_id?: string | null;
     };
 
 

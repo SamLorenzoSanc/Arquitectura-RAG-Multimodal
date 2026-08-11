@@ -1,25 +1,56 @@
-import { Outlet } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
-import { OrganizationProvider } from "@/context/OrganizationContext";
+import DashboardKeepAlive from "./DashboardKeepAlive";
+import {
+  OrganizationProvider,
+  useOrganization,
+} from "@/context/OrganizationContext";
+import { ShellProvider } from "@/context/ShellContext";
+import { usePrefetchDashboard } from "@/hooks/useCachedApi";
 
-// Definimos la interfaz para aceptar componentes hijos de forma opcional
-export interface DashboardLayoutProps {
-  children: React.ReactNode;
+function DashboardShell() {
+  const { pathname } = useLocation();
+  const isChat = pathname.startsWith("/dashboard/chat");
+  const { selectedOrg } = useOrganization();
+  const prefetch = usePrefetchDashboard(selectedOrg?.id);
+
+  useEffect(() => {
+    void prefetch();
+  }, [prefetch, selectedOrg?.id]);
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-[color:var(--agro-canvas)]">
+      <Sidebar />
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <Header />
+        <main
+          className={`min-w-0 flex-1 min-h-0 px-3 py-3 sm:px-5 sm:py-4 lg:px-6 ${
+            isChat ? "flex flex-col overflow-hidden" : "overflow-y-auto"
+          }`}
+        >
+          <div
+            className={`mx-auto flex w-full max-w-[1400px] ${
+              isChat
+                ? "min-h-0 flex-1 flex-col overflow-hidden"
+                : "min-h-0 flex-1 flex-col"
+            }`}
+          >
+            <DashboardKeepAlive />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }
 
 export default function DashboardLayout() {
-    return (
-        <OrganizationProvider>
-            <div className="h-screen bg-gray-100 flex">
-                <Sidebar />
-                <div className="flex-1 flex flex-col">
-                    <Header />
-                    <main className="flex-1 min-w-0 overflow-y-auto">
-                        <Outlet />
-                    </main>
-                </div>
-            </div>
-        </OrganizationProvider>
-    );
+  return (
+    <OrganizationProvider>
+      <ShellProvider>
+        <DashboardShell />
+      </ShellProvider>
+    </OrganizationProvider>
+  );
 }

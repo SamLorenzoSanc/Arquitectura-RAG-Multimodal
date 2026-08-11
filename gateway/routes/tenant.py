@@ -11,10 +11,15 @@ from .auth import get_current_user
 
 router = APIRouter(prefix="/tenants", tags=["Tenants"])
 
-
-# ==========================================================
-# LISTAR
-# ==========================================================
+# Columnas reales del dump/seed (sin slug ni updated_at).
+_TENANT_SELECT = """
+    id,
+    organization_id,
+    name,
+    description,
+    active,
+    created_at
+"""
 
 
 @router.get("/")
@@ -22,30 +27,24 @@ async def list_tenants(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-
-    tenants = (await db.execute(text("""
-                SELECT
-                    id,
-                    organization_id,
-                    name,
-                    description,
-                    slug,
-                    active,
-                    created_at,
-                    updated_at
+    tenants = (
+        (
+            await db.execute(
+                text(f"""
+                SELECT {_TENANT_SELECT}
                 FROM tenants
                 ORDER BY created_at DESC
-                """))).mappings().all()
+                """)
+            )
+        )
+        .mappings()
+        .all()
+    )
 
     return {
         "items": tenants,
         "total": len(tenants),
     }
-
-
-# ==========================================================
-# OBTENER
-# ==========================================================
 
 
 @router.get("/{tenant_id}")
@@ -54,20 +53,11 @@ async def get_tenant(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-
     tenant = (
         (
             await db.execute(
-                text("""
-                SELECT
-                    id,
-                    organization_id,
-                    name,
-                    description,
-                    slug,
-                    active,
-                    created_at,
-                    updated_at
+                text(f"""
+                SELECT {_TENANT_SELECT}
                 FROM tenants
                 WHERE id=:id
                 """),
@@ -93,7 +83,6 @@ async def create_tenant(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-
     organization_id = await db.scalar(text("SELECT id FROM organizations LIMIT 1"))
 
     if organization_id is None:
@@ -105,7 +94,6 @@ async def create_tenant(
     tenant_id = str(uuid4())
 
     try:
-
         await db.execute(
             text("""
                 INSERT INTO tenants (
@@ -113,15 +101,13 @@ async def create_tenant(
                     organization_id,
                     name,
                     description,
-                    created_at,
-                    updated_at
+                    created_at
                 )
                 VALUES (
                     :id,
                     :organization_id,
                     :name,
                     :description,
-                    NOW(),
                     NOW()
                 )
                 """),
@@ -138,16 +124,8 @@ async def create_tenant(
         created = (
             (
                 await db.execute(
-                    text("""
-                    SELECT
-                        id,
-                        organization_id,
-                        name,
-                        description,
-                        slug,
-                        active,
-                        created_at,
-                        updated_at
+                    text(f"""
+                    SELECT {_TENANT_SELECT}
                     FROM tenants
                     WHERE id=:id
                     """),
@@ -161,9 +139,7 @@ async def create_tenant(
         return created
 
     except Exception as e:
-
         await db.rollback()
-
         raise HTTPException(
             status_code=500,
             detail=str(e),
@@ -177,7 +153,6 @@ async def update_tenant(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-
     exists = await db.scalar(
         text("SELECT id FROM tenants WHERE id=:id"),
         {"id": tenant_id},
@@ -195,8 +170,7 @@ async def update_tenant(
             SET
                 name=COALESCE(:name,name),
                 description=COALESCE(:description,description),
-                active=COALESCE(:active,active),
-                updated_at=NOW()
+                active=COALESCE(:active,active)
             WHERE id=:id
             """),
         {
@@ -212,16 +186,8 @@ async def update_tenant(
     updated = (
         (
             await db.execute(
-                text("""
-                SELECT
-                    id,
-                    organization_id,
-                    name,
-                    description,
-                    slug,
-                    active,
-                    created_at,
-                    updated_at
+                text(f"""
+                SELECT {_TENANT_SELECT}
                 FROM tenants
                 WHERE id=:id
                 """),
@@ -241,7 +207,6 @@ async def delete_tenant(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-
     exists = await db.scalar(
         text("SELECT id FROM tenants WHERE id=:id"),
         {"id": tenant_id},
@@ -267,7 +232,6 @@ async def assign_tenant_to_user(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-
     organization_id = await db.scalar(
         text("""
             SELECT organization_id
@@ -283,42 +247,40 @@ async def assign_tenant_to_user(
             detail="Tenant not found",
         )
 
-    user_exists = await db.scalar(
-        text("SELECT id FROM users WHERE id=:id"),
-        {"id": data.user_id},
+    exists = await db.scalar(
+        text("""
+            SELECT id
+            FROM organization_members
+            WHERE organization_id=:org AND user_id=:user
+            """),
+        {"org": organization_id, "user": data.user_id},
     )
 
-    if user_exists is None:
-        raise HTTPException(
-            status_code=404,
-            detail="User not found",
+    if exists:
+        await db.execute(
+            text("""
+                UPDATE organization_members
+                SET active=true
+                WHERE id=:id
+                """),
+            {"id": exists},
+        )
+    else:
+        await db.execute(
+            text("""
+                INSERT INTO organization_members (
+                    id, organization_id, user_id, active
+                )
+                VALUES (
+                    :id, :org, :user, true
+                )
+                """),
+            {
+                "id": str(uuid4()),
+                "org": organization_id,
+                "user": data.user_id,
+            },
         )
 
-    await db.execute(
-        text("""
-            INSERT INTO organization_members (
-                organization_id,
-                user_id,
-                active
-            )
-            VALUES (
-                :organization_id,
-                :user_id,
-                TRUE
-            )
-            ON CONFLICT (organization_id,user_id)
-            DO UPDATE
-            SET active=TRUE
-            """),
-        {
-            "organization_id": organization_id,
-            "user_id": data.user_id,
-        },
-    )
-
     await db.commit()
-
-    return {
-        "status": "success",
-        "message": "User assigned successfully.",
-    }
+    return {"status": "assigned"}

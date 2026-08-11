@@ -8,13 +8,79 @@ import React, {
   useState,
 } from "react";
 
+import {
+  BarChart,
+  Bar,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
 import api from "@/api";
-import KnowledgeService from "@/services/knowledge.service";
 import { useOrganization } from "@/context/OrganizationContext";
+import {
+  useDocuments,
+  useInvalidateDocuments,
+  useKnowledgeBases,
+} from "@/hooks/useCachedApi";
 
 /* ============================================================
 TYPES
 ============================================================ */
+
+type DistanceMetric = "cosine" | "euclidean" | "manhattan";
+
+interface RetrievedChunk {
+  id: string;
+  rank: number;
+  title: string;
+  description: string;
+  content: string;
+
+  score: number;
+  distance: number | null;
+
+  flag_different_info?: boolean;
+  flag_out_of_knowledge?: boolean;
+}
+
+interface RetrievalInfo {
+  original_query: string;
+  rewritten_query: string;
+
+  retrieved_chunks: number;
+  rewritten_chunks: number;
+  merged_chunks: number;
+
+  dense_original_chunks: number;
+  dense_rewritten_chunks: number;
+
+  bm25_original_chunks: number;
+  bm25_rewritten_chunks: number;
+
+  candidate_chunks: number;
+  final_chunks: number;
+
+  retrieval_k: number;
+  bm25_k: number;
+  candidate_k: number;
+  final_k: number;
+  rrf_k: number;
+
+  reranking: boolean;
+  reranker: string;
+
+  query_rewriting: boolean;
+  parallel_retrieval: boolean;
+}
+
+interface RetrievalResponse {
+  question: string;
+  chunks: RetrievedChunk[];
+  retrieval?: RetrievalInfo;
+}
 
 type DocumentStatus = "active" | "inactive";
 
@@ -31,34 +97,14 @@ interface RagDocument {
   name: string;
   filename?: string;
 
-  /**
-   * Estado visual que devuelve el backend:
-   * active / inactive
-   */
   status: DocumentStatus;
 
-  /**
-   * Estado técnico del pipeline RAG:
-   * uploaded / pending / running / completed / failed
-   */
   processing_status?: ProcessingStatus;
 
   active?: boolean;
 
-  /**
-   * Modelo utilizado para generar embeddings.
-   */
   embedding_model?: string;
-
-  /**
-   * Modelo utilizado para generación/enriquecimiento
-   * y resumen de vídeos.
-   */
   generation_model?: string;
-
-  /**
-   * Alias compatible con respuestas anteriores.
-   */
   llm_model?: string;
 
   job_id?: string;
@@ -81,38 +127,68 @@ interface RagDocument {
 interface DocumentsResponse {
   documents?: RagDocument[];
 }
-interface RetrievedChunk {
-  id: string;
-  title: string;
-  description: string;
-  cosine_distance: number;
 
-  // Flags de evaluación manual en la UI
-  flag_different_info?: boolean;
-  flag_out_of_knowledge?: boolean;
-}
+/* ============================================================
+DATASET EVALUATION
+============================================================ */
 
-// Representa el resultado final de ejecutar la evaluación sobre el dataset guardado
 interface DatasetEvaluationResult {
-  model_date: string;
+  model_date?: string;
   dataset_name: string;
+
+  distance_metric?: DistanceMetric | string;
+
   recall_1: number;
   recall_k: number;
+  precision_at_k?: number;
+  ndcg?: number;
   mrr: number;
+
   false_positives: number;
   failures: number;
+
   duration_ms: number;
-  create_at: Date;
+
+  created_at?: string;
+  create_at?: string;
+  cached?: boolean;
 }
+
+interface RetrievalAuditRow {
+  id: number;
+  question: string;
+  qLabel: string;
+  mrr: number;
+  ndcg: number;
+  coverage: number;
+}
+
+interface AnswerAuditRow {
+  id: number;
+  question: string;
+  qLabel: string;
+  accuracy: number;
+  completeness: number;
+  relevance: number;
+}
+
+/* ============================================================
+UPLOAD
+============================================================ */
+
 interface UploadResponse {
   id?: string;
   document_id?: string;
   job_id?: string;
+
   status?: string;
   processing_status?: ProcessingStatus;
+
   active?: boolean;
+
   embedding_model?: string;
   generation_model?: string;
+
   message?: string;
 }
 
@@ -147,6 +223,51 @@ const ACCEPTED_EXTENSIONS = [
 ];
 
 const POLL_INTERVAL_MS = 2000;
+
+/* ============================================================
+EVALUATION AUDIT THRESHOLDS (match evaluator.py)
+============================================================ */
+const MRR_GREEN = 0.9;
+const MRR_AMBER = 0.75;
+const NDCG_GREEN = 0.9;
+const NDCG_AMBER = 0.75;
+const COVERAGE_GREEN = 90.0;
+const COVERAGE_AMBER = 75.0;
+
+const ANSWER_GREEN = 4.5;
+const ANSWER_AMBER = 4.0;
+
+/*
+ * Métricas disponibles para la evaluación.
+ *
+ * IMPORTANTE:
+ * Estos valores deben coincidir exactamente con los valores
+ * aceptados por DatasetEvaluationRequest en FastAPI.
+ */
+const DISTANCE_METRICS: {
+  value: DistanceMetric;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "cosine",
+    label: "Coseno",
+    description:
+      "Mide la similitud angular entre los vectores. Adecuada para embeddings semánticos.",
+  },
+  {
+    value: "euclidean",
+    label: "Euclídea (L2)",
+    description:
+      "Mide la distancia geométrica entre los vectores en el espacio de embeddings.",
+  },
+  {
+    value: "manhattan",
+    label: "Manhattan (L1)",
+    description:
+      "Mide la suma de las diferencias absolutas entre las dimensiones.",
+  },
+];
 
 /* ============================================================
 HELPERS
@@ -226,6 +347,120 @@ function statusTone(status: DocumentStatus) {
   return status === "active"
     ? "bg-emerald-50 text-emerald-600"
     : "bg-slate-100 text-slate-500";
+}
+
+function getMetricLabel(metric?: string) {
+  switch (metric) {
+    case "cosine":
+      return "Coseno";
+
+    case "euclidean":
+      return "Euclídea (L2)";
+
+    case "manhattan":
+      return "Manhattan (L1)";
+
+    default:
+      return metric || "—";
+  }
+}
+
+type HistogramBucket = {
+  bucket: string;
+  count: number;
+};
+
+function buildHistogram(
+  values: number[],
+  step: number,
+  maxValue?: number,
+  labelFormatter?: (start: number, end: number) => string,
+): HistogramBucket[] {
+  if (!values.length) {
+    return [];
+  }
+
+  const effectiveMaxValue = maxValue ?? Math.max(...values, step * 10, 1);
+
+  const formatter =
+    labelFormatter ??
+    ((start: number, end: number) => `${start.toFixed(1)}–${end.toFixed(1)}`);
+
+  const buckets = Array.from(
+    { length: Math.ceil(effectiveMaxValue / step) },
+    (_, index) => ({
+      start: index * step,
+      end: (index + 1) * step,
+      count: 0,
+    }),
+  );
+
+  for (const value of values) {
+    if (Number.isNaN(value) || value < 0) {
+      continue;
+    }
+
+    const index =
+      value >= effectiveMaxValue
+        ? buckets.length - 1
+        : Math.min(buckets.length - 1, Math.floor(value / step));
+
+    buckets[index].count += 1;
+  }
+
+  return buckets.map((bucket) => ({
+    bucket: formatter(bucket.start, bucket.end),
+    count: bucket.count,
+  }));
+}
+
+function HistogramCard({
+  title,
+  data,
+  color,
+}: {
+  title: string;
+  data: HistogramBucket[];
+  color: string;
+}) {
+  if (!data.length) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+        No hay datos suficientes para generar el histograma de {title}.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between gap-4">
+        <h4 className="text-sm font-semibold text-slate-800">{title}</h4>
+        <span className="text-[10px] text-slate-400">Buckets</span>
+      </div>
+
+      <div className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 10, right: 10, left: 0, bottom: 45 }}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis
+              dataKey="bucket"
+              tick={{ fontSize: 10 }}
+              interval={0}
+              angle={-35}
+              textAnchor="end"
+              height={50}
+            />
+            <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+            <Tooltip formatter={(value) => [Number(value ?? 0), "Conteo"]} />
+            <Bar dataKey="count" fill={color} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
 }
 
 /* ============================================================
@@ -314,7 +549,7 @@ function StatCard({
   label,
   active,
 }: {
-  value: number;
+  value: number | string;
   label: string;
   active?: boolean;
 }) {
@@ -410,10 +645,8 @@ function UploadModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-      <div className="w-full max-w-2xl overflow-hidden rounded-xl bg-white shadow-xl">
-        {/* HEADER */}
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6">
+      <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div>
             <h2 className="text-base font-semibold text-slate-800">
@@ -434,8 +667,6 @@ function UploadModal({
             ×
           </button>
         </div>
-
-        {/* BODY */}
 
         <div className="p-6">
           <div
@@ -471,18 +702,7 @@ function UploadModal({
             `}
           >
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-              >
-                <path d="M12 3v12" />
-                <path d="m7 8 5-5 5 5" />
-                <path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
-              </svg>
+              ↑
             </div>
 
             <p className="text-sm font-medium text-slate-700">
@@ -508,13 +728,10 @@ function UploadModal({
                   addFiles(event.target.files);
                 }
 
-                // Permite volver a seleccionar el mismo archivo.
                 event.currentTarget.value = "";
               }}
             />
           </div>
-
-          {/* FILES */}
 
           {files.length > 0 && (
             <div className="mt-5 space-y-2">
@@ -541,31 +758,7 @@ function UploadModal({
                           }
                         `}
                       >
-                        {video ? (
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.7"
-                          >
-                            <rect x="3" y="5" width="18" height="14" rx="2" />
-                            <path d="m10 9 5 3-5 3z" />
-                          </svg>
-                        ) : (
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.7"
-                          >
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                            <path d="M14 2v6h6" />
-                          </svg>
-                        )}
+                        {video ? "▶" : "□"}
                       </div>
 
                       <div className="min-w-0">
@@ -598,8 +791,6 @@ function UploadModal({
           )}
         </div>
 
-        {/* FOOTER */}
-
         <div className="flex justify-end gap-2 border-t px-6 py-4">
           <button
             type="button"
@@ -629,15 +820,55 @@ function UploadModal({
 }
 
 /* ============================================================
-EVALUATION CARD
+DISTANCE METRIC SELECTOR
 ============================================================ */
 
-function EvaluationCard({ label, value }: { label: string; value: string }) {
+function DistanceMetricSelector({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: DistanceMetric;
+  onChange: (value: DistanceMetric) => void;
+  disabled?: boolean;
+}) {
   return (
-    <div className="rounded-md border border-slate-100 p-4">
-      <span className="text-xs text-slate-400">{label}</span>
+    <div>
+      <label className="mb-2 block text-xs font-semibold text-slate-700">
+        Métrica de distancia
+      </label>
 
-      <p className="mt-2 text-xl font-semibold text-slate-700">{value}</p>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value as DistanceMetric)}
+        disabled={disabled}
+        className="
+          h-10
+          w-full
+          rounded-md
+          border
+          border-slate-300
+          bg-white
+          px-3
+          text-sm
+          text-slate-700
+          outline-none
+          transition
+          focus:border-blue-500
+          disabled:cursor-not-allowed
+          disabled:bg-slate-50
+        "
+      >
+        {DISTANCE_METRICS.map((metric) => (
+          <option key={metric.value} value={metric.value}>
+            {metric.label}
+          </option>
+        ))}
+      </select>
+
+      <p className="mt-2 text-[11px] leading-4 text-slate-400">
+        {DISTANCE_METRICS.find((metric) => metric.value === value)?.description}
+      </p>
     </div>
   );
 }
@@ -647,63 +878,356 @@ MAIN PAGE
 ============================================================ */
 
 export default function RagDocumentationPage() {
-  const [documents, setDocuments] = useState<RagDocument[]>([]);
+  const { selectedOrg } = useOrganization();
+  const {
+    data: kbsData,
+    isLoading: loadingKbs,
+    error: kbsError,
+  } = useKnowledgeBases(selectedOrg?.id);
+  const kbs = (kbsData as KnowledgeBase[]) ?? [];
 
-  const [loading, setLoading] = useState(true);
+  const [knowledgeBaseId, setKnowledgeBaseId] = useState("");
+  const {
+    data: documentsCached,
+    isLoading: loadingDocs,
+  } = useDocuments(knowledgeBaseId || undefined);
+  const invalidateDocuments = useInvalidateDocuments();
+
+  const [documents, setDocuments] = useState<RagDocument[]>([]);
+  const loading = (loadingKbs || loadingDocs) && documents.length === 0;
 
   const [uploadModal, setUploadModal] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const [search, setSearch] = useState("");
 
-  const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
-
   const [tab, setTab] = useState<"indexation" | "evaluation">("indexation");
 
-  const [knowledgeBaseId, setKnowledgeBaseId] = useState("");
-
   const [error, setError] = useState<string | null>(null);
-
   const [message, setMessage] = useState<string | null>(null);
 
-  const { selectedOrg } = useOrganization();
+  /* ============================================================
+  MANUAL RETRIEVAL
+  ============================================================ */
+
   const [manualQuestion, setManualQuestion] = useState("");
+
   const [retrievedChunks, setRetrievedChunks] = useState<RetrievedChunk[]>([]);
+
   const [selectedChunkId, setSelectedChunkId] = useState<string | null>(null);
+
   const [testingRetrieval, setTestingRetrieval] = useState(false);
+
   const [savingDataset, setSavingDataset] = useState(false);
 
-  // Estados para la evaluación masiva del dataset
+  /* ============================================================
+  DATASET EVALUATION
+  ============================================================ */
+
   const [datasetEvalResult, setDatasetEvalResult] =
     useState<DatasetEvaluationResult | null>(null);
+
+  // Tests dataset and upload
+  const [tests, setTests] = useState<any[]>([]);
+  const [loadingTests, setLoadingTests] = useState(false);
+  const [uploadingTests, setUploadingTests] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Audit runs
+  const [retrievalAudit, setRetrievalAudit] = useState<{
+    mrr?: number;
+    ndcg?: number;
+    coverage?: number;
+    progress?: number;
+  } | null>(null);
+
+  const [answerAudit, setAnswerAudit] = useState<{
+    accuracy?: number;
+    completeness?: number;
+    relevance?: number;
+    progress?: number;
+  } | null>(null);
+
+  const [retrievalAuditRows, setRetrievalAuditRows] = useState<
+    RetrievalAuditRow[]
+  >([]);
+  const [answerAuditRows, setAnswerAuditRows] = useState<AnswerAuditRow[]>([]);
+
+  const [retrievalHistogramData, setRetrievalHistogramData] = useState<{
+    mrr: HistogramBucket[];
+    ndcg: HistogramBucket[];
+    coverage: HistogramBucket[];
+  } | null>(null);
+
+  const [answerHistogramData, setAnswerHistogramData] = useState<{
+    accuracy: HistogramBucket[];
+    completeness: HistogramBucket[];
+    relevance: HistogramBucket[];
+  } | null>(null);
+
   const [runningDatasetEval, setRunningDatasetEval] = useState(false);
 
-  // 1. Probar la búsqueda y obtener chunks con distancia coseno
+  /*
+   * MÉTRICA SELECCIONADA
+   *
+   * Esta variable controla la métrica utilizada por el backend.
+   */
+  const [distanceMetric, setDistanceMetric] =
+    useState<DistanceMetric>("cosine");
+
+  /* ============================================================
+  TEST RETRIEVAL
+  ============================================================ */
+
   const handleTestRetrieval = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualQuestion.trim()) return;
+
+    if (!manualQuestion.trim()) {
+      return;
+    }
 
     setTestingRetrieval(true);
     setRetrievedChunks([]);
     setSelectedChunkId(null);
+    setError(null);
 
     try {
-      // Endpoint que debe devolver los chunks con su distancia coseno
-      const response = await api.post<RetrievedChunk[]>(
+      const response = await api.post<RetrievalResponse>(
         "/chat/simulator/search",
         {
-          question: manualQuestion,
+          question: manualQuestion.trim(),
+
+          /*
+           * También enviamos la métrica al simulador.
+           *
+           * Si tu endpoint /search todavía no acepta este campo,
+           * puedes eliminar esta propiedad del payload del search.
+           */
+          distance_metric: distanceMetric,
         },
       );
-      setRetrievedChunks(response.data || []);
-    } catch (err) {
+
+      console.log("RETRIEVAL RESPONSE:", response.data);
+
+      const chunks = response.data?.chunks ?? [];
+
+      setRetrievedChunks(chunks);
+    } catch (err: any) {
       console.error("Error al simular retrieval:", err);
+
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          err.message ||
+          "No se pudo ejecutar el retrieval.",
+      );
     } finally {
       setTestingRetrieval(false);
     }
   };
 
-  // 2. Manejar el cambio de los flags de cada chunk
+  /* ============================================================
+  TESTS DATASET HELPERS
+  ============================================================ */
+  const fetchTests = async () => {
+    setLoadingTests(true);
+    try {
+      const res = await api.get("/chat/evaluation/tests");
+      const data = res.data?.tests ?? [];
+      setTests(data);
+    } catch (err: any) {
+      console.error("Error loading tests:", err);
+      setTests([]);
+    } finally {
+      setLoadingTests(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "evaluation") {
+      fetchTests();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const handleUploadTests = async (f?: File) => {
+    const file = f ?? (fileInputRef.current?.files?.[0] as File | undefined);
+    if (!file) return;
+
+    setUploadingTests(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+
+      const res = await api.post("/chat/evaluation/upload-tests", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      console.log("upload res", res.data);
+      await fetchTests();
+      setMessage(`Tests subidos: ${res.data.uploaded}`);
+    } catch (err: any) {
+      console.error("Error uploading tests:", err);
+      setError(err.response?.data?.detail || err.message || "Error");
+    } finally {
+      setUploadingTests(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  /* ============================================================
+  FULL AUDIT (all tests)
+  ============================================================ */
+  const runRetrievalAuditAll = async () => {
+    if (!tests || tests.length === 0) return;
+    setRetrievalAudit({ progress: 0 });
+    setRetrievalAuditRows([]);
+
+    let totalMrr = 0;
+    let totalNdcg = 0;
+    let totalCoverage = 0;
+
+    const rows: RetrievalAuditRow[] = [];
+    const mrrValues: number[] = [];
+    const ndcgValues: number[] = [];
+    const coverageValues: number[] = [];
+
+    for (let i = 0; i < tests.length; i++) {
+      const id = tests[i].id; // id is index in backend
+      try {
+        const res = await api.post(`/chat/evaluation/retrieval/${id}`);
+        const r = res.data.retrieval;
+        totalMrr += r.mrr ?? 0;
+        totalNdcg += r.ndcg ?? 0;
+        totalCoverage += r.keyword_coverage ?? 0;
+
+        mrrValues.push(r.mrr ?? 0);
+        ndcgValues.push(r.ndcg ?? 0);
+        coverageValues.push(r.keyword_coverage ?? 0);
+
+        rows.push({
+          id,
+          question: tests[i].question,
+          qLabel: `${id + 1}. ${tests[i].question.slice(0, 40)}...`,
+          mrr: Number((r.mrr ?? 0).toFixed(3)),
+          ndcg: Number((r.ndcg ?? 0).toFixed(3)),
+          coverage: Number((r.keyword_coverage ?? 0).toFixed(1)),
+        });
+      } catch (err) {
+        console.error("Error evaluating retrieval test", id, err);
+      }
+
+      setRetrievalAudit({
+        progress: Math.round(((i + 1) / tests.length) * 100),
+      });
+    }
+
+    const count = tests.length;
+    setRetrievalAuditRows(rows);
+    setRetrievalHistogramData({
+      mrr: buildHistogram(
+        mrrValues,
+        0.1,
+        1,
+        (start, end) => `${start.toFixed(1)}–${end.toFixed(1)}`,
+      ),
+      ndcg: buildHistogram(
+        ndcgValues,
+        0.1,
+        1,
+        (start, end) => `${start.toFixed(1)}–${end.toFixed(1)}`,
+      ),
+      coverage: buildHistogram(
+        coverageValues,
+        10,
+        100,
+        (start, end) => `${start.toFixed(0)}–${end.toFixed(0)}%`,
+      ),
+    });
+    setRetrievalAudit({
+      mrr: totalMrr / count,
+      ndcg: totalNdcg / count,
+      coverage: totalCoverage / count,
+      progress: 100,
+    });
+  };
+
+  const runAnswerAuditAll = async () => {
+    if (!tests || tests.length === 0) return;
+    setAnswerAudit({ progress: 0 });
+    setAnswerAuditRows([]);
+
+    let totalAcc = 0;
+    let totalComp = 0;
+    let totalRel = 0;
+
+    const rows: AnswerAuditRow[] = [];
+    const accuracyValues: number[] = [];
+    const completenessValues: number[] = [];
+    const relevanceValues: number[] = [];
+
+    for (let i = 0; i < tests.length; i++) {
+      const id = tests[i].id;
+      try {
+        const res = await api.post(`/chat/evaluation/answer/${id}`);
+        const ev = res.data.evaluation;
+        totalAcc += ev.accuracy ?? 0;
+        totalComp += ev.completeness ?? 0;
+        totalRel += ev.relevance ?? 0;
+
+        accuracyValues.push(ev.accuracy ?? 0);
+        completenessValues.push(ev.completeness ?? 0);
+        relevanceValues.push(ev.relevance ?? 0);
+
+        rows.push({
+          id,
+          question: tests[i].question,
+          qLabel: `${id + 1}. ${tests[i].question.slice(0, 40)}...`,
+          accuracy: Number((ev.accuracy ?? 0).toFixed(2)),
+          completeness: Number((ev.completeness ?? 0).toFixed(2)),
+          relevance: Number((ev.relevance ?? 0).toFixed(2)),
+        });
+      } catch (err) {
+        console.error("Error evaluating answer test", id, err);
+      }
+
+      setAnswerAudit({ progress: Math.round(((i + 1) / tests.length) * 100) });
+    }
+
+    const count = tests.length;
+    setAnswerAuditRows(rows);
+    setAnswerHistogramData({
+      accuracy: buildHistogram(
+        accuracyValues,
+        0.5,
+        5,
+        (start, end) => `${start.toFixed(1)}–${end.toFixed(1)}`,
+      ),
+      completeness: buildHistogram(
+        completenessValues,
+        0.5,
+        5,
+        (start, end) => `${start.toFixed(1)}–${end.toFixed(1)}`,
+      ),
+      relevance: buildHistogram(
+        relevanceValues,
+        0.5,
+        5,
+        (start, end) => `${start.toFixed(1)}–${end.toFixed(1)}`,
+      ),
+    });
+    setAnswerAudit({
+      accuracy: totalAcc / count,
+      completeness: totalComp / count,
+      relevance: totalRel / count,
+      progress: 100,
+    });
+  };
+
+  /* ============================================================
+  FLAGS
+  ============================================================ */
+
   const handleToggleFlag = (
     chunkId: string,
     flagType: "flag_different_info" | "flag_out_of_knowledge",
@@ -711,19 +1235,28 @@ export default function RagDocumentationPage() {
     setRetrievedChunks((prev) =>
       prev.map((chunk) =>
         chunk.id === chunkId
-          ? { ...chunk, [flagType]: !chunk[flagType] }
+          ? {
+              ...chunk,
+              [flagType]: !chunk[flagType],
+            }
           : chunk,
       ),
     );
   };
 
-  // 3. Guardar el juego de preguntas en la BD
+  /* ============================================================
+  SAVE DATASET
+  ============================================================ */
+
   const handleSaveQuestionSet = async () => {
     if (!manualQuestion || !selectedChunkId) {
       alert("Por favor, selecciona el chunk correcto antes de guardar.");
+
       return;
     }
+
     setSavingDataset(true);
+
     try {
       const selectedChunk = retrievedChunks.find(
         (c) => c.id === selectedChunkId,
@@ -731,48 +1264,78 @@ export default function RagDocumentationPage() {
 
       await api.post("/chat/simulator/save-dataset", {
         question: manualQuestion,
+
         selected_chunk_id: selectedChunkId,
+
         flags: {
           different_info: selectedChunk?.flag_different_info || false,
+
           out_of_knowledge: selectedChunk?.flag_out_of_knowledge || false,
         },
       });
 
-      setMessage("Dataset y métricas de evaluación guardadas con éxito.");
+      setMessage("Pregunta y referencia guardadas correctamente.");
+
       setManualQuestion("");
       setRetrievedChunks([]);
       setSelectedChunkId(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error al guardar el dataset:", err);
-      setError("No se pudo guardar el registro de evaluación.");
+
+      setError(
+        err.response?.data?.detail ||
+          err.response?.data?.message ||
+          "No se pudo guardar el registro de evaluación.",
+      );
     } finally {
       setSavingDataset(false);
     }
   };
 
-  // 4. Ejecutar evaluación sobre todo el dataset guardado
+  /* ============================================================
+  EXECUTE DATASET EVALUATION
+  ============================================================ */
+
   const handleExecuteDatasetEvaluation = async () => {
-    if (runningDatasetEval) return;
+    if (runningDatasetEval) {
+      return;
+    }
 
     setRunningDatasetEval(true);
     setError(null);
+    setMessage(null);
 
+    /*
+     * PAYLOAD ACTUALIZADO
+     *
+     * distance_metric es ahora una propiedad explícita.
+     */
     const payload = {
       model_name: "llama3.2",
+
       embedding_model: "qwen3-embedding:latest",
+
+      distance_metric: distanceMetric,
+
       top_k: 5,
+
       retrieval_k: 10,
+
       bm25_k: 10,
+
       rrf_k: 60,
+
       candidate_k: 15,
+
       reranker_model: "BAAI/bge-reranker-v2-m3",
+
       reranker_batch_size: 16,
     };
 
     console.log("PAYLOAD EVALUATION:", payload);
 
     try {
-      const response = await api.post(
+      const response = await api.post<DatasetEvaluationResult>(
         "/chat/simulator/evaluate-dataset",
         payload,
         {
@@ -785,158 +1348,90 @@ export default function RagDocumentationPage() {
       console.log("EVALUATION RESPONSE:", response.data);
 
       setDatasetEvalResult(response.data);
+
+      setMessage(
+        `Evaluación completada utilizando la distancia ${getMetricLabel(
+          distanceMetric,
+        )}.`,
+      );
     } catch (err: any) {
       console.error("ERROR EVALUATION:", err.response?.data || err);
 
-      setError(
-        err.response?.data?.detail || "No se pudo ejecutar la evaluación.",
-      );
+      const detail = err.response?.data?.detail;
+
+      let errorMessage = "No se pudo ejecutar la evaluación.";
+
+      if (Array.isArray(detail)) {
+        errorMessage = detail
+          .map((item) => item.msg || JSON.stringify(item))
+          .join(", ");
+      } else if (typeof detail === "string") {
+        errorMessage = detail;
+      }
+
+      setError(errorMessage);
     } finally {
       setRunningDatasetEval(false);
     }
   };
-  /* ========================================================
-  LOAD DOCUMENTS
-  ======================================================== */
+
+  /* ============================================================
+  LOAD DOCUMENTS (caché global; invalida solo tras mutaciones)
+  ============================================================ */
 
   const loadDocuments = useCallback(
     async (
       kbId: string,
-      options?: {
+      _options?: {
         silent?: boolean;
       },
     ) => {
       if (!kbId) {
         setDocuments([]);
-        setLoading(false);
         return;
       }
-
-      try {
-        if (!options?.silent) {
-          setLoading(true);
-        }
-
-        const response = await api.get<RagDocument[] | DocumentsResponse>(
-          "/documents",
-          {
-            params: {
-              knowledge_base_id: kbId,
-            },
-          },
-        );
-
-        const data = response.data;
-
-        const items: RagDocument[] = Array.isArray(data)
-          ? data
-          : (data?.documents ?? []);
-
-        setDocuments(items);
-
-        // Si una actualización correcta llega después de un error,
-        // quitamos el mensaje antiguo.
-        if (!options?.silent) {
-          setError(null);
-        }
-      } catch (err: any) {
-        console.error("Error cargando documentos:", err);
-
-        console.error("Status:", err.response?.status);
-
-        console.error("Data:", err.response?.data);
-
-        setDocuments([]);
-
-        setError(
-          err.response?.data?.detail ||
-            err.response?.data?.message ||
-            err.message ||
-            "No se pudieron cargar los documentos.",
-        );
-      } finally {
-        if (!options?.silent) {
-          setLoading(false);
-        }
+      if (kbId !== knowledgeBaseId) {
+        setKnowledgeBaseId(kbId);
       }
+      await invalidateDocuments(kbId);
     },
-    [],
+    [invalidateDocuments, knowledgeBaseId],
   );
-
-  /* ========================================================
-  INITIALIZE
-  ======================================================== */
-
-  const initialize = useCallback(
-    async (orgId: string) => {
-      try {
-        let kbList: KnowledgeBase[] = [];
-
-        if (
-          "list" in KnowledgeService &&
-          typeof (KnowledgeService as any).list === "function"
-        ) {
-          kbList = await (KnowledgeService as any).list(orgId);
-        } else if (
-          "getCurrent" in KnowledgeService &&
-          typeof (KnowledgeService as any).getCurrent === "function"
-        ) {
-          const currentKb = await (KnowledgeService as any).getCurrent();
-
-          if (currentKb) {
-            kbList = [currentKb];
-          }
-        }
-
-        setKbs(kbList || []);
-
-        if (kbList && kbList.length > 0) {
-          const defaultKbId = kbList[0].id;
-
-          setKnowledgeBaseId(defaultKbId);
-
-          await loadDocuments(defaultKbId);
-        } else {
-          setKnowledgeBaseId("");
-          setDocuments([]);
-          setLoading(false);
-        }
-      } catch (err: any) {
-        console.error("Error al inicializar KBs:", err);
-
-        setKbs([]);
-        setKnowledgeBaseId("");
-        setDocuments([]);
-        setLoading(false);
-
-        setError(
-          err.response?.data?.detail ||
-            err.response?.data?.message ||
-            "No se pudieron cargar las Knowledge Bases.",
-        );
-      }
-    },
-    [loadDocuments],
-  );
-
-  /* ========================================================
-  ORGANIZATION CHANGE
-  ======================================================== */
 
   useEffect(() => {
-    if (selectedOrg?.id) {
-      initialize(selectedOrg.id);
-    } else {
-      setKbs([]);
+    if (documentsCached) {
+      setDocuments(documentsCached as unknown as RagDocument[]);
+    } else if (!knowledgeBaseId) {
+      setDocuments([]);
+    }
+  }, [documentsCached, knowledgeBaseId]);
+
+  useEffect(() => {
+    if (!knowledgeBaseId && kbs.length > 0) {
+      setKnowledgeBaseId(kbs[0].id);
+    }
+  }, [kbs, knowledgeBaseId]);
+
+  useEffect(() => {
+    if (kbsError) {
+      setError("No se pudieron cargar las Knowledge Bases.");
+    }
+  }, [kbsError]);
+
+  /* ============================================================
+  ORGANIZATION CHANGE
+  ============================================================ */
+
+  useEffect(() => {
+    if (!selectedOrg?.id) {
       setKnowledgeBaseId("");
       setDocuments([]);
-      setLoading(false);
     }
-  }, [selectedOrg?.id, initialize]);
+  }, [selectedOrg?.id]);
 
-  /* ========================================================
-  AUTO REFRESH WHILE PROCESSING
-  ======================================================== */
+  /* ============================================================
+  AUTO REFRESH
+  ============================================================ */
 
   useEffect(() => {
     if (!knowledgeBaseId) {
@@ -954,7 +1449,7 @@ export default function RagDocumentationPage() {
     }
 
     const interval = window.setInterval(() => {
-      loadDocuments(knowledgeBaseId, {
+      void loadDocuments(knowledgeBaseId, {
         silent: true,
       });
     }, POLL_INTERVAL_MS);
@@ -964,13 +1459,14 @@ export default function RagDocumentationPage() {
     };
   }, [documents, knowledgeBaseId, loadDocuments]);
 
-  /* ========================================================
-  UPLOAD DOCUMENTS
-  ======================================================== */
+  /* ============================================================
+  UPLOAD
+  ============================================================ */
 
   const uploadDocuments = async (files: File[]) => {
     if (!knowledgeBaseId) {
       setError("No hay ninguna Knowledge Base seleccionada.");
+
       return;
     }
 
@@ -998,15 +1494,13 @@ export default function RagDocumentationPage() {
         if (isVideoFile(file)) {
           videos += 1;
         }
-
-        console.log(`Archivo ${file.name} subido:`, response.data);
       }
 
       setMessage(
         videos > 0
           ? uploaded === 1
-            ? "Vídeo subido. Se ha iniciado automáticamente la extracción de voz, resumen e indexación."
-            : `${uploaded} archivos subidos. Los vídeos se procesarán automáticamente antes de la indexación.`
+            ? "Vídeo subido y procesamiento iniciado."
+            : `${uploaded} archivos subidos y procesamiento iniciado.`
           : uploaded === 1
             ? "Documento subido y procesamiento iniciado."
             : `${uploaded} documentos subidos y procesamiento iniciado.`,
@@ -1014,9 +1508,6 @@ export default function RagDocumentationPage() {
 
       setUploadModal(false);
 
-      // El backend crea el job PENDING antes de devolver la respuesta.
-      // Esperamos un pequeño instante para que el primer estado aparezca
-      // en la tabla.
       await loadDocuments(knowledgeBaseId);
     } catch (err: any) {
       console.error("Error subiendo documentos:", err);
@@ -1032,17 +1523,15 @@ export default function RagDocumentationPage() {
     }
   };
 
-  /* ========================================================
-  REINDEX DOCUMENT
-  ======================================================== */
+  /* ============================================================
+  REINDEX
+  ============================================================ */
 
   const indexDocument = async (documentId: string) => {
     try {
       setError(null);
       setMessage(null);
 
-      // El backend devuelve PENDING inmediatamente y
-      // procesa posteriormente en BackgroundTasks.
       setDocuments((current) =>
         current.map((document) =>
           document.id === documentId
@@ -1056,9 +1545,7 @@ export default function RagDocumentationPage() {
         ),
       );
 
-      const response = await api.post(`/documents/${documentId}/index`);
-
-      console.log("Indexación iniciada:", response.data);
+      await api.post(`/documents/${documentId}/index`);
 
       setMessage(
         "Procesamiento iniciado. La tabla se actualizará automáticamente.",
@@ -1076,25 +1563,12 @@ export default function RagDocumentationPage() {
           err.message ||
           "Error iniciando la indexación.",
       );
-
-      setDocuments((current) =>
-        current.map((document) =>
-          document.id === documentId
-            ? {
-                ...document,
-                status: "inactive",
-                processing_status: "failed",
-                active: false,
-              }
-            : document,
-        ),
-      );
     }
   };
 
-  /* ========================================================
-  DELETE DOCUMENT
-  ======================================================== */
+  /* ============================================================
+  DELETE
+  ============================================================ */
 
   const deleteDocument = async (documentId: string) => {
     const document = documents.find((item) => item.id === documentId);
@@ -1132,9 +1606,9 @@ export default function RagDocumentationPage() {
     }
   };
 
-  /* ========================================================
+  /* ============================================================
   FILTER
-  ======================================================== */
+  ============================================================ */
 
   const filteredDocuments = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -1152,9 +1626,9 @@ export default function RagDocumentationPage() {
     });
   }, [documents, search]);
 
-  /* ========================================================
+  /* ============================================================
   COUNTERS
-  ======================================================== */
+  ============================================================ */
 
   const stats = useMemo(() => {
     return {
@@ -1174,12 +1648,12 @@ export default function RagDocumentationPage() {
     };
   }, [documents]);
 
-  /* ========================================================
+  /* ============================================================
   RENDER
-  ======================================================== */
+  ============================================================ */
 
   return (
-    <div className="min-h-full">
+    <div>
       {/* ==================================================
           HEADER
       ================================================== */}
@@ -1193,8 +1667,7 @@ export default function RagDocumentationPage() {
               </h1>
 
               <p className="mt-1 text-xs text-slate-400">
-                Estado de indexación, modelos utilizados, retrieval y evaluación
-                del RAG
+                Estado de indexación, retrieval y evaluación del RAG
               </p>
             </div>
 
@@ -1275,8 +1748,6 @@ export default function RagDocumentationPage() {
 
         {tab === "indexation" && (
           <>
-            {/* TOP ACTIONS */}
-
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-1">
                 <StatCard value={stats.total} label="Total" active />
@@ -1296,52 +1767,23 @@ export default function RagDocumentationPage() {
                 disabled={!knowledgeBaseId}
                 className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M12 3v12" />
-                  <path d="m7 8-5 5 5 5" />
-                  <path d="M17 8V6a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" />
-                </svg>
                 Subir documentos / vídeos
               </button>
             </div>
 
-            {/* SEARCH */}
-
             <div className="mb-4">
               <div className="relative max-w-md">
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300"
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-4-4" />
-                </svg>
-
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="Buscar documento por título..."
-                  className="h-9 w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 text-xs text-slate-700 outline-none placeholder:text-slate-300 focus:border-slate-300"
+                  className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none placeholder:text-slate-300 focus:border-slate-300"
                 />
               </div>
             </div>
 
-            {/* TABLE */}
-
             <div className="overflow-x-auto rounded-md border border-slate-100">
-              <table className="w-full min-w-[1250px]">
+              <table className="w-full min-w-[1100px]">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50">
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
@@ -1369,11 +1811,7 @@ export default function RagDocumentationPage() {
                     </th>
 
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Última actualización
-                    </th>
-
-                    <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Error
+                      Actualización
                     </th>
 
                     <th className="px-4 py-3 text-right text-[10px] font-medium uppercase tracking-wide text-slate-400">
@@ -1386,7 +1824,7 @@ export default function RagDocumentationPage() {
                   {loading ? (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={8}
                         className="px-4 py-14 text-center text-xs text-slate-400"
                       >
                         Cargando documentos...
@@ -1394,7 +1832,7 @@ export default function RagDocumentationPage() {
                     </tr>
                   ) : filteredDocuments.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-14 text-center">
+                      <td colSpan={8} className="px-4 py-14 text-center">
                         <p className="text-sm font-medium text-slate-600">
                           No hay documentos
                         </p>
@@ -1410,43 +1848,11 @@ export default function RagDocumentationPage() {
                         key={document.id}
                         className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50/40"
                       >
-                        {/* DOCUMENT */}
-
                         <td className="px-4 py-3">
                           <div className="min-w-[230px]">
-                            <div className="flex items-center gap-2">
-                              {document.content_type?.startsWith("video/") ||
-                              VIDEO_EXTENSIONS.some((extension) =>
-                                document.name.toLowerCase().endsWith(extension),
-                              ) ? (
-                                <span
-                                  title="Vídeo"
-                                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600"
-                                >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.8"
-                                  >
-                                    <rect
-                                      x="3"
-                                      y="5"
-                                      width="18"
-                                      height="14"
-                                      rx="2"
-                                    />
-                                    <path d="m10 9 5 3-5 3z" />
-                                  </svg>
-                                </span>
-                              ) : null}
-
-                              <p className="truncate text-xs font-semibold text-slate-700">
-                                {document.name}
-                              </p>
-                            </div>
+                            <p className="truncate text-xs font-semibold text-slate-700">
+                              {document.name}
+                            </p>
 
                             <p className="mt-1 text-[10px] text-slate-400">
                               {document.content_type ??
@@ -1469,35 +1875,19 @@ export default function RagDocumentationPage() {
                           </div>
                         </td>
 
-                        {/* EMBEDDING MODEL */}
-
                         <td className="px-4 py-3">
-                          <span
-                            className="block max-w-[180px] truncate text-xs text-slate-500"
-                            title={document.embedding_model ?? ""}
-                          >
+                          <span className="block max-w-[180px] truncate text-xs text-slate-500">
                             {document.embedding_model ?? "—"}
                           </span>
                         </td>
 
-                        {/* GENERATION MODEL */}
-
                         <td className="px-4 py-3">
-                          <span
-                            className="block max-w-[150px] truncate text-xs text-slate-500"
-                            title={
-                              document.generation_model ??
-                              document.llm_model ??
-                              ""
-                            }
-                          >
+                          <span className="block max-w-[150px] truncate text-xs text-slate-500">
                             {document.generation_model ??
                               document.llm_model ??
                               "—"}
                           </span>
                         </td>
-
-                        {/* STATUS */}
 
                         <td className="px-4 py-3">
                           <StatusBadge
@@ -1506,23 +1896,17 @@ export default function RagDocumentationPage() {
                           />
                         </td>
 
-                        {/* CHUNKS */}
-
                         <td className="px-4 py-3">
                           <span className="text-xs text-slate-500">
                             {document.chunks ?? 0}
                           </span>
                         </td>
 
-                        {/* ATTEMPTS */}
-
                         <td className="px-4 py-3">
                           <span className="text-xs text-slate-500">
                             {document.attempts ?? 0}
                           </span>
                         </td>
-
-                        {/* DATE */}
 
                         <td className="px-4 py-3">
                           <span className="text-xs text-slate-500">
@@ -1531,23 +1915,6 @@ export default function RagDocumentationPage() {
                             )}
                           </span>
                         </td>
-
-                        {/* ERROR */}
-
-                        <td className="px-4 py-3">
-                          <span
-                            title={document.error ?? undefined}
-                            className={
-                              document.error
-                                ? "block max-w-[180px] truncate text-xs text-red-500"
-                                : "text-xs text-slate-300"
-                            }
-                          >
-                            {document.error ?? "—"}
-                          </span>
-                        </td>
-
-                        {/* ACTION */}
 
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
@@ -1571,12 +1938,12 @@ export default function RagDocumentationPage() {
                               </button>
                             )}
 
-                            {document.processing_status === "pending" ||
-                            document.processing_status === "running" ? (
+                            {(document.processing_status === "pending" ||
+                              document.processing_status === "running") && (
                               <span className="text-xs text-slate-400">
                                 Procesando...
                               </span>
-                            ) : null}
+                            )}
 
                             <button
                               type="button"
@@ -1602,16 +1969,42 @@ export default function RagDocumentationPage() {
 
         {tab === "evaluation" && (
           <div className="space-y-8">
-            {/* SECCIÓN 1: BUSCADOR MANUAL */}
+            {/* =================================================
+                1. RETRIEVAL MANUAL
+            ================================================= */}
+
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-base font-bold text-slate-800">
                 1. Simulador de Retrieval
               </h2>
-              <p className="mt-1 text-xs text-slate-500 mb-4">
-                Escribe una pregunta para probar el retrieval. Los resultados
-                incluirán la distancia coseno. Selecciona el chunk correcto para
-                agregarlo al dataset de pruebas.
+
+              <p className="mb-5 mt-1 text-xs text-slate-500">
+                Escribe una pregunta para comprobar cómo responde el sistema de
+                recuperación.
               </p>
+
+              <div className="mb-5 grid grid-cols-1 gap-5 md:grid-cols-[280px_1fr]">
+                <DistanceMetricSelector
+                  value={distanceMetric}
+                  onChange={setDistanceMetric}
+                  disabled={testingRetrieval}
+                />
+
+                <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+                  <p className="text-xs font-semibold text-blue-700">
+                    Métrica seleccionada
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-slate-800">
+                    {getMetricLabel(distanceMetric)}
+                  </p>
+
+                  <p className="mt-1 text-[11px] leading-4 text-slate-500">
+                    La métrica seleccionada se utilizará también en la
+                    evaluación global del dataset.
+                  </p>
+                </div>
+              </div>
 
               <form onSubmit={handleTestRetrieval} className="flex gap-3">
                 <input
@@ -1619,106 +2012,194 @@ export default function RagDocumentationPage() {
                   value={manualQuestion}
                   onChange={(e) => setManualQuestion(e.target.value)}
                   placeholder="Ej: ¿Cuál es el procedimiento para la siembra de maíz?"
-                  className="flex-1 h-10 rounded-md border border-slate-300 px-4 text-sm outline-none focus:border-blue-500 shadow-xs"
+                  className="h-10 flex-1 rounded-md border border-slate-300 px-4 text-sm outline-none shadow-xs focus:border-blue-500"
                 />
+
                 <button
                   type="submit"
                   disabled={testingRetrieval || !manualQuestion.trim()}
-                  className="rounded-md bg-slate-900 px-5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50 transition"
+                  className="rounded-md bg-slate-900 px-5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
                   {testingRetrieval ? "Buscando..." : "Probar Retrieval"}
                 </button>
               </form>
             </div>
 
-            {/* SECCIÓN 2: RESULTADOS DE LA BÚSQUEDA */}
+            {/* =================================================
+                2. RESULTADOS RETRIEVAL
+            ================================================= */}
+
             {retrievedChunks.length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
-                <h3 className="text-sm font-bold text-slate-800">
-                  Chunks Recuperados Semánticamente
-                </h3>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      Chunks recuperados
+                    </h3>
 
-                <div className="space-y-4">
-                  {retrievedChunks.map((chunk) => (
-                    <div
-                      key={chunk.id}
-                      className={`relative rounded-lg border p-4 transition-all ${selectedChunkId === chunk.id ? "border-emerald-500 bg-emerald-50" : "border-slate-200 bg-slate-50 hover:border-slate-300"}`}
-                    >
-                      {/* Checkbox para seleccionar el correcto */}
-                      <div className="absolute top-4 left-4">
-                        <input
-                          type="radio"
-                          name="selected_chunk"
-                          checked={selectedChunkId === chunk.id}
-                          onChange={() => setSelectedChunkId(chunk.id)}
-                          className="h-4 w-4 cursor-pointer accent-emerald-600"
-                        />
-                      </div>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Selecciona el chunk que contiene la respuesta correcta.
+                    </p>
+                  </div>
 
-                      <div className="ml-8">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="text-sm font-bold text-slate-800">
-                              {chunk.title || "Sin título"}
-                            </h4>
-                          </div>
-                          {/* Distancia coseno a la derecha */}
-                          <div className="flex flex-col items-end">
-                            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                              Distancia Coseno
-                            </span>
-                            <span className="text-sm font-mono font-bold text-blue-600">
-                              {chunk.cosine_distance.toFixed(4)}
-                            </span>
-                          </div>
-                        </div>
-
-                        <p className="mt-2 text-xs text-slate-600 bg-white p-3 rounded border border-slate-100">
-                          {chunk.description}
-                        </p>
-
-                        {/* Funciones / Flags de Evaluación Manual */}
-                        <div className="mt-4 flex flex-wrap gap-4 pt-3 border-t border-slate-200/60">
-                          <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={chunk.flag_different_info || false}
-                              onChange={() =>
-                                handleToggleFlag(
-                                  chunk.id,
-                                  "flag_different_info",
-                                )
-                              }
-                              className="rounded text-amber-500 focus:ring-amber-500"
-                            />
-                            Devolvió información distinta
-                          </label>
-                          <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={chunk.flag_out_of_knowledge || false}
-                              onChange={() =>
-                                handleToggleFlag(
-                                  chunk.id,
-                                  "flag_out_of_knowledge",
-                                )
-                              }
-                              className="rounded text-rose-500 focus:ring-rose-500"
-                            />
-                            Fuera de conocimiento (No debería devolver nada)
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                    {retrievedChunks.length} resultados
+                  </span>
                 </div>
 
-                {/* Botón para guardar en la BD */}
-                <div className="flex justify-end pt-4 border-t border-slate-100">
+                <div className="space-y-4">
+                  {retrievedChunks.map((chunk) => {
+                    const isSelected = selectedChunkId === chunk.id;
+
+                    return (
+                      <div
+                        key={chunk.id}
+                        className={`
+                            relative rounded-lg border p-4 transition-all
+                            ${
+                              isSelected
+                                ? "border-emerald-500 bg-emerald-50/50 shadow-sm"
+                                : "border-slate-200 bg-slate-50 hover:border-slate-300"
+                            }
+                          `}
+                      >
+                        <div className="absolute left-4 top-4">
+                          <input
+                            type="radio"
+                            name="selected_chunk"
+                            checked={isSelected}
+                            onChange={() => setSelectedChunkId(chunk.id)}
+                            className="h-4 w-4 cursor-pointer accent-emerald-600"
+                          />
+                        </div>
+
+                        <div className="ml-8">
+                          <div className="flex items-start justify-between gap-6">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="rounded bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                  #{chunk.rank}
+                                </span>
+
+                                <h4 className="truncate text-sm font-bold text-slate-800">
+                                  {chunk.title || "Sin título"}
+                                </h4>
+                              </div>
+
+                              <p className="mt-1 text-[10px] text-slate-400">
+                                ID: {chunk.id}
+                              </p>
+                            </div>
+
+                            <div className="flex shrink-0 gap-5">
+                              <div className="text-right">
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400">
+                                  Distancia
+                                </span>
+
+                                <span className="font-mono text-sm font-bold text-blue-600">
+                                  {chunk.distance !== null &&
+                                  chunk.distance !== undefined
+                                    ? chunk.distance.toFixed(4)
+                                    : "—"}
+                                </span>
+
+                                <span className="mt-0.5 block text-[9px] text-slate-400">
+                                  {getMetricLabel(distanceMetric)}
+                                </span>
+                              </div>
+
+                              <div className="text-right">
+                                <span className="block text-[9px] uppercase tracking-wider text-slate-400">
+                                  Score
+                                </span>
+
+                                <span className="font-mono text-sm font-bold text-purple-600">
+                                  {chunk.score !== undefined
+                                    ? chunk.score.toExponential(2)
+                                    : "—"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {chunk.description && (
+                            <div className="mt-3 rounded-md border border-slate-100 bg-white p-3">
+                              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                                Descripción
+                              </p>
+
+                              <p className="whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                                {chunk.description}
+                              </p>
+                            </div>
+                          )}
+
+                          {chunk.content && (
+                            <details className="mt-2 rounded-md border border-slate-100 bg-white">
+                              <summary className="cursor-pointer px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700">
+                                Ver contenido completo
+                              </summary>
+
+                              <div className="border-t border-slate-100 px-3 py-3">
+                                <p className="whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                                  {chunk.content}
+                                </p>
+                              </div>
+                            </details>
+                          )}
+
+                          <div className="mt-4 flex flex-wrap gap-4 border-t border-slate-200/60 pt-3">
+                            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={chunk.flag_different_info || false}
+                                onChange={() =>
+                                  handleToggleFlag(
+                                    chunk.id,
+                                    "flag_different_info",
+                                  )
+                                }
+                                className="rounded text-amber-500 focus:ring-amber-500"
+                              />
+
+                              <span>Devolvió información distinta</span>
+                            </label>
+
+                            <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700">
+                              <input
+                                type="checkbox"
+                                checked={chunk.flag_out_of_knowledge || false}
+                                onChange={() =>
+                                  handleToggleFlag(
+                                    chunk.id,
+                                    "flag_out_of_knowledge",
+                                  )
+                                }
+                                className="rounded text-rose-500 focus:ring-rose-500"
+                              />
+
+                              <span>Fuera de conocimiento</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4">
+                  <p className="text-xs text-slate-400">
+                    {selectedChunkId
+                      ? "Chunk correcto seleccionado."
+                      : "Selecciona el chunk correcto antes de guardar."}
+                  </p>
+
                   <button
+                    type="button"
                     onClick={handleSaveQuestionSet}
                     disabled={savingDataset || !selectedChunkId}
-                    className="rounded-md bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 transition cursor-pointer"
+                    className="rounded-md bg-emerald-600 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {savingDataset
                       ? "Guardando..."
@@ -1728,76 +2209,528 @@ export default function RagDocumentationPage() {
               </div>
             )}
 
-            {/* SECCIÓN 3: EVALUAR DATASET GUARDADO */}
+            {/* =================================================
+                3. DATASET EVALUATION
+            ================================================= */}
+
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <div className="flex justify-between items-center mb-6">
+              <div className="mb-6 flex items-start justify-between gap-6">
                 <div>
                   <h2 className="text-base font-bold text-slate-800">
                     2. Evaluación del Dataset Consolidado
                   </h2>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Calcula las métricas de todo el dataset de preguntas y
-                    chunks correctos almacenados en la base de datos.
+
+                  <p className="mt-1 text-xs text-slate-500">
+                    Ejecuta la evaluación completa utilizando la métrica de
+                    distancia seleccionada.
                   </p>
                 </div>
+
                 <button
+                  type="button"
                   onClick={handleExecuteDatasetEvaluation}
                   disabled={runningDatasetEval}
-                  className="rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                  className="shrink-0 rounded-md bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {runningDatasetEval
-                    ? "Ejecutando..."
-                    : "Ejecutar / Actualizar Evaluación"}
+                  {runningDatasetEval ? "Ejecutando..." : "Ejecutar evaluación"}
                 </button>
               </div>
 
-              {datasetEvalResult ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <StatCard
-                    value={datasetEvalResult.recall_1.toFixed(2)}
-                    label="Recall @ 1"
-                    active
-                  />
-                  <StatCard
-                    value={datasetEvalResult.recall_k.toFixed(2)}
-                    label="Recall @ K"
-                    active
-                  />
-                  <StatCard
-                    value={datasetEvalResult.mrr.toFixed(3)}
-                    label="MRR Global"
-                    active
-                  />
-                  <StatCard
-                    value={datasetEvalResult.false_positives}
-                    label="Falsos Positivos"
-                    active
-                  />
-                  <StatCard
-                    value={datasetEvalResult.failures}
-                    label="Fallos (Misses)"
-                    active
-                  />
-                  <StatCard
-                    value={`${(datasetEvalResult.duration_ms / 1000).toFixed(2)}s`}
-                    label="Duración Total"
-                  />
-                  <StatCard
-                    value={datasetEvalResult.dataset_name}
-                    label="Dataset"
-                  />
-                  <StatCard
-                    value={formatDate(datasetEvalResult.created_at)}
-                    label="Fecha del Modelo"
-                  />
+              {/* =================================================
+                  CONFIGURACIÓN DE EVALUACIÓN
+              ================================================= */}
+
+              <div className="mb-6 rounded-xl border border-slate-200 bg-slate-50/50 p-5">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Configuración de Retrieval
+                  </h3>
+
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Selecciona la métrica utilizada para calcular la distancia
+                    entre embeddings.
+                  </p>
                 </div>
+
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
+                  {DISTANCE_METRICS.map((metric) => {
+                    const selected = distanceMetric === metric.value;
+
+                    return (
+                      <button
+                        key={metric.value}
+                        type="button"
+                        disabled={runningDatasetEval}
+                        onClick={() => setDistanceMetric(metric.value)}
+                        className={`
+                            rounded-lg
+                            border
+                            p-4
+                            text-left
+                            transition
+                            ${
+                              selected
+                                ? "border-blue-500 bg-blue-50 shadow-sm"
+                                : "border-slate-200 bg-white hover:border-slate-300"
+                            }
+                            disabled:cursor-not-allowed
+                            disabled:opacity-60
+                          `}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`
+                                text-sm font-semibold
+                                ${selected ? "text-blue-700" : "text-slate-700"}
+                              `}
+                          >
+                            {metric.label}
+                          </span>
+
+                          <span
+                            className={`
+                                flex h-4 w-4 items-center justify-center rounded-full border
+                                ${
+                                  selected
+                                    ? "border-blue-600 bg-blue-600"
+                                    : "border-slate-300 bg-white"
+                                }
+                              `}
+                          >
+                            {selected && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                            )}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 text-[11px] leading-4 text-slate-500">
+                          {metric.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex items-center gap-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2">
+                  <span className="text-[11px] font-medium text-blue-700">
+                    Métrica actual:
+                  </span>
+
+                  <span className="text-[11px] font-bold text-blue-900">
+                    {getMetricLabel(distanceMetric)}
+                  </span>
+                </div>
+              </div>
+
+              {/* =================================================
+                  RESULTS
+              ================================================= */}
+
+              {datasetEvalResult ? (
+                <>
+                  <div className="mb-5 rounded-lg border border-emerald-100 bg-emerald-50/50 p-4">
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                      <div>
+                        <span className="block text-[9px] uppercase tracking-wide text-slate-400">
+                          Métrica
+                        </span>
+
+                        <span className="text-sm font-bold text-slate-800">
+                          {getMetricLabel(
+                            datasetEvalResult.distance_metric ?? distanceMetric,
+                          )}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="block text-[9px] uppercase tracking-wide text-slate-400">
+                          Dataset
+                        </span>
+
+                        <span className="text-sm font-bold text-slate-800">
+                          {datasetEvalResult.dataset_name}
+                        </span>
+                      </div>
+
+                      <div>
+                        <span className="block text-[9px] uppercase tracking-wide text-slate-400">
+                          Modelo
+                        </span>
+
+                        <span className="text-sm font-bold text-slate-800">
+                          {datasetEvalResult.model_date ?? "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+                    <StatCard
+                      value={datasetEvalResult.recall_1.toFixed(2)}
+                      label="Recall @ 1"
+                      active
+                    />
+
+                    <StatCard
+                      value={datasetEvalResult.recall_k.toFixed(2)}
+                      label="Recall @ K"
+                      active
+                    />
+
+                    <StatCard
+                      value={datasetEvalResult.mrr.toFixed(3)}
+                      label="MRR Global"
+                      active
+                    />
+
+                    <StatCard
+                      value={datasetEvalResult.false_positives}
+                      label="Falsos Positivos"
+                      active
+                    />
+
+                    <StatCard
+                      value={datasetEvalResult.failures}
+                      label="Fallos"
+                      active
+                    />
+
+                    <StatCard
+                      value={`${(datasetEvalResult.duration_ms / 1000).toFixed(
+                        2,
+                      )}s`}
+                      label="Duración"
+                    />
+
+                    <StatCard
+                      value={datasetEvalResult.dataset_name}
+                      label="Dataset"
+                    />
+
+                    <StatCard
+                      value={formatDate(
+                        datasetEvalResult.created_at ??
+                          datasetEvalResult.create_at,
+                      )}
+                      label="Fecha"
+                    />
+                  </div>
+                </>
               ) : (
                 <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center">
                   <p className="text-sm text-slate-400">
-                    Haz clic en ejecutar para ver las métricas del modelo.
+                    Selecciona una métrica y ejecuta la evaluación para obtener
+                    las métricas del RAG.
                   </p>
                 </div>
               )}
+
+              {/* =================================================
+                  DATASET DE PRUEBAS + JSON UPLOAD
+              ================================================= */}
+
+              <div className="mt-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-800">
+                  Dataset de Pruebas
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Listado de preguntas con las que se trabaja. Puedes subir un
+                  JSON/JSONL para reemplazar el dataset de pruebas.
+                </p>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/json,text/json"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0])
+                        handleUploadTests(e.target.files[0]);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="rounded-md border px-3 py-2 text-sm"
+                  >
+                    Subir JSON de tests
+                  </button>
+                  <button
+                    type="button"
+                    onClick={fetchTests}
+                    className="rounded-md border px-3 py-2 text-sm"
+                  >
+                    Refrescar listado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={runRetrievalAuditAll}
+                    className="ml-auto rounded-md bg-blue-600 px-3 py-2 text-sm text-white"
+                  >
+                    Ejecutar auditoría IR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={runAnswerAuditAll}
+                    className="rounded-md bg-purple-600 px-3 py-2 text-sm text-white"
+                  >
+                    Ejecutar auditoría respuestas
+                  </button>
+                </div>
+
+                <div className="mt-4">
+                  {loadingTests ? (
+                    <div className="text-xs text-slate-400">
+                      Cargando tests...
+                    </div>
+                  ) : tests.length === 0 ? (
+                    <div className="text-xs text-slate-400">
+                      No hay tests cargados.
+                    </div>
+                  ) : (
+                    <div className="mt-3 max-h-64 overflow-auto border border-slate-100 p-2">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-left text-slate-500">
+                            <th className="px-2 py-1">#</th>
+                            <th className="px-2 py-1">Pregunta</th>
+                            <th className="px-2 py-1">Keywords</th>
+                            <th className="px-2 py-1">Categoría</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {tests.map((t) => (
+                            <tr key={t.id} className="border-t">
+                              <td className="px-2 py-1 text-slate-600">
+                                {t.id}
+                              </td>
+                              <td
+                                className="px-2 py-1 truncate"
+                                title={t.question}
+                              >
+                                {t.question}
+                              </td>
+                              <td className="px-2 py-1">
+                                {(t.keywords || []).join(", ")}
+                              </td>
+                              <td className="px-2 py-1">{t.category}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-700">
+                      Auditoría IR
+                    </h4>
+                    {retrievalAudit ? (
+                      <div className="mt-2 space-y-2">
+                        <div className="text-xs text-slate-500">
+                          Progreso: {retrievalAudit.progress ?? 0}%
+                        </div>
+                        <div className="w-full rounded bg-slate-100 h-4 overflow-hidden">
+                          <div
+                            style={{
+                              width: `${retrievalAudit.progress ?? 0}%`,
+                            }}
+                            className="h-4 bg-blue-600"
+                          />
+                        </div>
+                        <div className="mt-2 text-xs">
+                          <div>MRR: {(retrievalAudit.mrr ?? 0).toFixed(3)}</div>
+                          <div>
+                            nDCG: {(retrievalAudit.ndcg ?? 0).toFixed(3)}
+                          </div>
+                          <div>
+                            Cobertura:{" "}
+                            {(retrievalAudit.coverage ?? 0).toFixed(1)}%
+                          </div>
+                        </div>
+
+                        <div className="mt-2 flex gap-2">
+                          <div className="flex-1">
+                            <div className="text-[10px] text-slate-500">
+                              MRR
+                            </div>
+                            <div className="w-full bg-slate-100 h-3 rounded mt-1">
+                              <div
+                                style={{
+                                  width: `${Math.min(100, (retrievalAudit.mrr ?? 0) * 100)}%`,
+                                  background:
+                                    (retrievalAudit.mrr ?? 0) >= MRR_GREEN
+                                      ? "#10b981"
+                                      : (retrievalAudit.mrr ?? 0) >= MRR_AMBER
+                                        ? "#f59e0b"
+                                        : "#ef4444",
+                                }}
+                                className="h-3 rounded"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="text-[10px] text-slate-500">
+                              nDCG
+                            </div>
+                            <div className="w-full bg-slate-100 h-3 rounded mt-1">
+                              <div
+                                style={{
+                                  width: `${Math.min(100, (retrievalAudit.ndcg ?? 0) * 100)}%`,
+                                  background:
+                                    (retrievalAudit.ndcg ?? 0) >= NDCG_GREEN
+                                      ? "#10b981"
+                                      : (retrievalAudit.ndcg ?? 0) >= NDCG_AMBER
+                                        ? "#f59e0b"
+                                        : "#ef4444",
+                                }}
+                                className="h-3 rounded"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400">
+                        No se ha ejecutado la auditoría IR.
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-semibold text-slate-700">
+                      Auditoría Respuestas
+                    </h4>
+                    {answerAudit ? (
+                      <div className="mt-2 space-y-2">
+                        <div className="text-xs text-slate-500">
+                          Progreso: {answerAudit.progress ?? 0}%
+                        </div>
+                        <div className="w-full rounded bg-slate-100 h-4 overflow-hidden">
+                          <div
+                            style={{ width: `${answerAudit.progress ?? 0}%` }}
+                            className="h-4 bg-purple-600"
+                          />
+                        </div>
+                        <div className="mt-2 text-xs">
+                          <div>
+                            Accuracy: {(answerAudit.accuracy ?? 0).toFixed(2)} /
+                            5
+                          </div>
+                          <div>
+                            Completeness:{" "}
+                            {(answerAudit.completeness ?? 0).toFixed(2)} / 5
+                          </div>
+                          <div>
+                            Relevance: {(answerAudit.relevance ?? 0).toFixed(2)}{" "}
+                            / 5
+                          </div>
+                        </div>
+
+                        <div className="mt-2 flex gap-2">
+                          <div className="flex-1">
+                            <div className="text-[10px] text-slate-500">
+                              Accuracy
+                            </div>
+                            <div className="w-full bg-slate-100 h-3 rounded mt-1">
+                              <div
+                                style={{
+                                  width: `${Math.min(100, ((answerAudit.accuracy ?? 0) / 5) * 100)}%`,
+                                  background:
+                                    (answerAudit.accuracy ?? 0) >= ANSWER_GREEN
+                                      ? "#10b981"
+                                      : (answerAudit.accuracy ?? 0) >= ANSWER_AMBER
+                                        ? "#f59e0b"
+                                        : "#ef4444",
+                                }}
+                                className="h-3 rounded"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex-1">
+                            <div className="text-[10px] text-slate-500">
+                              Completeness
+                            </div>
+                            <div className="w-full bg-slate-100 h-3 rounded mt-1">
+                              <div
+                                style={{
+                                  width: `${Math.min(100, ((answerAudit.completeness ?? 0) / 5) * 100)}%`,
+                                  background:
+                                    (answerAudit.completeness ?? 0) >= ANSWER_GREEN
+                                      ? "#10b981"
+                                      : (answerAudit.completeness ?? 0) >= ANSWER_AMBER
+                                        ? "#f59e0b"
+                                        : "#ef4444",
+                                }}
+                                className="h-3 rounded"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-slate-400">
+                        No se ha ejecutado la auditoría de respuestas.
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="space-y-4">
+                      <div className="text-sm font-semibold text-slate-800">
+                        Histogramas Retrieval
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <HistogramCard
+                          title="MRR"
+                          data={retrievalHistogramData?.mrr ?? []}
+                          color="#0ea5e9"
+                        />
+                        <HistogramCard
+                          title="nDCG"
+                          data={retrievalHistogramData?.ndcg ?? []}
+                          color="#6366f1"
+                        />
+                        <HistogramCard
+                          title="Cobertura"
+                          data={retrievalHistogramData?.coverage ?? []}
+                          color="#14b8a6"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="text-sm font-semibold text-slate-800">
+                        Histogramas Answer
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <HistogramCard
+                          title="Accuracy"
+                          data={answerHistogramData?.accuracy ?? []}
+                          color="#8b5cf6"
+                        />
+                        <HistogramCard
+                          title="Completeness"
+                          data={answerHistogramData?.completeness ?? []}
+                          color="#ec4899"
+                        />
+                        <HistogramCard
+                          title="Relevance"
+                          data={answerHistogramData?.relevance ?? []}
+                          color="#f59e0b"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -1,60 +1,57 @@
 import api from "@/api";
 import type { KnowledgeMap } from "@/types/knowledge";
 
-export const getOrganizations = async () => {
-    const { data } = await api.get("/organization");
-    return data;
+export type KnowledgeBaseSummary = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description?: string | null;
+  chroma_collection?: string | null;
+  created_by?: string | null;
+  created_at?: string;
+  organization_id?: string;
 };
 
-export const getOrganization = async (id: string) => {
-    const { data } = await api.get(`/organization/${id}`);
-    return data;
-};
-
-export const getOrganizationMembers = async (id: string) => {
-    const { data } = await api.get(`/organization/${id}/members`);
-    return data;
-};
-
-export const createOrganization = async (body: any) => {
-    const { data } = await api.post("/organization", body);
-    return data;
-};
-
-export const updateOrganization = async (
-    id: string,
-    body: any,
-) => {
-    const { data } = await api.put(`/organization/${id}`, body);
-    return data;
-};
-
-export const deleteOrganization = async (id: string) => {
-    await api.delete(`/organization/${id}`);
-};
 class KnowledgeService {
+  async list(organizationId: string): Promise<KnowledgeBaseSummary[]> {
+    const { data } = await api.get<KnowledgeBaseSummary[]>(
+      `/organization/${organizationId}/knowledge-bases`,
+    );
+    return Array.isArray(data) ? data : [];
+  }
 
-    async getCurrent(): Promise<KnowledgeMap> {
-        const response = await api.get<KnowledgeMap>(
-            "/knowledge/current"
-        );
+  async getCurrent(organizationId?: string): Promise<KnowledgeBaseSummary> {
+    const { data } = await api.get<KnowledgeBaseSummary>("/knowledge/current", {
+      params: organizationId ? { organization_id: organizationId } : undefined,
+    });
+    return data;
+  }
 
-        return response.data;
+  async getMap(
+    organizationId: string,
+    options?: {
+      preview?: boolean;
+      knowledgeBaseId?: string;
+      similarityThreshold?: number;
+      maxNeighbors?: number;
+    },
+  ): Promise<KnowledgeMap> {
+    const params: Record<string, string | number | boolean> = {};
+    if (options?.preview) params.preview = true;
+    if (options?.knowledgeBaseId) params.knowledge_base_id = options.knowledgeBaseId;
+    if (options?.similarityThreshold != null) {
+      params.similarity_threshold = options.similarityThreshold;
+    }
+    if (options?.maxNeighbors != null) {
+      params.max_neighbors = options.maxNeighbors;
     }
 
-    async getMap(
-        organizationId:string,
-    ):Promise<KnowledgeMap>{
-
-
-        const {data}=await api.get<KnowledgeMap>(
-            `/organization/${organizationId}/knowledge-map`
-        );
-
-
-        return data;
-
-    }
+    const { data } = await api.get<KnowledgeMap>(
+      `/organization/${organizationId}/knowledge-map`,
+      { params },
+    );
+    return data;
+  }
 }
 
 export default new KnowledgeService();

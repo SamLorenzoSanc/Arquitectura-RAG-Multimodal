@@ -42,6 +42,7 @@ class LlamaParseParser(FileParser):
         self.parser = LlamaParse(
             api_key=self.api_key,
             result_type=result_type,
+            num_workers=4,
             verbose=verbose,
         )
 

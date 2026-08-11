@@ -64,6 +64,11 @@ OLLAMA_BASE_URL = os.getenv(
     "http://localhost:11434/v1",
 )
 
+# Preferir inference-service si INFERENCE_URL está definido.
+_inf = os.getenv("INFERENCE_URL", "").rstrip("/")
+if _inf:
+    OLLAMA_BASE_URL = f"{_inf}/v1"
+
 OLLAMA_API_KEY = os.getenv(
     "OLLAMA_API_KEY",
     "ollama",
@@ -92,6 +97,19 @@ client = AsyncOpenAI(
     base_url=OLLAMA_BASE_URL,
     api_key=OLLAMA_API_KEY,
 )
+INGEST_ENRICHMENT_CONCURRENCY = max(
+    1, int(os.getenv("INGEST_ENRICHMENT_CONCURRENCY", "4"))
+)
+# Por defecto sin LLM por chunk: acelera la ingesta x3–x10.
+INGEST_SKIP_LLM_ENRICHMENT = os.getenv(
+    "INGEST_SKIP_LLM_ENRICHMENT", "true"
+).lower() in {"1", "true", "yes"}
+INGEST_SAVE_MARKDOWN = os.getenv("INGEST_SAVE_MARKDOWN", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+INGEST_EMBED_BATCH_SIZE = max(1, int(os.getenv("INGEST_EMBED_BATCH_SIZE", "32")))
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +196,11 @@ class IngestService:
 
         # Lazy-load: no cargamos Whisper hasta procesar realmente un vídeo.
         self._whisper_model = None
+        self._enrichment_semaphore = asyncio.Semaphore(INGEST_ENRICHMENT_CONCURRENCY)
+
+    async def _enrich_chunk_limited(self, chunk_text: str) -> ProcessedChunk:
+        async with self._enrichment_semaphore:
+            return await self._enrich_chunk(chunk_text)
 
     # -----------------------------------------------------------------------
     # Helpers generales
@@ -259,6 +282,32 @@ class IngestService:
                 }
             )
 
+        await self._persist_bm25_payload(tenant_id, documents)
+
+    async def _append_bm25_documents(
+        self,
+        tenant_id: str,
+        new_documents: list[dict],
+    ):
+        """Actualiza BM25 añadiendo chunks nuevos (sin reconsultar toda la BD)."""
+        path = self._bm25_path(tenant_id)
+        existing: list[dict] = []
+        if path.exists():
+            try:
+                with path.open("rb") as fh:
+                    payload = pickle.load(fh)
+                existing = list(payload.get("documents") or [])
+            except Exception as exc:
+                logger.warning(
+                    "[BM25 INDEX] No se pudo leer índice previo (%s); rebuild DB",
+                    exc,
+                )
+                await self._rebuild_bm25_index(tenant_id)
+                return
+
+        await self._persist_bm25_payload(tenant_id, existing + new_documents)
+
+    async def _persist_bm25_payload(self, tenant_id: str, documents: list[dict]):
         path = self._bm25_path(tenant_id)
 
         if not documents:
@@ -267,8 +316,6 @@ class IngestService:
             return
 
         corpus = [self._tokenize(item["text"]) for item in documents]
-
-        # Validación del corpus.
         BM25Okapi(corpus)
 
         payload = {
@@ -279,14 +326,8 @@ class IngestService:
         }
 
         tmp_path = path.with_suffix(".tmp")
-
         with tmp_path.open("wb") as fh:
-            pickle.dump(
-                payload,
-                fh,
-                protocol=pickle.HIGHEST_PROTOCOL,
-            )
-
+            pickle.dump(payload, fh, protocol=pickle.HIGHEST_PROTOCOL)
         tmp_path.replace(path)
 
         logger.info(
@@ -811,23 +852,23 @@ class IngestService:
                     print("[PROCESS] WARNING: " "Markdown extremadamente corto")
 
                 # -----------------------------------------------------------
-                # Guardar Markdown
+                # Guardar Markdown (opcional; desactivado por velocidad)
                 # -----------------------------------------------------------
 
-                print("[PROCESS] Guardando Markdown...")
+                if INGEST_SAVE_MARKDOWN:
+                    print("[PROCESS] Guardando Markdown...")
 
-                output_filename = f"{Path(document.filename).stem}_" f"{document.id}.md"
-
-                output_file_path = EXTRACTED_MD_DIR / output_filename
-
-                output_file_path.write_text(
-                    markdown,
-                    encoding="utf-8",
-                )
-
-                print(
-                    f"[PROCESS] Markdown guardado en: " f"{output_file_path.resolve()}"
-                )
+                    output_filename = (
+                        f"{Path(document.filename).stem}_{document.id}.md"
+                    )
+                    output_file_path = EXTRACTED_MD_DIR / output_filename
+                    output_file_path.write_text(markdown, encoding="utf-8")
+                    print(
+                        f"[PROCESS] Markdown guardado en: "
+                        f"{output_file_path.resolve()}"
+                    )
+                else:
+                    print("[PROCESS] Guardado Markdown OMITIDO (INGEST_SAVE_MARKDOWN=false)")
 
             except Exception as e:
                 print("\n[PROCESS] !!! ERROR EN PARSER !!!")
@@ -889,32 +930,33 @@ class IngestService:
             raise
 
         # -------------------------------------------------------------------
-        # 5. ENRIQUECIMIENTO LLM
+        # 5. ENRIQUECIMIENTO (heurístico por defecto; LLM opcional)
         # -------------------------------------------------------------------
 
-        print("\n[PROCESS] PASO 5 - ENRIQUECIMIENTO LLM")
+        print("\n[PROCESS] PASO 5 - ENRIQUECIMIENTO")
 
         try:
+            print(f"[PROCESS] Chunks a enriquecer: {len(raw_chunks)}")
 
-            print(f"[PROCESS] Chunks a enriquecer: " f"{len(raw_chunks)}")
+            if INGEST_SKIP_LLM_ENRICHMENT:
+                print("[PROCESS] Enriquecimiento LLM OMITIDO (heurístico rápido)")
+                enriched_chunks = [
+                    self._fast_enrich_chunk(chunk.page_content) for chunk in raw_chunks
+                ]
+            else:
+                print(f"[PROCESS] Modelo LLM: {MODEL}")
+                tasks = [
+                    self._enrich_chunk_limited(chunk.page_content)
+                    for chunk in raw_chunks
+                ]
+                print(f"[PROCESS] Tasks creadas: {len(tasks)}")
+                enriched_chunks = await asyncio.gather(*tasks)
 
-            print(f"[PROCESS] Modelo LLM: {MODEL}")
-
-            tasks = [self._enrich_chunk(chunk.page_content) for chunk in raw_chunks]
-
-            print(f"[PROCESS] Tasks creadas: {len(tasks)}")
-
-            print("[PROCESS] Ejecutando asyncio.gather()...")
-
-            enriched_chunks = await asyncio.gather(*tasks)
-
-            print("[PROCESS] Enriquecimiento completado")
-
-            print(f"[PROCESS] Enriched chunks: " f"{len(enriched_chunks)}")
+            print(f"[PROCESS] Enriched chunks: {len(enriched_chunks)}")
 
         except Exception as e:
 
-            print("\n[PROCESS] !!! ERROR EN ENRIQUECIMIENTO LLM !!!")
+            print("\n[PROCESS] !!! ERROR EN ENRIQUECIMIENTO !!!")
             print(f"[PROCESS] Tipo: {type(e).__name__}")
             print(f"[PROCESS] Error: {e}")
 
@@ -934,7 +976,7 @@ class IngestService:
 
             print("[PROCESS] Llamando a " "create_embeddings_and_save()...")
 
-            await self.create_embeddings_and_save(
+            bm25_docs = await self.create_embeddings_and_save(
                 document=document,
                 chunks=enriched_chunks,
             )
@@ -950,7 +992,7 @@ class IngestService:
             raise
 
         # -------------------------------------------------------------------
-        # 7. BM25
+        # 7. BM25 (append incremental)
         # -------------------------------------------------------------------
 
         print("\n[PROCESS] PASO 7 - BM25")
@@ -959,11 +1001,15 @@ class IngestService:
 
             print(f"[PROCESS] tenant_id = " f"{document.tenant_id}")
 
-            print("[PROCESS] Reconstruyendo índice BM25...")
+            print("[PROCESS] Actualizando índice BM25 (append)...")
 
-            await self._rebuild_bm25_index(str(document.tenant_id))
+            await self._append_bm25_documents(str(document.tenant_id), bm25_docs)
+            # Importación local para evitar cargar el reranker durante el arranque.
+            from services.rag_service import RAGService
 
-            print("[PROCESS] BM25 reconstruido correctamente")
+            RAGService.invalidate_retrieval_cache(str(document.tenant_id))
+
+            print("[PROCESS] BM25 actualizado correctamente")
 
         except Exception as e:
 
@@ -985,6 +1031,21 @@ class IngestService:
     # -----------------------------------------------------------------------
     # Enriquecimiento de chunks
     # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _fast_enrich_chunk(chunk_text: str) -> ProcessedChunk:
+        """Headline/summary heurísticos sin llamada LLM."""
+        cleaned = " ".join((chunk_text or "").split())
+        words = cleaned.split()
+        headline = " ".join(words[:6]) if words else "Fragmento"
+        if len(headline) > 72:
+            headline = headline[:69].rstrip() + "…"
+        summary = cleaned[:220] + ("…" if len(cleaned) > 220 else "")
+        return ProcessedChunk(
+            headline=headline or "Fragmento",
+            summary=summary or "Sin resumen",
+            original_text=chunk_text,
+        )
 
     @retry(wait=wait_strategy)
     async def _enrich_chunk(
@@ -1047,25 +1108,27 @@ class IngestService:
         self,
         document: Document,
         chunks: list[ProcessedChunk],
-    ):
+    ) -> list[dict]:
         if not chunks:
             logger.warning("[EMBEDDINGS] No hay chunks para procesar.")
-            return
+            return []
 
-        texts_to_embed = [
-            (f"{chunk.headline}\n\n" f"{chunk.summary}\n\n" f"{chunk.original_text}")
-            for chunk in chunks
-        ]
+        if INGEST_SKIP_LLM_ENRICHMENT:
+            texts_to_embed = [chunk.original_text for chunk in chunks]
+        else:
+            texts_to_embed = [
+                (f"{chunk.headline}\n\n" f"{chunk.summary}\n\n" f"{chunk.original_text}")
+                for chunk in chunks
+            ]
 
         all_vectors = []
-
-        # Mantener el batching existente.
-        batch_size = 10
+        batch_size = INGEST_EMBED_BATCH_SIZE
 
         logger.info(
-            "[EMBEDDINGS] Generando vectores con '%s' " "para %s fragmentos",
+            "[EMBEDDINGS] Generando vectores con '%s' para %s fragmentos (batch=%s)",
             EMBEDDING_MODEL,
             len(texts_to_embed),
+            batch_size,
         )
 
         for i in range(
@@ -1142,6 +1205,28 @@ class IngestService:
             len(all_vectors),
             EMBEDDING_MODEL,
         )
+
+        bm25_docs = []
+        for db_chunk, chunk in zip(chunk_models, chunks):
+            text = "\n".join(
+                part
+                for part in [chunk.headline, chunk.summary, chunk.original_text]
+                if part
+            )
+            bm25_docs.append(
+                {
+                    "chunk_id": str(db_chunk.id),
+                    "document_id": str(document.id),
+                    "tenant_id": str(document.tenant_id),
+                    "knowledge_base_id": str(document.knowledge_base_id),
+                    "source": document.filename,
+                    "type": document.mime_type,
+                    "position": db_chunk.position,
+                    "text": text,
+                }
+            )
+
+        return bm25_docs
 
     # -----------------------------------------------------------------------
     # Contexto del parser

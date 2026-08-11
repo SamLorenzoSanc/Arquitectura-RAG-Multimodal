@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-from .base import FileParser
+from .base import FileParser, ParsingContext
 from .parsed_document import ParsedDocument
 
 logger = logging.getLogger(__name__)
@@ -19,6 +19,7 @@ class MarkdownParser(FileParser):
     async def parse(
         self,
         file: Path,
+        context: ParsingContext | None = None,
     ) -> ParsedDocument:
 
         if not file.exists():

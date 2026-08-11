@@ -1,0 +1,82 @@
+[
+  {
+    "id": 101,
+    "category": "direct_fact",
+    "crop_id": "dbcb6b2b-bf68-45cc-8149-44dd0577b343",
+    "question": "¿Cuál es la referencia catastral y la superficie de mi finca de plátano en La Palma?",
+    "reference_answer": "Referencia catastral 38026A01200045 y superficie 3.2 ha (Finca La Palma - Sector Norte, variedad Gran Enana).",
+    "keywords": ["38026A01200045", "3.2", "catastral", "plátano"]
+  },
+  {
+    "id": 102,
+    "category": "direct_fact",
+    "crop_id": "dbcb6b2b-bf68-45cc-8149-44dd0577b343",
+    "question": "¿Qué dotación hídrica anual tengo registrada y de dónde me llega el agua?",
+    "reference_answer": "Dotación 9500 m³/ha·año; fuente comunidad de regantes CR Tazacorte más agua desalada; sistema de riego por goteo.",
+    "keywords": ["9500", "Tazacorte", "desalada", "goteo"]
+  },
+  {
+    "id": 103,
+    "category": "relationship",
+    "crop_id": "dbcb6b2b-bf68-45cc-8149-44dd0577b343",
+    "question": "¿Qué carencia tiene el tratamiento de Score 25 EC que apliqué contra sigatoka?",
+    "reference_answer": "Carencia de 14 días; producto Score 25 EC (difenoconazol) a 0.4 L/ha aplicado el 2026-05-02 contra sigatoka.",
+    "keywords": ["14", "Score", "difenoconazol", "sigatoka"]
+  },
+  {
+    "id": 104,
+    "category": "direct_fact",
+    "crop_id": "58041ead-c2ff-4de8-b2ba-487a097676ca",
+    "question": "¿Qué variedad de tomate cultivo en Aldea San Nicolás y bajo qué sistema de riego?",
+    "reference_answer": "Variedad Daniela con riego por goteo bajo invernadero en Gran Canaria.",
+    "keywords": ["Daniela", "goteo", "invernadero", "Aldea"]
+  },
+  {
+    "id": 105,
+    "category": "regulatory_compliance",
+    "crop_id": "58041ead-c2ff-4de8-b2ba-487a097676ca",
+    "question": "Tras el tratamiento de Confidor del 20/02/2026, ¿cuántos días de carencia debo respetar?",
+    "reference_answer": "3 días de carencia; Confidor (imidacloprid) contra mosca blanca.",
+    "keywords": ["3", "Confidor", "imidacloprid", "carencia"]
+  },
+  {
+    "id": 106,
+    "category": "direct_fact",
+    "crop_id": "51602692-142b-4d20-a913-202952ac711f",
+    "question": "¿Por qué mi viña de La Geria tiene una dotación hídrica tan baja?",
+    "reference_answer": "Porque se cultiva en secano/enarenado con humedad retenida en lapilli; dotación registrada ~800 m³/ha·año bajo DOP Lanzarote.",
+    "keywords": ["800", "enarenado", "lapilli", "secano"]
+  },
+  {
+    "id": 107,
+    "category": "temporal",
+    "crop_id": "ffe88808-06a5-4452-9297-8b6c9867d98f",
+    "question": "¿Qué tratamiento apliqué en enero 2026 a las papas Bonitas y contra qué?",
+    "reference_answer": "Ridomil Gold (metalaxil-M + mancozeb) el 2026-01-08 contra mildiu de la papa, carencia 14 días.",
+    "keywords": ["Ridomil", "mildiu", "enero", "14"]
+  },
+  {
+    "id": 108,
+    "category": "direct_fact",
+    "crop_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "question": "¿Qué certificaciones y superficie tiene mi finca de aguacate Hass en El Sauzal?",
+    "reference_answer": "Certificación GlobalGAP, superficie 2.1 ha, referencia catastral 38038A00700033.",
+    "keywords": ["GlobalGAP", "2.1", "Hass", "38038A00700033"]
+  },
+  {
+    "id": 109,
+    "category": "spanning",
+    "crop_id": null,
+    "question": "¿Cuántas hectáreas de plátano tengo entre Sector Norte y Finca Lorenzos?",
+    "reference_answer": "5.6 ha en total (3.2 ha Sector Norte + 2.4 ha Finca Lorenzos), ambas con IGP Plátano de Canarias.",
+    "keywords": ["5.6", "3.2", "2.4", "plátano"]
+  },
+  {
+    "id": 110,
+    "category": "traceability",
+    "crop_id": "dbcb6b2b-bf68-45cc-8149-44dd0577b343",
+    "question": "Según mi perfil GlobalGAP e IGP, ¿qué datos de trazabilidad fitosanitaria debo documentar de mis tratamientos?",
+    "reference_answer": "Fecha, producto, materia activa, dosis, plaga objetivo y días de carencia de cada tratamiento registrado (p.ej. Oillette, Score 25 EC, Karate Zeon).",
+    "keywords": ["GlobalGAP", "IGP", "carencia", "dosis", "trazabilidad"]
+  }
+]

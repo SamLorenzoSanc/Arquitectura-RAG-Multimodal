@@ -165,37 +165,11 @@ async def register(request: RegisterRequest, db: AsyncSession = Depends(get_db))
         )
 
         # =========================================================
-        # 8. INSCRIBIR AUTOMÁTICAMENTE EN LA ORG GLOBAL
+        # 8. INSCRIBIR AUTOMÁTICAMENTE EN LA ORG GLOBAL (AgroTech)
         # =========================================================
-        GLOBAL_ORG_NAME = "AgroTech"  # Cambia esto a "Agrotech" si usaste ese nombre
+        from utils.global_org import ensure_agrotech_membership
 
-        global_org_id = await db.scalar(
-            text("SELECT id FROM organizations WHERE name = :global_name LIMIT 1"),
-            {"global_name": GLOBAL_ORG_NAME},
-        )
-
-        if global_org_id:
-            # Buscar el rol global básico de lectura
-            basic_role_id = await db.scalar(
-                text(
-                    "SELECT id FROM roles WHERE name = 'USER' AND organization_id IS NULL LIMIT 1"
-                )
-            )
-
-            # Insertar al usuario como miembro de la organización global si el rol existe
-            if basic_role_id:
-                await db.execute(
-                    text("""
-                        INSERT INTO organization_members (organization_id, user_id, role_id, active)
-                        VALUES (:org_id, :user_id, :role_id, true)
-                        ON CONFLICT (organization_id, user_id) DO NOTHING
-                    """),
-                    {
-                        "org_id": global_org_id,
-                        "user_id": new_user_id,
-                        "role_id": basic_role_id,
-                    },
-                )
+        await ensure_agrotech_membership(db, new_user_id)
         # =========================================================
 
         await db.commit()
@@ -230,6 +204,11 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not verify_password(request.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Credenciales incorrectas")
 
+    from utils.global_org import ensure_agrotech_membership
+
+    await ensure_agrotech_membership(db, user["id"])
+    await db.commit()
+
     token = create_access_token(user["id"], user["email"])
     return LoginResponse(
         access_token=token, expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60
@@ -241,13 +220,26 @@ async def logout(authorization: str = Header(...), db: AsyncSession = Depends(ge
     token = authorization.removeprefix("Bearer ").strip()
     payload = decode_token(token)
 
+    # La BD remota puede no tener aún la tabla del modelo RevokedToken.
+    await db.execute(
+        text("""
+            CREATE TABLE IF NOT EXISTS revoked_tokens (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                token TEXT NOT NULL,
+                expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+                revoked_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+            )
+            """)
+    )
     await db.execute(
         text(
             "INSERT INTO revoked_tokens (token, expires_at) VALUES (:token, :expires)"
         ),
         {
             "token": token,
-            "expires": datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
+            "expires": datetime.fromtimestamp(payload["exp"], tz=timezone.utc).replace(
+                tzinfo=None
+            ),
         },
     )
     await db.commit()

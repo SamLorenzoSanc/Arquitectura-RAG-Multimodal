@@ -393,7 +393,7 @@ async def send_temperature_alert_whatsapp(
     # Variables de entorno para WhatsApp Cloud API / Twilio
     whatsapp_api_url = os.getenv(
         "WHATSAPP_API_URL",
-        "https://graph.facebook.com/v17.0/YOUR_PHONE_NUMBER_ID/messages",
+        "https://graph.facebook.com/v17.0/699296619/messages",
     )
     whatsapp_token = os.getenv("WHATSAPP_ACCESS_TOKEN", "tu_token_de_meta")
 
@@ -447,7 +447,7 @@ async def force_shipment_alert(
     forced_temp = threshold + 3.5  # Temperatura simulada en zona de alerta
 
     # Obtener el teléfono del usuario o un número de agricultor registrado (por defecto un número de prueba)
-    farmer_phone = getattr(current_user, "phone", "+34600000000")
+    farmer_phone = getattr(current_user, "phone", "+34699296619")
 
     # Enviar la alerta crítica por WhatsApp
     await send_temperature_alert_whatsapp(

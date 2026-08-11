@@ -8,7 +8,7 @@ from models.user import User
 from schemas.department import (
     DepartmentCreateRequest,
     DepartmentUpdateRequest,
-    DepartmentMemberRequest,
+    AddMemberPayload,
 )
 
 router = APIRouter(
@@ -250,36 +250,91 @@ async def list_department_members(
 @router.post("/{department_id}/members")
 async def add_department_member(
     department_id: str,
-    request: DepartmentMemberRequest,
+    request: AddMemberPayload,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # El frontend envía email (+ role_id opcional); resolvemos a user_id.
+    user_id = await db.scalar(
+        text("SELECT id FROM users WHERE email = :email AND active = true"),
+        {"email": request.email.strip().lower()},
+    )
+    if user_id is None:
+        # Intento case-insensitive por si el email se guardó con mayúsculas.
+        user_id = await db.scalar(
+            text(
+                "SELECT id FROM users WHERE lower(email) = lower(:email) AND active = true"
+            ),
+            {"email": request.email.strip()},
+        )
+    if user_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No existe un usuario activo con el email '{request.email}'.",
+        )
+
+    dept = (
+        (
+            await db.execute(
+                text(
+                    "SELECT id, organization_id FROM departments WHERE id = :id"
+                ),
+                {"id": department_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if dept is None:
+        raise HTTPException(status_code=404, detail="Departamento no encontrado")
+
+    # Asegurar membresía en la organización del departamento.
+    await db.execute(
+        text("""
+            INSERT INTO organization_members (organization_id, user_id, role_id, active)
+            VALUES (:org_id, :user_id, :role_id, true)
+            ON CONFLICT (organization_id, user_id) DO UPDATE
+            SET
+                role_id = COALESCE(EXCLUDED.role_id, organization_members.role_id),
+                active = true
+            """),
+        {
+            "org_id": dept["organization_id"],
+            "user_id": user_id,
+            "role_id": request.role_id,
+        },
+    )
 
     await db.execute(
         text("""
-            INSERT INTO department_members(
+            INSERT INTO department_members (
                 department_id,
-                user_id
+                user_id,
+                role_id
             )
-            VALUES(
+            VALUES (
                 :department_id,
-                :user_id
+                :user_id,
+                :role_id
             )
-            ON CONFLICT (
-                department_id,
-                user_id
-            )
-            DO NOTHING
+            ON CONFLICT (department_id, user_id)
+            DO UPDATE SET role_id = COALESCE(EXCLUDED.role_id, department_members.role_id)
             """),
         {
             "department_id": department_id,
-            "user_id": request.user_id,
+            "user_id": user_id,
+            "role_id": request.role_id,
         },
     )
 
     await db.commit()
 
-    return {"status": "member_added"}
+    return {
+        "status": "member_added",
+        "user_id": str(user_id),
+        "email": request.email,
+        "role_id": request.role_id,
+    }
 
 
 # ============================================================

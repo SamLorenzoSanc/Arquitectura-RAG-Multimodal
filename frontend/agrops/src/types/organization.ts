@@ -16,7 +16,8 @@ export interface Organization {
     id: string;
     name: string;
     description?: string;
-    status?: string; 
+    status?: string;
+    is_global?: boolean;
     departments?: Department[];
     members?: Member[];
 }

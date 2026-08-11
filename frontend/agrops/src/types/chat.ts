@@ -7,13 +7,62 @@ export interface ChatRequest {
     organization_id?: string;
     organization_name?: string;
     model?: string;
+    rag_mode?: "hybrid" | "agentic" | "compare";
+    island?: string;
+    crop?: string;
+    crop_id?: string;
 }
+
+export interface AgentTraceStep {
+    tool: string;
+    reason?: string;
+    ok?: boolean;
+    latency_ms?: number;
+    summary?: string;
+}
+
+export interface ModeComparisonSide {
+    mode: string;
+    architecture?: string | null;
+    answer: string;
+    context?: ContextChunk[];
+    retrieval?: RetrievalInfo | null;
+    retrieval_details?: any;
+    agent_trace?: AgentTraceStep[] | null;
+    related_questions?: string[];
+    latency_ms?: number | null;
+}
+
+export interface ChatResponse {
+    conversation_id: string;
+    answer: string;
+    context: ContextChunk[];
+    retrieval: RetrievalInfo;
+    retrieval_details?: any;
+    related_questions?: string[];
+    rag_mode?: string | null;
+    architecture?: string | null;
+    agent_trace?: AgentTraceStep[] | null;
+    comparison?: {
+        hybrid?: ModeComparisonSide;
+        agentic?: ModeComparisonSide;
+        note?: string;
+    } | null;
+    farmer_profile?: Record<string, unknown> | null;
+}
+
 
 export interface Message {
     id: string;
     role: "user" | "assistant";
     content: string;
     timestamp: Date;
+    sources?: Array<{
+        source?: string;
+        score?: number;
+        chunk_id?: string;
+        snippet?: string;
+    }>;
 }
 
 export interface ChatContext {
@@ -59,17 +108,6 @@ export interface ContextChunk {
     type:string;
     metadata:any;
 }
-
-
-
-export interface ChatResponse {
-    conversation_id:string;
-    answer:string;
-    context:ContextChunk[];
-    retrieval: RetrievalInfo;
-
-}
-
 
 export interface ChatMessage {
     role:

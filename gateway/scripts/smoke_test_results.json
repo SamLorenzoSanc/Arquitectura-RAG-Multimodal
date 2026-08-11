@@ -1,0 +1,729 @@
+{
+  "email": "smoke_8e64059ffd@example.com",
+  "summary": {
+    "total": 81,
+    "reachable": 70,
+    "success_2xx": 42,
+    "skipped": 2,
+    "failed_5xx": 9
+  },
+  "results": [
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "status": 200,
+      "ok": true,
+      "detail": "{\"status\": \"registered\"}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "status": 200,
+      "ok": true,
+      "detail": "{\"access_token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkN2I0YWViNS0zNmZkLTQxNTYtYTk5Zi05M2U1Nzc3OTA5YTUiLCJlbWFpbCI6InNtb2tlXzhlNjQwNTlmZmRAZXhhbXBsZS5jb20iLCJleHAiOjE3ODY1MjQ0NzJ9.o2yEUIfdrBzRi09ntwiklY7UfYbY53L1Ai0zrFjJ9y4\", \"token_type\": \"Bearer\", \"expires_in\": 86400}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "status": 200,
+      "ok": true,
+      "detail": "{\"id\": \"d7b4aeb5-36fd-4156-a99f-93e5777909a5\", \"name\": \"Smoke Tester\", \"email\": \"smoke_8e64059ffd@example.com\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/current",
+      "status": 200,
+      "ok": true,
+      "detail": "{\"id\": \"ef16711c-58f1-42d2-af76-b5382715505e\", \"tenant_id\": \"50413176-da8d-4915-9962-190413cce66b\", \"name\": \"General\", \"description\": \"Knowledge Base por defecto\", \"chroma_collection\": \"col_50413176da8d49159962190413cce66b\", \"created_by\": \"None\", \"created_at\": \"2026-08-11T08:47:46.840305\"}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "resolved": "/auth/logout",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/",
+      "resolved": "/chat/",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'question'], 'msg': 'Field required', 'input': {'message': 'Hola, esto es una prueba de smoke test', 'conversation_id': None, 'knowledge_base_id': 'ef16711c-58f1-42d2-af76-b5382715505e', 'model': 'llama3.2:latest'}}]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/conversations",
+      "resolved": "/chat/conversations",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[]"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/evaluation/answer/{test_id}",
+      "resolved": "/chat/evaluation/answer/0",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/evaluation/history",
+      "resolved": "/chat/evaluation/history",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/evaluation/retrieval/{test_id}",
+      "resolved": "/chat/evaluation/retrieval/0",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/evaluation/stream-run",
+      "status": null,
+      "ok": null,
+      "detail": "SKIP SSE largo"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/evaluation/tests",
+      "resolved": "/chat/evaluation/tests",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"total\": 21, \"tests\": [{\"id\": 0, \"question\": \"¿Cuál es el salario actual del Ingeniero Agrónomo Alejandro Castro?\", \"keywords\": [\"Alejandro\", \"Castro\", \"42.000 €\"], \"reference_answer\": \"El salario actual de Alejandro Castro es de 42.000 €.\", \"category\": \"direct_fact\"}, {\"id\": 1, \"question\": \"¿En qu"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/evaluation/tests/{test_id}",
+      "resolved": "/chat/evaluation/tests/0",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"id\": 0, \"question\": \"¿Cuál es el salario actual del Ingeniero Agrónomo Alejandro Castro?\", \"keywords\": [\"Alejandro\", \"Castro\", \"42.000 €\"], \"reference_answer\": \"El salario actual de Alejandro Castro es de 42.000 €.\", \"category\": \"direct_fact\"}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/evaluation/upload-tests",
+      "status": null,
+      "ok": null,
+      "detail": "SKIP multipart upload"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/list-all-documents",
+      "resolved": "/chat/list-all-documents",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"total\": 151, \"documentos\": [{\"id\": \"04d611f7-6f52-4f7d-b03a-0c4026861972\", \"document_id\": \"853ce05f-2aec-4832-8691-98a7bc57b0b7\", \"headline\": \"Análisis Económico Agropecuario\", \"summary\": \"Plataforma de análisis económico y gestión de mercados que procesa información para evaluar costes, predecir "
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/retrieve",
+      "resolved": "/chat/retrieve",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'question'], 'msg': 'Field required', 'input': {'query': 'subvenciones plátano', 'top_k': 3}}]"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/simulator/evaluate-dataset",
+      "resolved": "/chat/simulator/evaluate-dataset",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/simulator/import-question-bank",
+      "resolved": "/chat/simulator/import-question-bank",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'questions'], 'msg': 'Field required', 'input': {'items': []}}]"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/simulator/save-dataset",
+      "resolved": "/chat/simulator/save-dataset",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'question'], 'msg': 'Field required', 'input': {'name': 'smoke-dataset', 'items': []}}, {'type': 'missing', 'loc': ['body', 'flags'], 'msg': 'Field required', 'input': {'name': 'smoke-dataset', 'items': []}}]"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chat/simulator/search",
+      "resolved": "/chat/simulator/search",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'question'], 'msg': 'Field required', 'input': {'query': 'precio plátano', 'top_k': 3}}]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chat/{conversation_id}",
+      "resolved": "/chat/63348891-a6c4-417e-8f8d-475825d464cb",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Conversación no encontrada"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/chat/{conversation_id}",
+      "resolved": "/chat/63348891-a6c4-417e-8f8d-475825d464cb",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Conversación no encontrada o sin permisos"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/crops/",
+      "resolved": "/crops/",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'CropCreateSchema', 'nombre'], 'msg': 'Field required', 'input': {'name': 'Crop smoke 93c0c7d5', 'island': 'Tenerife'}}, {'type': 'missing', 'loc': ['body', 'CropCreateSchema', 'cultivo'], 'msg': 'Field required', 'input': {'name': 'Crop smoke 93c0c7d5', 'island'"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/crops/",
+      "resolved": "/crops/",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"status\": \"success\", \"data\": []}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/department",
+      "resolved": "/department",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"id\": \"3bb49da8-8186-40dc-a20f-ee4e091bf950\", \"organization_id\": \"f53a5f39-f53b-4120-a8e2-3d401e3a84cf\", \"name\": \"Dept smoke 422879c5\", \"description\": null}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/department/organization/{organization_id}",
+      "resolved": "/department/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'id': '3bb49da8-8186-40dc-a20f-ee4e091bf950', 'name': 'Dept smoke 422879c5', 'description': None, 'members': 0}, {'id': 'c26d3a9c-e4d4-4f91-bea8-7239049e7539', 'name': 'IT', 'description': '', 'members': 1}, {'id': '15fd21cb-d47e-4eef-adad-c7582207f55f', 'name': 'RRHH', 'description': '', 'members"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/department/user/{user_id}",
+      "resolved": "/department/user/d7b4aeb5-36fd-4156-a99f-93e5777909a5",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"items\": [], \"total\": 0}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/department/{department_id}",
+      "resolved": "/department/6a1aa70a-0e1e-4112-bee4-d1c2346f42a3",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Departamento no encontrado"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/department/{department_id}",
+      "resolved": "/department/6a1aa70a-0e1e-4112-bee4-d1c2346f42a3",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'name'], 'msg': 'Field required', 'input': {}}]"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/department/{department_id}",
+      "resolved": "/department/6a1aa70a-0e1e-4112-bee4-d1c2346f42a3",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"status\": \"deleted\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/department/{department_id}/available-users",
+      "resolved": "/department/6a1aa70a-0e1e-4112-bee4-d1c2346f42a3/available-users",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"items\": [{\"id\": \"26b8923a-f886-48b9-8fcf-7b20fdce77da\", \"name\": \"Carlos Grandos Aguilar\", \"email\": \"carlosgranadosaguilar@gmail.com\"}, {\"id\": \"20cf5d26-4fe8-4bf0-bc29-b1e3d7053d12\", \"name\": \"Jorge\", \"email\": \"jorge@gmail.com\"}, {\"id\": \"d4cb9223-6b87-4497-8f1b-6e7151261158\", \"name\": \"Jose Arcadio L"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/department/{department_id}/members",
+      "resolved": "/department/6a1aa70a-0e1e-4112-bee4-d1c2346f42a3/members",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"items\": [], \"total\": 0}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/department/{department_id}/members",
+      "resolved": "/department/6a1aa70a-0e1e-4112-bee4-d1c2346f42a3/members",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'user_id'], 'msg': 'Field required', 'input': {}}]"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/department/{department_id}/members/{user_id}",
+      "resolved": "/department/6a1aa70a-0e1e-4112-bee4-d1c2346f42a3/members/d7b4aeb5-36fd-4156-a99f-93e5777909a5",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"status\": \"member_removed\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/documents",
+      "resolved": "/documents",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['query', 'knowledge_base_id'], 'msg': 'Field required', 'input': None}]"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/documents/{document_id}",
+      "resolved": "/documents/feaedc9e-1714-48b9-a72c-0daa68ed1c09",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Document not found"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/documents/{document_id}/progress",
+      "resolved": "/documents/feaedc9e-1714-48b9-a72c-0daa68ed1c09/progress",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Document not found"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/forecast/arimax",
+      "resolved": "/forecast/arimax",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'product_id'], 'msg': 'Field required', 'input': {'series': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'periods': 3}}, {'type': 'missing', 'loc': ['body', 'island'], 'msg': 'Field required', 'input': {'series': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'periods': 3}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/forecast/compare",
+      "resolved": "/forecast/compare",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'product_id'], 'msg': 'Field required', 'input': {'series': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'periods': 3}}, {'type': 'missing', 'loc': ['body', 'island'], 'msg': 'Field required', 'input': {'series': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'periods': 3}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/forecast/exogenous/commodities",
+      "resolved": "/forecast/exogenous/commodities",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"ticker\": \"CL=F\", \"data\": [{\"ds\": \"2023-01-03\", \"oil_price\": 76.93000030517578}, {\"ds\": \"2023-01-04\", \"oil_price\": 72.83999633789062}, {\"ds\": \"2023-01-05\", \"oil_price\": 73.66999816894531}, {\"ds\": \"2023-01-06\", \"oil_price\": 73.7699966430664}, {\"ds\": \"2023-01-09\", \"oil_price\": 74.62999725341797}, {\"d"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/forecast/exogenous/weather",
+      "resolved": "/forecast/exogenous/weather",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"island\": \"Tenerife_Norte\", \"data\": [{\"ds\": \"2023-01-01\", \"max_temp\": 20.9, \"precipitation\": 0.0}, {\"ds\": \"2023-01-02\", \"max_temp\": 19.8, \"precipitation\": 1.4}, {\"ds\": \"2023-01-03\", \"max_temp\": 18.6, \"precipitation\": 1.1}, {\"ds\": \"2023-01-04\", \"max_temp\": 19.9, \"precipitation\": 0.0}, {\"ds\": \"2023-0"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/forecast/prophet",
+      "resolved": "/forecast/prophet",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'product_id'], 'msg': 'Field required', 'input': {'series': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'periods': 3}}, {'type': 'missing', 'loc': ['body', 'island'], 'msg': 'Field required', 'input': {'series': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], 'periods': 3}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "resolved": "/health",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"gateway\": \"running\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health/ready",
+      "resolved": "/health/ready",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"gateway\": \"running\", \"database\": \"ok\"}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/",
+      "resolved": "/knowledge/",
+      "status": 201,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"knowledge_base_id\": \"f472e06f-0627-462f-bd2f-2b2a4cd336ae\", \"name\": \"KB smoke 37f90c87\", \"tenant_id\": \"50413176-da8d-4915-9962-190413cce66b\", \"status\": \"created\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{knowledge_base_id}",
+      "resolved": "/knowledge/ef16711c-58f1-42d2-af76-b5382715505e",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"id\": \"ef16711c-58f1-42d2-af76-b5382715505e\", \"tenant_id\": \"50413176-da8d-4915-9962-190413cce66b\", \"name\": \"General\", \"description\": \"Knowledge Base por defecto\", \"created_at\": \"2026-08-11T08:47:46.840305\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/alerts/summary",
+      "resolved": "/logistics/alerts/summary",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"totalAlerts\": 0, \"alerts\": []}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/catalog/agricultural-options",
+      "resolved": "/logistics/catalog/agricultural-options",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'product': 'Plátano de Canarias IGP', 'containerId': 'MSCU 982105-4', 'vessel': 'MSC Canarias', 'originName': 'Finca San Miguel - Tazacorte (La Palma)', 'originCoords': [28.6478, -17.9255], 'destinationName': 'Plataforma Logística - Cádiz', 'destinationCoords': [36.5271, -6.2886], 'temperatureThre"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/fleet",
+      "resolved": "/logistics/fleet",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'vesselName': 'MSC Canarias', 'status': 'Línea Regular'}, {'vesselName': 'Volcán de Teneguía', 'status': 'Línea Regular'}, {'vesselName': 'Boluda Express', 'status': 'Línea Regular'}]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/shipments",
+      "resolved": "/logistics/shipments",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[]"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/shipments",
+      "resolved": "/logistics/shipments",
+      "status": 422,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "[{'type': 'missing', 'loc': ['body', 'id'], 'msg': 'Field required', 'input': {'origin': 'Santa Cruz', 'destination': 'Las Palmas', 'product': 'plátano', 'quantity_kg': 100}}, {'type': 'missing', 'loc': ['body', 'container_id'], 'msg': 'Field required', 'input': {'origin': 'Santa Cruz', 'destination"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/shipments/{shipment_id}/alerts",
+      "resolved": "/logistics/shipments/c7fc632d-9220-4a71-a206-387c47ef88e2/alerts",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Lote no encontrado."
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/shipments/{shipment_id}/force-alert",
+      "resolved": "/logistics/shipments/c7fc632d-9220-4a71-a206-387c47ef88e2/force-alert",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Lote no encontrado."
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/map/canarias",
+      "resolved": "/map/canarias",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"name\": \"Canarias\", \"center\": {\"lat\": 28.2916, \"lon\": -16.6291, \"zoom\": 8}, \"layers\": {\"weather\": {\"provider\": \"Open-Meteo\", \"timestamp\": \"2026-08-11T08:49:20.438896\", \"current\": {\"time\": \"2026-08-11T10:45\", \"interval\": 900, \"temperature_2m\": 14.3, \"relative_humidity_2m\": 44, \"apparent_temperature\""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/map/cultivos",
+      "resolved": "/map/cultivos",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'id': '1', 'nombre': 'Parcela Norte', 'cultivo': 'Plátano', 'isla': 'Tenerife', 'lat': 28.45, 'lon': -16.25, 'temperatura': 23, 'humedad': 70, 'lluvia': 2, 'viento': 15, 'ndvi': 0.78}, {'id': '2', 'nombre': 'Finca La Palma', 'cultivo': 'Aguacate', 'isla': 'La Palma', 'lat': 28.68, 'lon': -17.76, '"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/map/dashboard",
+      "resolved": "/map/dashboard",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"timestamp\": \"2026-08-11T08:49:21.659482\", \"weather\": {\"provider\": \"Open-Meteo\", \"timestamp\": \"2026-08-11T08:49:20.438896\", \"current\": {\"time\": \"2026-08-11T10:45\", \"interval\": 900, \"temperature_2m\": 14.3, \"relative_humidity_2m\": 44, \"apparent_temperature\": 12.0, \"precipitation\": 0.0, \"rain\": 0.0, \""
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/map/forecast",
+      "resolved": "/map/forecast",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"provider\": \"AEMET\", \"enabled\": false, \"message\": \"API KEY not configured\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/map/health",
+      "resolved": "/map/health",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"OpenMeteo\": {\"status\": \"OK\"}, \"AEMET\": {\"status\": \"OK\"}, \"Sentinel\": {\"status\": \"OK\"}}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/map/sentinel",
+      "resolved": "/map/sentinel",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"provider\": \"Sentinel\", \"enabled\": false}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/map/weather",
+      "resolved": "/map/weather",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"provider\": \"Open-Meteo\", \"timestamp\": \"2026-08-11T08:49:20.438896\", \"current\": {\"time\": \"2026-08-11T10:45\", \"interval\": 900, \"temperature_2m\": 14.3, \"relative_humidity_2m\": 44, \"apparent_temperature\": 12.0, \"precipitation\": 0.0, \"rain\": 0.0, \"wind_speed_10m\": 3.9, \"wind_direction_10m\": 344, \"cloud"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/metrics/",
+      "resolved": "/metrics/",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"server\": {\"uptime_seconds\": 208, \"timestamp\": \"2026-08-11T08:49:28.562839+00:00\", \"cpu_percent\": 5.0, \"memory_percent\": 90.6}, \"database\": {\"users\": 5, \"documents\": 17, \"conversations\": 99, \"messages\": 267}, \"processing\": {\"pending\": 0, \"processing\": 0, \"completed\": 16, \"failed\": 2}}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/models",
+      "resolved": "/models",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"models\": [\"llama3.2-vision:latest\", \"qwen3-embedding:latest\", \"qwen3-embedding:8b\", \"llama3:latest\", \"deepseek-r1:1.5b\", \"llama3.2:latest\", \"gpt-oss:latest\", \"phi3:latest\", \"gemma3:270m\", \"all-minilm:latest\", \"gemma3:4b\"]}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/models/select",
+      "resolved": "/models/select",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"selected\": \"llama3.2:latest\"}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organization",
+      "resolved": "/organization",
+      "status": 201,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"status\": \"success\", \"message\": \"Estructura multi-tenant y Base de Conocimiento inicializadas correctamente.\", \"organization_id\": \"6e44ead8-482b-40e8-bd9c-1b251bed7493\", \"tenant_id\": \"b3a16eea-10a0-462c-b8be-011fe334c714\", \"default_knowledge_base_id\": \"6a9ffb26-65ec-4010-a394-ede2b3b6d521\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organization",
+      "resolved": "/organization",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'id': 'f53a5f39-f53b-4120-a8e2-3d401e3a84cf', 'name': 'AgroTech', 'description': '', 'status': 'ACTIVE', 'is_global': True}, {'id': '6e44ead8-482b-40e8-bd9c-1b251bed7493', 'name': 'Org smoke 96b00454', 'description': 'smoke', 'status': 'ACTIVE', 'is_global': False}, {'id': '60d790a3-c9b8-46cd-aac2"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organization/{organization_id}",
+      "resolved": "/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"id\": \"f53a5f39-f53b-4120-a8e2-3d401e3a84cf\", \"name\": \"AgroTech\", \"description\": \"\", \"active\": true}"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/organization/{organization_id}",
+      "resolved": "/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/organization/{organization_id}/activate",
+      "resolved": "/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf/activate",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"status\": \"activated\"}"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/organization/{organization_id}/deactivate",
+      "resolved": "/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf/deactivate",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "{\"status\": \"deactivated\"}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organization/{organization_id}/departments",
+      "resolved": "/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf/departments",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'id': '3bb49da8-8186-40dc-a20f-ee4e091bf950', 'name': 'Dept smoke 422879c5', 'description': None}, {'id': 'c26d3a9c-e4d4-4f91-bea8-7239049e7539', 'name': 'IT', 'description': ''}, {'id': '15fd21cb-d47e-4eef-adad-c7582207f55f', 'name': 'RRHH', 'description': ''}]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organization/{organization_id}/knowledge-map",
+      "resolved": "/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf/knowledge-map",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Organización no encontrada o acceso denegado"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organization/{organization_id}/members",
+      "resolved": "/organization/f53a5f39-f53b-4120-a8e2-3d401e3a84cf/members",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'id': '26b8923a-f886-48b9-8fcf-7b20fdce77da', 'name': 'Carlos Grandos Aguilar', 'email': 'carlosgranadosaguilar@gmail.com', 'role': 'USER'}, {'id': 'b41323cb-a9b6-45f1-802a-cf8f1d68852e', 'name': 'Samuel Lorenzo', 'email': 'samuellorenzosanchez@gmail.com', 'role': None}, {'id': 'd7b4aeb5-36fd-4156"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/",
+      "resolved": "/tenants/",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/",
+      "resolved": "/tenants/",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "'TenantCreate' object has no attribute 'description'"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/assign",
+      "resolved": "/tenants/assign",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Tenant not found"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}",
+      "resolved": "/tenants/df133142-0527-45fe-9007-ee47827aca28",
+      "status": 500,
+      "ok": false,
+      "success_2xx": false,
+      "detail": "Internal Server Error"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}",
+      "resolved": "/tenants/df133142-0527-45fe-9007-ee47827aca28",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Tenant not found"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}",
+      "resolved": "/tenants/df133142-0527-45fe-9007-ee47827aca28",
+      "status": 404,
+      "ok": true,
+      "success_2xx": false,
+      "detail": "Tenant not found"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/",
+      "resolved": "/users/",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'id': 'b41323cb-a9b6-45f1-802a-cf8f1d68852e', 'name': 'Samuel Lorenzo', 'email': 'samuellorenzosanchez@gmail.com', 'active': True, 'created_at': '2026-07-15T12:41:14.557604'}, {'id': 'd4cb9223-6b87-4497-8f1b-6e7151261158', 'name': 'Jose Arcadio Lorenzo', 'email': 'josearcadio@gmail.com', 'active':"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/roles",
+      "resolved": "/users/me/roles",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'organization_id': '60d790a3-c9b8-46cd-aac2-97e3b2eda2fd', 'organization_name': 'Smoke Tester Organization', 'role_name': 'ORG_ADMIN', 'role_description': 'Administrador de un tenant. Gestión de usuarios y acceso total a la base RAG.'}, {'organization_id': 'f53a5f39-f53b-4120-a8e2-3d401e3a84cf', '"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/roles",
+      "resolved": "/users/roles",
+      "status": 200,
+      "ok": true,
+      "success_2xx": true,
+      "detail": "[{'id': '0e266484-55b4-49a8-a76f-b2d878affcde', 'name': 'SUPER_ADMIN', 'description': 'Administrador global de la plataforma SaaS', 'organization_id': None}, {'id': '040520c9-6ceb-4ebb-8cbd-f59cb5d014f4', 'name': 'ORG_ADMIN', 'description': 'Administrador de un tenant. Gestión de usuarios y acceso t"
+    }
+  ]
+}

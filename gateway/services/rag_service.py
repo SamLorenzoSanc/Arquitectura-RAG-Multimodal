@@ -1,30 +1,100 @@
 from __future__ import annotations
 
+import hashlib
 import math
+import os
 import pickle
 import re
 import time
 import unicodedata
+from collections import OrderedDict
 from pathlib import Path
 from threading import Lock
-import torch
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
-from sentence_transformers import CrossEncoder
-from sqlalchemy import select
+from sqlalchemy import cast, func, select
+from pgvector.sqlalchemy import Vector
 from tenacity import wait_exponential
 import asyncio
-import time
 from services.database import AsyncSessionLocal
 from schemas.chat import Result
 from models.chunk import Chunk
 from models.document import Document
 from models.embedding import Embedding
+from schemas.evaluation import AnswerEvaluation
+from services.evaluation_metrics import (
+    abstention_score,
+    citation_accuracy,
+    numeric_match,
+)
 
 load_dotenv(override=True)
 WAIT_POLICY = wait_exponential(multiplier=1, min=10, max=240)
+
+from clients.inference_client import resolve_llm_base_url
+from clients.retrieval_client import retrieval_service_enabled, retrieve_remote
+
+OLLAMA_BASE_URL = resolve_llm_base_url()
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
+HNSW_INDEX_DIMENSIONS = int(os.getenv("HNSW_INDEX_DIMENSIONS", "2000"))
+
+# Límites de generación: el cuello de botella típico está en Ollama, no en retrieval.
+RAG_MAX_TOKENS = int(os.getenv("RAG_MAX_TOKENS", "192"))
+RAG_TEMPERATURE = float(os.getenv("RAG_TEMPERATURE", "0"))
+RAG_CHUNK_CHAR_LIMIT = int(os.getenv("RAG_CHUNK_CHAR_LIMIT", "600"))
+RAG_KEEP_ALIVE = os.getenv("RAG_KEEP_ALIVE", "30m")
+RAG_RELATED_QUESTIONS = max(1, int(os.getenv("RAG_RELATED_QUESTIONS", "5")))
+
+# Expansión léxica agrícola (sin LLM): mejora BM25 en milisegundos.
+_AGRO_SYNONYMS: dict[str, str] = {
+    "riego": "riego irrigación gotero aspersión",
+    "tomate": "tomate solanum lycopersicum",
+    "plátano": "plátano banana musa",
+    "platano": "plátano banana musa",
+    "papaya": "papaya carica",
+    "aguacate": "aguacate palta persea",
+    "papa": "papa patata solanum tuberosum",
+    "viña": "viña vid uva viticultura",
+    "vina": "viña vid uva viticultura",
+    "posei": "posei ayudas subvenciones canarias",
+    "subvención": "subvención ayuda prima incentivo",
+    "subvencion": "subvención ayuda prima incentivo",
+    "plaga": "plaga insecto patogeno enfermedad fitosanitario",
+    "fertilizante": "fertilizante abono nutriente npk",
+    "suelo": "suelo edafologia materia organica",
+    "sequía": "sequía deficit hidrico estres hidrico",
+    "sequia": "sequía deficit hidrico estres hidrico",
+}
+# Por defecto sin Cross-Encoder: el ranking final es el de RRF (mucho más rápido).
+RAG_USE_RERANKER = os.getenv("RAG_USE_RERANKER", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+RAG_USE_QUERY_REWRITE = os.getenv("RAG_USE_QUERY_REWRITE", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+
+# Cache de retrieval para evitar ejecutar el pipeline dos veces
+# (frontend llama /retrieve y luego /chat/ con la misma pregunta).
+_RETRIEVAL_CACHE: OrderedDict[str, tuple[float, dict]] = OrderedDict()
+_RETRIEVAL_CACHE_TTL = int(os.getenv("RETRIEVAL_CACHE_TTL", "120"))
+_RETRIEVAL_CACHE_MAX_SIZE = int(os.getenv("RETRIEVAL_CACHE_MAX_SIZE", "256"))
+_RETRIEVAL_CACHE_LOCK = Lock()
+_RERANKERS: dict[str, object] = {}
+_RERANKERS_LOCK = Lock()
+
+
+def _retrieval_cache_key(
+    tenant_id: str, question: str, collections: list[str] | None
+) -> str:
+    cols = ",".join(sorted(collections or []))
+    raw = f"{tenant_id}|{question.strip()}|{cols}"
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 
 class RetrievalEval(BaseModel):
@@ -34,13 +104,6 @@ class RetrievalEval(BaseModel):
     total_keywords: int = Field(description="Número total de keywords")
     keyword_coverage: float = Field(description="Cobertura porcentual de keywords")
     accuracy: float = Field(description="Acierto globales de la búsqueda")
-
-
-class AnswerEval(BaseModel):
-    feedback: str = Field(description="Comentarios sobre la respuesta")
-    accuracy: float = Field(description="Precisión factual de 1 a 5")
-    completeness: float = Field(description="Exhaustividad de 1 a 5")
-    relevance: float = Field(description="Pertinencia de 1 a 5")
 
 
 class DatasetEvaluationRequest(BaseModel):
@@ -111,13 +174,17 @@ class RAGService:
     """RAG híbrido multitenant: Dense + BM25 + RRF + Cross-Encoder."""
 
     SYSTEM_PROMPT = """
-    Eres un asistente experto y amable que representa a la empresa AgroTech.
-    Si el usuario pregunta por información contenida en el contexto, RESPÓNDELA con precisión técnica y profesional.
-    No te niegues a responder información técnica o corporativa si esta se encuentra dentro del Contexto facilitado.
-    No añadas avisos de confidencialidad a menos que el documento mismo los contenga explícitamente.
-    REGLA CRÍTICA DE IDIOMA: Debe responder SIEMPRE en español.
-    No inventes datos que no estén respaldados por el contexto proporcionado.
-    Contexto:
+    Eres AgroPS, un asistente agrario experto (cultivos, riego, plagas, suelos,
+    ayudas/POSEI, normativa y buenas prácticas en explotación agrícola).
+    Responde SIEMPRE en español, de forma breve, clara y accionable.
+    Usa el perfil operativo del agricultor cuando exista (hechos de su parcela).
+    Usa la información del Contexto documental; si falta evidencia, dilo sin inventar.
+    Prioriza cifras, plazos, dosis y requisitos cuando aparezcan en el Contexto.
+    No añadas avisos de confidencialidad salvo que el documento los contenga.
+
+    {farmer_context}
+
+    Contexto documental:
     {context}
     """
 
@@ -150,8 +217,8 @@ class RAGService:
         self.wait = WAIT_POLICY
 
         self.client = OpenAI(
-            base_url="http://localhost:11434/v1",
-            api_key="ollama",
+            base_url=OLLAMA_BASE_URL,
+            api_key=OLLAMA_API_KEY,
         )
 
         # Por defecto se comparte el directorio con el servicio de ingesta.
@@ -162,7 +229,125 @@ class RAGService:
 
         self._bm25_cache: dict[str, tuple[float, BM25Okapi, list[dict]]] = {}
         self._bm25_lock = Lock()
-        self._reranker: CrossEncoder | None = None
+        self._reranker = None
+
+    async def _run_in_thread(self, func, *args, **kwargs):
+        return await asyncio.to_thread(func, *args, **kwargs)
+
+    @staticmethod
+    def expand_agro_query(question: str) -> str:
+        """Expande términos agrarios sin LLM (coste ~0 ms)."""
+        lower = question.lower()
+        extras: list[str] = []
+        for term, expansion in _AGRO_SYNONYMS.items():
+            if term in lower:
+                extras.append(expansion)
+        if not extras:
+            return question
+        return f"{question} {' '.join(extras)}"
+
+    @staticmethod
+    def _topic_from_chunk(chunk: Result) -> str | None:
+        meta = chunk.metadata or {}
+        for key in ("headline", "title", "source"):
+            value = meta.get(key)
+            if isinstance(value, str) and value.strip():
+                topic = value.replace(".pdf", "").replace("_", " ").strip()
+                if len(topic) >= 4:
+                    return topic[:80]
+        text = (chunk.page_content or "").replace("\n", " ").strip()
+        if not text:
+            return None
+        first = re.split(r"[.?!\n]", text, maxsplit=1)[0].strip()
+        words = [w for w in first.split() if len(w) > 2][:8]
+        topic = " ".join(words).strip(" -:;,")
+        return topic[:80] if len(topic) >= 4 else None
+
+    def generate_related_questions(
+        self,
+        question: str,
+        chunks: list[Result],
+        max_questions: int | None = None,
+    ) -> list[str]:
+        """Preguntas relacionadas agrícolas a partir del retrieval (sin LLM)."""
+        limit = max_questions or RAG_RELATED_QUESTIONS
+        templates = [
+            "¿Cuáles son los requisitos o condiciones de {topic}?",
+            "¿Qué ayudas o subvenciones se mencionan sobre {topic}?",
+            "¿Cómo afecta {topic} al cultivo o a la explotación?",
+            "¿Qué plazos o dosis aparecen relacionados con {topic}?",
+            "¿Qué prácticas de riego o manejo se recomiendan para {topic}?",
+        ]
+        seen: set[str] = set()
+        out: list[str] = []
+        q_norm = " ".join(question.lower().split())
+        seen.add(q_norm)
+
+        topics: list[str] = []
+        for chunk in chunks:
+            topic = self._topic_from_chunk(chunk)
+            if not topic:
+                continue
+            key = topic.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            topics.append(topic)
+
+        for i, topic in enumerate(topics):
+            tmpl = templates[i % len(templates)]
+            candidate = tmpl.format(topic=topic)
+            key = candidate.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(candidate)
+            if len(out) >= limit:
+                return out
+
+        # Fallbacks útiles si hay poco contexto recuperado.
+        fallbacks = [
+            "¿Qué ayudas agrícolas o POSEI aplican a mi explotación?",
+            "¿Cómo optimizar el riego ante estrés hídrico?",
+            "¿Qué tratamientos fitosanitarios se recomiendan ante plagas comunes?",
+            "¿Qué requisitos de fertilización aparecen en la documentación?",
+        ]
+        for fb in fallbacks:
+            if fb.lower() in seen:
+                continue
+            out.append(fb)
+            if len(out) >= limit:
+                break
+        return out
+
+    async def _create_embeddings(self, question: str):
+        return await asyncio.to_thread(
+            self.client.embeddings.create,
+            model=self.embedding_model,
+            input=[question],
+        )
+
+    async def _create_completion(self, model: str, messages: list[dict]):
+        # OpenAI-compatible: max_tokens limita la respuesta.
+        # Extra body keep_alive evita recargar el modelo en cada request (Ollama).
+        return await asyncio.to_thread(
+            self.client.chat.completions.create,
+            model=model,
+            messages=messages,
+            temperature=RAG_TEMPERATURE,
+            max_tokens=RAG_MAX_TOKENS,
+            extra_body={"keep_alive": RAG_KEEP_ALIVE},
+        )
+
+    async def _create_parse_completion(
+        self, model: str, messages: list[dict], response_format
+    ):
+        return await asyncio.to_thread(
+            self.client.beta.chat.completions.parse,
+            model=model,
+            messages=messages,
+            response_format=response_format,
+        )
 
     def get_embeddings(self):
         return self.embedding_model
@@ -260,14 +445,17 @@ class RAGService:
         }
         path = self._bm25_path(tenant_id)
         tmp_path = path.with_suffix(".tmp")
-        with tmp_path.open("wb") as fh:
-            pickle.dump(payload, fh, protocol=pickle.HIGHEST_PROTOCOL)
+        await asyncio.to_thread(self._dump_bm25_payload, tmp_path, payload)
         tmp_path.replace(path)
 
         corpus = [self._tokenize(d["text"]) for d in documents]
         if not corpus:
             return None
         return BM25Okapi(corpus), documents, path.stat().st_mtime
+
+    def _dump_bm25_payload(self, tmp_path: Path, payload: dict):
+        with tmp_path.open("wb") as fh:
+            pickle.dump(payload, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
     def should_rewrite_query(self, question: str) -> bool:
         """
@@ -377,7 +565,7 @@ class RAGService:
             return cache[1], cache[2]
 
         with self._bm25_lock:
-            loaded = self._load_bm25_file(tenant_id)
+            loaded = await asyncio.to_thread(self._load_bm25_file, tenant_id)
         if loaded is None:
             loaded = await self._build_bm25_from_db(tenant_id)
             if loaded is None:
@@ -393,7 +581,24 @@ class RAGService:
         else:
             self._bm25_cache.pop(str(tenant_id), None)
 
-    def rewrite_query(self, question: str, history: list | None = None) -> str:
+    @staticmethod
+    def invalidate_retrieval_cache(tenant_id: str | None = None) -> int:
+        with _RETRIEVAL_CACHE_LOCK:
+            if tenant_id is None:
+                count = len(_RETRIEVAL_CACHE)
+                _RETRIEVAL_CACHE.clear()
+                return count
+            prefix = f"{tenant_id}|"
+            keys = [
+                key
+                for key in _RETRIEVAL_CACHE
+                if _RETRIEVAL_CACHE[key][1].get("_cache_scope", "").startswith(prefix)
+            ]
+            for key in keys:
+                _RETRIEVAL_CACHE.pop(key, None)
+            return len(keys)
+
+    async def rewrite_query(self, question: str, history: list | None = None) -> str:
         t0 = time.time()
         history = history or []
         prompt = f"""
@@ -404,9 +609,9 @@ class RAGService:
             Respuesta en español.
             Reescribe únicamente la consulta.
         """
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "system", "content": prompt}],
+        response = await self._create_completion(
+            self.model,
+            [{"role": "system", "content": prompt}],
         )
         rewritten = response.choices[0].message.content.strip()
         print(f"      Consulta reescrita en {time.time()-t0:.2f}s: '{rewritten}'")
@@ -418,17 +623,58 @@ class RAGService:
         tenant_id: str,
         collections: list[str] | None = None,
     ) -> list[Result]:
-        """Dense retrieval mediante pgvector, manteniendo el filtro multitenant."""
+        """Dense retrieval mediante pgvector, manteniendo el filtro multitenant.
+
+        Si USE_RETRIEVAL_SERVICE=true, delega en retrieval-service (mismo contrato
+        para Hybrid/Agentic/eval).
+        """
+        if retrieval_service_enabled():
+            t0 = time.time()
+            try:
+                data = await retrieve_remote(
+                    question=question,
+                    tenant_id=tenant_id,
+                    collections=collections,
+                    retrieval_k=self.retrieval_k,
+                    final_k=self.retrieval_k,
+                )
+                results = []
+                for ch in data.get("chunks") or []:
+                    results.append(
+                        Result(
+                            page_content=ch.get("page_content") or "",
+                            metadata={
+                                "chunk_id": ch.get("chunk_id"),
+                                "document_id": ch.get("document_id"),
+                                "tenant_id": tenant_id,
+                                "source": ch.get("source"),
+                                "distance": float(
+                                    (ch.get("metadata") or {}).get("distance", 0)
+                                    or 0
+                                ),
+                                "score": ch.get("score"),
+                                "retrieval_source": "dense_remote",
+                                "dense_latency_ms": (time.time() - t0) * 1000,
+                            },
+                        )
+                    )
+                print(
+                    f"      [DENSE-REMOTE] {len(results)} chunks | "
+                    f"tenant={tenant_id} | {(time.time()-t0):.2f}s"
+                )
+                return results
+            except Exception as exc:
+                print(f"      [DENSE-REMOTE] fallback local: {exc}")
+
         t0 = time.time()
-        raw_embedding = (
-            self.client.embeddings.create(
-                model=self.embedding_model,
-                input=[question],
-            )
-            .data[0]
-            .embedding
-        )
+        raw_embedding = (await self._create_embeddings(question)).data[0].embedding
         t_emb = time.time() - t0
+        index_dimensions = min(HNSW_INDEX_DIMENSIONS, len(raw_embedding))
+        approximate_distance = func.subvector(
+            Embedding.vector, 1, index_dimensions
+        ).cast(Vector(index_dimensions)).cosine_distance(
+            raw_embedding[:index_dimensions]
+        )
 
         stmt = (
             select(
@@ -444,9 +690,9 @@ class RAGService:
         if collections:
             stmt = stmt.where(Document.knowledge_base_id.in_(collections))
 
-        stmt = stmt.order_by(Embedding.vector.cosine_distance(raw_embedding)).limit(
-            self.retrieval_k
-        )
+        # El índice HNSW usa un subvector (pgvector limita la dimensión indexable);
+        # la distancia exacta completa se conserva en el resultado.
+        stmt = stmt.order_by(approximate_distance).limit(self.retrieval_k)
 
         async with AsyncSessionLocal() as session:
             result_proxy = await session.execute(stmt)
@@ -470,6 +716,8 @@ class RAGService:
                         "type": document.mime_type,
                         "distance": float(distance),
                         "retrieval_source": "dense",
+                        "embedding_latency_ms": t_emb * 1000,
+                        "dense_latency_ms": (time.time() - t0) * 1000,
                     },
                 )
             )
@@ -497,6 +745,7 @@ class RAGService:
             return []
 
         scores = bm25.get_scores(query_tokens)
+        bm25_latency_ms = (time.time() - t0) * 1000
         allowed = set(map(str, collections)) if collections else None
 
         ranked_indices = sorted(
@@ -521,6 +770,7 @@ class RAGService:
                         **meta,
                         "bm25_score": score,
                         "retrieval_source": "bm25",
+                        "bm25_latency_ms": bm25_latency_ms,
                     },
                 )
             )
@@ -596,16 +846,21 @@ class RAGService:
         )
         return candidates
 
-    def _get_reranker(self) -> CrossEncoder:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+    def _get_reranker(self):
+        # Import lazy: no cargar torch/sentence-transformers si el rerank está off.
+        import torch
+        from sentence_transformers import CrossEncoder
 
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        cache_key = f"{self.reranker_model}:{device}"
         if self._reranker is None:
-            print(f"      [CROSS-ENCODER] Cargando modelo '{self.reranker_model}'...")
-            self._reranker = CrossEncoder(
-                self.reranker_model,
-                device=device,
-                max_length=512,
-            )
+            with _RERANKERS_LOCK:
+                if cache_key not in _RERANKERS:
+                    print(f"      [CROSS-ENCODER] Cargando modelo '{self.reranker_model}' en {device}...")
+                    _RERANKERS[cache_key] = CrossEncoder(
+                        self.reranker_model, device=device, max_length=512
+                    )
+                self._reranker = _RERANKERS[cache_key]
         return self._reranker
 
     def cross_encoder_rerank(self, question: str, chunks: list[Result]) -> list[Result]:
@@ -645,37 +900,38 @@ class RAGService:
         question: str,
         tenant_id: str = "global",
         collections: list[str] | None = None,
+        evaluation_mode: bool = False,
+        use_reranking: bool | None = None,
+        use_query_rewrite: bool | None = None,
     ):
         """
-        Pipeline híbrido optimizado:
-
-            Query
-              │
-              ├── Query original
-              │      ├── Dense
-              │      └── BM25
-              │
-              └── Query reescrita (solo si es necesaria)
-                     ├── Dense
-                     └── BM25
-                              │
-                              ▼
-                             RRF
-                              │
-                              ▼
-                        Cross-Encoder
-                              │
-                              ▼
-                           final_k
-
-        Se mantiene:
-        - aislamiento multitenant
-        - Dense Retrieval
-        - BM25
-        - RRF
-        - Cross-Encoder
-        - contrato de respuesta existente
+        Pipeline: Dense + BM25 + RRF → final_k.
+        Cross-Encoder y query-rewrite están opcionales (desactivados por defecto).
         """
+
+        question = " ".join(question.strip().split())
+        do_rerank = RAG_USE_RERANKER if use_reranking is None else bool(use_reranking)
+        allow_rewrite = (
+            RAG_USE_QUERY_REWRITE
+            if use_query_rewrite is None
+            else bool(use_query_rewrite)
+        )
+
+        cache_key = _retrieval_cache_key(
+            tenant_id,
+            f"{question}|rr={int(do_rerank)}|rw={int(allow_rewrite)}",
+            collections,
+        )
+        now = time.time()
+        with _RETRIEVAL_CACHE_LOCK:
+            cached = None if evaluation_mode else _RETRIEVAL_CACHE.get(cache_key)
+            if cached and (now - cached[0]) < _RETRIEVAL_CACHE_TTL:
+                _RETRIEVAL_CACHE.move_to_end(cache_key)
+                print(
+                    "[RAG - FETCH] CACHE HIT — reutilizando retrieval previo "
+                    f"(edad: {now - cached[0]:.1f}s)"
+                )
+                return cached[1]
 
         print(
             "\n"
@@ -690,8 +946,6 @@ class RAGService:
         # ================================================================
         # 1. NORMALIZACIÓN DE LA CONSULTA
         # ================================================================
-
-        question = " ".join(question.strip().split())
 
         if not question:
             return {
@@ -710,8 +964,8 @@ class RAGService:
                     "merged_chunks": 0,
                     "candidate_chunks": 0,
                     "final_chunks": 0,
-                    "reranking": True,
-                    "reranker": self.reranker_model,
+                    "reranking": False,
+                    "reranker": None,
                 },
             }
 
@@ -720,37 +974,22 @@ class RAGService:
         # ================================================================
 
         t_rewrite = time.time()
-
-        rewrite_required = self.should_rewrite_query(question)
+        rewrite_required = allow_rewrite and self.should_rewrite_query(question)
 
         if rewrite_required:
-            rewritten = self.rewrite_query(question)
-
-            # Evitamos resultados extraños del LLM.
-            rewritten = " ".join(rewritten.strip().split())
-
-            if not rewritten:
-                rewritten = question
-
-            print(f"      [REWRITE] ACTIVADO | " f"{time.time() - t_rewrite:.2f}s")
+            rewritten = await self.rewrite_query(question)
+            rewritten = " ".join(rewritten.strip().split()) or question
+            print(f"      [REWRITE] ACTIVADO | {time.time() - t_rewrite:.2f}s")
             print(f"      Original : '{question}'")
             print(f"      Rewritten: '{rewritten}'")
-
         else:
-            # ------------------------------------------------------------
-            # No necesitamos LLM.
-            #
-            # Muy importante:
-            # no hacemos una segunda recuperación idéntica.
-            # ------------------------------------------------------------
-
             rewritten = question
-
             print(
                 f"      [REWRITE] OMITIDO | "
-                f"consulta suficientemente directa | "
+                f"{'desactivado' if not allow_rewrite else 'consulta directa'} | "
                 f"{time.time() - t_rewrite:.2f}s"
             )
+        rewrite_latency_ms = (time.time() - t_rewrite) * 1000
 
         # ================================================================
         # 3. RETRIEVAL
@@ -780,6 +1019,7 @@ class RAGService:
 
             print("      [RETRIEVAL] FAST PATH: " "Dense + BM25 en paralelo")
 
+            bm25_query = self.expand_agro_query(question)
             dense_original, bm25_original = await asyncio.gather(
                 self.retrieve(
                     question,
@@ -787,7 +1027,7 @@ class RAGService:
                     collections=collections,
                 ),
                 self.retrieve_bm25(
-                    question,
+                    bm25_query,
                     tenant_id=tenant_id,
                     collections=collections,
                 ),
@@ -822,12 +1062,12 @@ class RAGService:
                     collections=collections,
                 ),
                 self.retrieve_bm25(
-                    question,
+                    self.expand_agro_query(question),
                     tenant_id=tenant_id,
                     collections=collections,
                 ),
                 self.retrieve_bm25(
-                    rewritten,
+                    self.expand_agro_query(rewritten),
                     tenant_id=tenant_id,
                     collections=collections,
                 ),
@@ -841,6 +1081,7 @@ class RAGService:
             f"BM25 original={len(bm25_original)} | "
             f"BM25 rewritten={len(bm25_rewritten)}"
         )
+        retrieval_latency_ms = (time.time() - t_retrieval) * 1000
 
         # ================================================================
         # 4. RRF
@@ -860,39 +1101,33 @@ class RAGService:
             f"{len(candidates)} candidatos | "
             f"{time.time() - t_rrf:.2f}s"
         )
+        rrf_latency_ms = (time.time() - t_rrf) * 1000
 
         # ================================================================
-        # 5. CROSS-ENCODER
+        # 5. CROSS-ENCODER (opcional; desactivado por defecto)
         # ================================================================
 
         t_rerank = time.time()
-
-        # ------------------------------------------------------------
-        # IMPORTANTE:
-        #
-        # cross_encoder_rerank() es síncrona y pesada.
-        #
-        # La ejecutamos en un thread para NO bloquear el event loop
-        # de FastAPI.
-        # ------------------------------------------------------------
-
-        reranked = await asyncio.to_thread(
-            self.cross_encoder_rerank,
-            question,
-            candidates,
-        )
-
-        print(
-            f"      [CROSS-ENCODER] "
-            f"{len(candidates)} candidatos reordenados en "
-            f"{time.time() - t_rerank:.2f}s"
-        )
+        if do_rerank:
+            ranked = await asyncio.to_thread(
+                self.cross_encoder_rerank,
+                question,
+                candidates,
+            )
+            print(
+                f"      [CROSS-ENCODER] {len(candidates)} candidatos en "
+                f"{time.time() - t_rerank:.2f}s"
+            )
+        else:
+            ranked = candidates
+            print("      [CROSS-ENCODER] OMITIDO — ranking RRF directo")
+        rerank_latency_ms = (time.time() - t_rerank) * 1000
 
         # ================================================================
         # 6. TOP-K FINAL
         # ================================================================
 
-        final_chunks = reranked[: self.final_k]
+        final_chunks = ranked[: self.final_k]
 
         elapsed = time.time() - t0
 
@@ -907,7 +1142,7 @@ class RAGService:
         # 7. RESULTADO
         # ================================================================
 
-        return {
+        result = {
             "chunks": final_chunks,
             "rewritten_query": rewritten,
             "dense_original": dense_original,
@@ -938,15 +1173,53 @@ class RAGService:
                 "candidate_k": self.candidate_k,
                 "final_k": self.final_k,
                 "rrf_k": self.rrf_k,
-                "reranking": True,
-                "reranker": self.reranker_model,
+                "reranking": do_rerank,
+                "reranker": self.reranker_model if do_rerank else None,
                 # --------------------------------------------------------
                 # Información adicional de optimización
                 # --------------------------------------------------------
                 "query_rewriting": rewrite_required,
                 "parallel_retrieval": True,
+                "timings_ms": {
+                    "rewrite": rewrite_latency_ms,
+                    "retrieval_parallel": retrieval_latency_ms,
+                    "rrf": rrf_latency_ms,
+                    "reranking": rerank_latency_ms,
+                    "total_retrieval": elapsed * 1000,
+                    "embedding": max(
+                        (
+                            chunk.metadata.get("embedding_latency_ms", 0.0)
+                            for chunk in dense_original
+                        ),
+                        default=0.0,
+                    ),
+                    "dense": max(
+                        (
+                            chunk.metadata.get("dense_latency_ms", 0.0)
+                            for chunk in dense_original
+                        ),
+                        default=0.0,
+                    ),
+                    "bm25": max(
+                        (
+                            chunk.metadata.get("bm25_latency_ms", 0.0)
+                            for chunk in bm25_original
+                        ),
+                        default=0.0,
+                    ),
+                },
             },
         }
+
+        if not evaluation_mode:
+            result["_cache_scope"] = f"{tenant_id}|{','.join(sorted(collections or []))}"
+            with _RETRIEVAL_CACHE_LOCK:
+                _RETRIEVAL_CACHE[cache_key] = (time.time(), result)
+                _RETRIEVAL_CACHE.move_to_end(cache_key)
+                while len(_RETRIEVAL_CACHE) > _RETRIEVAL_CACHE_MAX_SIZE:
+                    _RETRIEVAL_CACHE.popitem(last=False)
+
+        return result
 
     async def fetch_context_simple(
         self, question, tenant_id="global", collections=None
@@ -958,31 +1231,57 @@ class RAGService:
             collections,
         )
 
-    def build_prompt(self, question: str, history: list, chunks: list[Result]):
-        context = "\n\n".join(
-            f"Extrae de {c.metadata.get('source', 'fuente_desconocida')}:\n{c.page_content}"
-            for c in chunks
-        )
+    def build_prompt(
+        self,
+        question: str,
+        history: list,
+        chunks: list[Result],
+        farmer_context: str | None = None,
+    ):
+        # Truncar chunks evita prompts enormes: más tokens de contexto = más latencia en Ollama.
+        parts = []
+        for c in chunks:
+            body = c.page_content or ""
+            if len(body) > RAG_CHUNK_CHAR_LIMIT:
+                body = body[:RAG_CHUNK_CHAR_LIMIT].rstrip() + "…"
+            source = c.metadata.get("source", "fuente_desconocida")
+            parts.append(f"Extrae de {source}:\n{body}")
+        context = "\n\n".join(parts)
+        # Historial acotado: solo últimos turnos para no hinchar el prompt.
+        trimmed_history = (history or [])[-6:]
+        farmer_block = (farmer_context or "").strip() or "Sin perfil operativo de parcela."
         return (
-            [{"role": "system", "content": self.SYSTEM_PROMPT.format(context=context)}]
-            + history
+            [
+                {
+                    "role": "system",
+                    "content": self.SYSTEM_PROMPT.format(
+                        context=context,
+                        farmer_context=farmer_block,
+                    ),
+                }
+            ]
+            + trimmed_history
             + [{"role": "user", "content": question}]
         )
 
     async def simple_chat(self, question: str, history: list | None = None):
         history = history or []
         messages = [
-            {"role": "system", "content": self.SYSTEM_PROMPT.format(context="")}
+            {
+                "role": "system",
+                "content": self.SYSTEM_PROMPT.format(
+                    context="",
+                    farmer_context="Sin perfil operativo de parcela.",
+                ),
+            }
         ]
         messages += history + [{"role": "user", "content": question}]
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-        )
+        response = await self._create_completion(self.model, messages)
         return {
             "answer": response.choices[0].message.content,
             "chunks": [],
             "retrieval": None,
+            "related_questions": self.generate_related_questions(question, []),
         }
 
     async def answer(
@@ -992,6 +1291,10 @@ class RAGService:
         tenant_id: str = "global",
         collections: list[str] | None = None,
         model: str | None = None,
+        use_reranking: bool | None = None,
+        use_query_rewrite: bool | None = None,
+        farmer_context: str | None = None,
+        farmer_profile: dict | None = None,
     ):
         print(f"\n{'='*70}")
         print("INICIANDO RAG PIPELINE HÍBRIDO")
@@ -1007,12 +1310,14 @@ class RAGService:
             question,
             tenant_id=tenant_id,
             collections=collections,
+            use_reranking=use_reranking,
+            use_query_rewrite=use_query_rewrite,
         )
         chunks = retrieval["chunks"]
 
         print(f"\nPregunta:\n{question}\n")
         print(f"Consulta reescrita:\n{retrieval['rewritten_query']}\n")
-        print("Ranking final Cross-Encoder:")
+        print("Ranking final (RRF" + ("+CE" if retrieval.get("retrieval", {}).get("reranking") else "") + "):")
         for i, chunk in enumerate(chunks, start=1):
             print(
                 f"Chunk {i} | CE={chunk.metadata.get('cross_encoder_score', 0):.4f} | "
@@ -1020,20 +1325,36 @@ class RAGService:
                 f"Fuente={chunk.metadata.get('source', 'fuente_desconocida')}"
             )
 
-        messages = self.build_prompt(question, history, chunks)
-        t_gen = time.time()
-        response = self.client.chat.completions.create(
-            model=active_model,
-            messages=messages,
+        messages = self.build_prompt(
+            question, history, chunks, farmer_context=farmer_context
         )
+        t_gen = time.time()
+        response = await self._create_completion(active_model, messages)
+        generation_latency_ms = (time.time() - t_gen) * 1000
+
+        related_questions = self.generate_related_questions(question, chunks)
 
         print(f"Generación completada en {time.time()-t_gen:.2f}s")
         print(f"RAG COMPLETADO EN {time.time()-t_total:.2f}s\n{'='*70}\n")
 
+        # Include both the compact retrieval summary and the full
+        # retrieval pipeline details for frontend debugging/visualization.
+        retrieval["retrieval"].setdefault("timings_ms", {})[
+            "generation"
+        ] = generation_latency_ms
+        retrieval["retrieval"]["timings_ms"]["total_rag"] = (
+            time.time() - t_total
+        ) * 1000
+        retrieval["related_questions"] = related_questions
+        if farmer_profile:
+            retrieval["farmer_profile"] = farmer_profile
         return {
             "answer": response.choices[0].message.content,
             "chunks": chunks,
-            "retrieval": retrieval["retrieval"],
+            "retrieval": retrieval.get("retrieval", {}),
+            "retrieval_details": retrieval,
+            "related_questions": related_questions,
+            "farmer_profile": farmer_profile,
         }
 
     # ------------------------------------------------------------------
@@ -1103,25 +1424,49 @@ class RAGService:
         )
 
     async def evaluate_answer(
-        self, question: str, generated_answer: str, retrieved_docs: list
-    ) -> tuple[AnswerEval, str, list]:
+        self,
+        question: str,
+        generated_answer: str,
+        retrieved_docs: list,
+        reference_answer: str | None = None,
+        out_of_knowledge: bool = False,
+    ) -> tuple[AnswerEvaluation, str, list]:
+        context = "\n\n".join(
+            getattr(doc, "page_content", str(doc)) for doc in retrieved_docs
+        )
+        sources = [
+            str(getattr(doc, "metadata", {}).get("source", ""))
+            for doc in retrieved_docs
+        ]
         prompt = f"""
         Pregunta: {question}
+        Respuesta de referencia: {reference_answer or "No disponible"}
         Respuesta Generada: {generated_answer}
-        Evalúa la respuesta basándote en la precisión factual, exhaustividad y relevancia (escala de 1 a 5).
+        Contexto recuperado: {context or "Sin contexto"}
+        Fuera de conocimiento: {out_of_knowledge}
+        Puntúa accuracy, completeness, relevance, faithfulness y groundedness de 1 a 5.
+        citation_accuracy, numeric_match y abstention deben estar entre 0 y 1.
+        La referencia mide corrección; el contexto mide fidelidad. No premies afirmaciones
+        correctas que no estén respaldadas por el contexto cuando se evalúe groundedness.
         """
-        completion = self.client.beta.chat.completions.parse(
-            model=self.model,
-            messages=[
+        completion = await self._create_parse_completion(
+            self.model,
+            [
                 {
                     "role": "system",
                     "content": "Eres un evaluador experto. Responde solo en JSON.",
                 },
                 {"role": "user", "content": prompt},
             ],
-            response_format=AnswerEval,
+            AnswerEvaluation,
         )
         eval_result = completion.choices[0].message.parsed
+        if eval_result is None:
+            raise RuntimeError("El juez no devolvió una evaluación estructurada")
+        # Las métricas deterministas prevalecen sobre estimaciones del juez.
+        eval_result.numeric_match = numeric_match(reference_answer, generated_answer)
+        eval_result.citation_accuracy = citation_accuracy(generated_answer, sources)
+        eval_result.abstention = abstention_score(generated_answer, out_of_knowledge)
         return eval_result, generated_answer, retrieved_docs
 
     async def knowledge_graph(self):

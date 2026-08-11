@@ -1,0 +1,149 @@
+[
+  {
+    "id": 0,
+    "question": "¿Cuál es el salario actual del ingeniero agrónomo Alejandro Castro?",
+    "keywords": ["Alejandro Castro", "42.000 €"],
+    "reference_answer": "El salario actual de Alejandro Castro es de 42.000 €.",
+    "category": "direct_fact"
+  },
+  {
+    "id": 1,
+    "question": "¿En qué localidad de Canarias está ubicado Alejandro Herrera, responsable de Control de Calidad?",
+    "keywords": ["Alejandro Herrera", "Gáldar", "Gran Canaria"],
+    "reference_answer": "Alejandro Herrera está ubicado en Gáldar, Gran Canaria.",
+    "category": "direct_fact"
+  },
+  {
+    "id": 2,
+    "question": "¿Qué mercados mayoristas de destino procesa el motor de ingesta de PrecioLLM?",
+    "keywords": ["Mercatenerife", "Mercalaspalmas"],
+    "reference_answer": "PrecioLLM procesa los boletines de precios de Mercatenerife y Mercalaspalmas.",
+    "category": "direct_fact"
+  },
+  {
+    "id": 3,
+    "question": "¿Qué modelo de visión artificial utilizan las plataformas de AgroLLM para interpretar documentos escaneados?",
+    "keywords": ["Llama 3.2 Vision", "multimodal"],
+    "reference_answer": "Las plataformas incorporan el modelo de visión multimodal Llama 3.2 Vision.",
+    "category": "direct_fact"
+  },
+  {
+    "id": 4,
+    "question": "¿Cuándo está prevista la integración de AguaLLM con sensores IoT para medir la humedad del suelo?",
+    "keywords": ["Q2 2026", "sensores IoT", "LangChain"],
+    "reference_answer": "La integración nativa con sensores IoT de humedad del suelo está prevista para el segundo trimestre de 2026 (Q2 2026).",
+    "category": "temporal"
+  },
+  {
+    "id": 5,
+    "question": "¿En qué trimestre está previsto que PrecioLLM lance el módulo de seguros agrarios paramétricos con Agroseguro?",
+    "keywords": ["Q4 2026", "Agroseguro"],
+    "reference_answer": "El lanzamiento del módulo de seguros agrarios paramétricos está previsto para el cuarto trimestre de 2026 (Q4 2026).",
+    "category": "temporal"
+  },
+  {
+    "id": 6,
+    "question": "¿Desde qué año ocupa Alejandro Toledo el puesto de Director de Logística?",
+    "keywords": ["Alejandro Toledo", "2015"],
+    "reference_answer": "Alejandro Toledo ocupa el puesto de Socio-Comercial y Director de Logística desde el año 2015.",
+    "category": "temporal"
+  },
+  {
+    "id": 7,
+    "question": "¿Qué módulo de la arquitectura de AgroLLM está asociado al perfil de Alejandro Castro?",
+    "keywords": ["Alejandro Castro", "FitoLLM", "tecnico_campo"],
+    "reference_answer": "El perfil de Alejandro Castro está asociado al módulo FitoLLM.",
+    "category": "relationship"
+  },
+  {
+    "id": 8,
+    "question": "¿Con qué plataforma de software está relacionada la especialidad de calibrado DOP de Alejandro Herrera?",
+    "keywords": ["Alejandro Herrera", "PrecioLLM", "operaciones_almacen"],
+    "reference_answer": "El perfil de Alejandro Herrera está asociado al módulo PrecioLLM.",
+    "category": "relationship"
+  },
+  {
+    "id": 9,
+    "question": "¿Qué módulo de la arquitectura de AgroLLM está asociado al perfil de Alejandro Castro?",
+    "keywords": ["Alejandro Castro", "FitoLLM", "tecnico_campo"],
+    "reference_answer": "El perfil de Alejandro Castro está asociado al módulo FitoLLM.",
+    "category": "relationship"
+  },
+  {
+    "id": 10,
+    "question": "¿Con qué plataforma de software está relacionada la especialidad de calibrado DOP de Alejandro Herrera?",
+    "keywords": ["Alejandro Herrera", "PrecioLLM", "operaciones_almacen"],
+    "reference_answer": "El perfil de Alejandro Herrera está asociado al módulo PrecioLLM.",
+    "category": "relationship"
+  },
+  {
+    "id": 11,
+    "question": "¿Cuál es el objetivo del módulo de software asociado al empleado nacido el 3 de mayo de 1985?",
+    "keywords": ["Alejandro Toledo", "PoseiLLM", "ayudas", "PAC", "POSEI"],
+    "reference_answer": "El empleado es Alejandro Toledo y su módulo asociado es PoseiLLM, diseñado para automatizar la interpretación, el cálculo y la tramitación de ayudas directas en el marco de la PAC y el POSEI.",
+    "category": "spanning"
+  },
+  {
+    "id": 12,
+    "question": "¿Qué funcionalidad de visión por computadora implementará en Q4 de 2025 la plataforma asignada a la gestora de cuentas Alicia Lancaster?",
+    "keywords": ["Alicia Lancaster", "PrecioLLM", "Llama 3.2 Vision", "tablas manuscritas", "cooperativas"],
+    "reference_answer": "El módulo asignado a Alicia Lancaster es PrecioLLM, que incorporará en Q4 de 2025 Llama 3.2 Vision para extraer tablas de precios manuscritas o escaneadas de los tablones de anuncios.",
+    "category": "spanning"
+  },
+  {
+    "id": 13,
+    "question": "¿Cuál es la ayuda por hectárea para el cultivo de aguacates en una zona árida según el POSEI actual?",
+    "keywords": ["1.200 €", "hectárea", "aguacate", "POSEI", "zona árida"],
+    "reference_answer": "Según la ficha técnica del programa POSEI para cultivos tropicales, la ayuda directa para el cultivo de aguacate en zonas áridas es de 1.200 € por hectárea, siempre que se justifique el uso de sistemas de riego eficiente debidamente autorizados.",
+    "category": "direct_fact"
+  },
+  {
+    "id": 14,
+    "question": "¿Qué requisitos de condicionalidad reforzada de la PAC debo cumplir en 2026 si combino cultivos de pimiento con frutales tropicales?",
+    "keywords": ["PAC", "2026", "pimiento", "frutales tropicales", "BCAM 6", "BCAM 7"],
+    "reference_answer": "En 2026, las explotaciones mixtas de pimiento y frutales tropicales deben cumplir la BCAM 6, relativa a la cobertura mínima del suelo en periodos sensibles, y la BCAM 7, relativa a la rotación de cultivos en parcelas anuales. Las superficies ocupadas por frutales perennes están excluidas de la rotación.",
+    "category": "regulatory_compliance"
+  },
+  {
+    "id": 15,
+    "question": "Si una cooperativa supera las 50 hectáreas de cultivo de tomate, ¿cómo se aplica el coeficiente de reducción de la ayuda según el POSEI?",
+    "keywords": ["cooperativa", "tomate", "50 hectáreas", "POSEI", "reducción", "15%"],
+    "reference_answer": "Según el Anexo III de la normativa POSEI, las primeras 50 hectáreas de cultivo de tomate reciben el 100% de la ayuda. A partir de la hectárea 51 se aplica una reducción del 15% en el importe correspondiente a cada hectárea adicional.",
+    "category": "spanning"
+  },
+  {
+    "id": 16,
+    "question": "¿Cuál es el protocolo fitosanitario oficial para tratar la mosca blanca en un cultivo de pimiento y cuál es el plazo de seguridad?",
+    "keywords": ["mosca blanca", "pimiento", "control biológico", "Flupyradifurone 20%", "3 días"],
+    "reference_answer": "El protocolo oficial establece el uso prioritario del control biológico, como Amblyseius swirskii. Cuando sea necesaria una intervención química autorizada, se permite utilizar Flupyradifurone 20%, respetando un plazo de seguridad de 3 días antes de la recolección del pimiento.",
+    "category": "direct_fact"
+  },
+  {
+    "id": 17,
+    "question": "¿Qué productos fitosanitarios autorizados se pueden utilizar para controlar plagas en invernaderos sujetos a normativa de optimización del agua?",
+    "keywords": ["productos autorizados", "invernaderos", "optimización del agua", "azadiractina", "jabón potásico", "FitoLLM"],
+    "reference_answer": "Bajo la normativa de optimización hídrica, se autorizan productos de residuo cero e hidrosolubles de alta degradación que no contaminen los acuíferos por lixiviación. Entre ellos destacan las formulaciones a base de azadiractina y el jabón potásico en sistemas de microaspersión cerrados.",
+    "category": "relationship"
+  },
+  {
+    "id": 18,
+    "question": "Según la última directiva técnica para zonas áridas, ¿cuál es el volumen máximo de riego permitido por hectárea y año para cultivos hortícolas?",
+    "keywords": ["4.500 m³", "riego", "hectárea", "zonas áridas", "cultivos hortícolas"],
+    "reference_answer": "La directiva técnica sectorial establece un consumo máximo de 4.500 m³ de agua por hectárea y año para cultivos hortícolas en suelos catalogados como de alta evaporación. Además, exige el uso de sistemas de riego por goteo con sensor de caudal.",
+    "category": "regulatory_fact"
+  },
+  {
+    "id": 19,
+    "question": "¿En qué página y anexo del documento de directrices de la PAC se detallan los criterios de exclusión para jóvenes agricultores?",
+    "keywords": ["página 142", "Anexo IV", "PAC", "jóvenes agricultores", "exclusión"],
+    "reference_answer": "Los criterios de exclusión específicos para la ayuda complementaria a jóvenes agricultores se detallan en la página 142, dentro del Anexo IV, denominado Requisitos de Incorporación y Titularidad, del Manual General de la PAC.",
+    "category": "traceability"
+  },
+  {
+    "id": 20,
+    "question": "¿Qué cambios normativos entraron en vigor durante el primer trimestre de 2026 respecto a las superficies no productivas de la BCAM 8?",
+    "keywords": ["BCAM 8", "Q1 2026", "3%", "4%", "superficies no productivas", "pastoreo controlado"],
+    "reference_answer": "Durante el primer trimestre de 2026 entró en vigor una modificación que redujo del 4% al 3% la superficie obligatoria destinada a tierras no productivas o elementos del paisaje para las explotaciones de secano. Además, se permitió el pastoreo controlado en estas zonas durante los meses de barbecho.",
+    "category": "temporal"
+  }
+]

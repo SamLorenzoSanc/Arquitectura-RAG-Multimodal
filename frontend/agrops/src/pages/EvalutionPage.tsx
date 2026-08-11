@@ -2,6 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import api from "@/api";
+import { useOrganization } from "@/context/OrganizationContext";
+import {
+  useEvaluationTests,
+  useKnowledgeBases,
+} from "@/hooks/useCachedApi";
 import { 
   BarChart, 
   Bar, 
@@ -50,6 +55,10 @@ type AnswerResult = {
   precision?: number;
   completeness?: number;
   relevance?: number;
+  faithfulness?: number;
+  groundedness?: number;
+  citation_accuracy?: number;
+  abstention?: number;
   feedback?: string;
   evaluation?: {
     feedback: string;
@@ -57,6 +66,10 @@ type AnswerResult = {
     precision?: number;
     completeness: number;
     relevance: number;
+    faithfulness?: number;
+    groundedness?: number;
+    citation_accuracy?: number;
+    abstention?: number;
   };
 };
 
@@ -82,6 +95,10 @@ function getAnswerMetric(item: AnswerResult | undefined | null, metric: string):
     precision: ["precision", "sin_paja", "precision_score"],
     completeness: ["completeness", "exhaustividad", "completeness_score"],
     relevance: ["relevance", "utilidad", "relevance_score"],
+    faithfulness: ["faithfulness", "fidelidad"],
+    groundedness: ["groundedness", "anclaje", "grounded"],
+    citation_accuracy: ["citation_accuracy", "citas"],
+    abstention: ["abstention", "abstencion"],
   };
 
   const aliases = metricAliases[metric] || [metric];
@@ -105,37 +122,70 @@ function getFeedbackText(item: AnswerResult | undefined | null): string {
   return item.evaluation?.feedback || item.feedback || "";
 }
 
+/** Escala 1-5 → %; 0-1 → %; >5 se trata como % ya. */
 function getSafePercentage(value: number): number {
+  if (!value || isNaN(value)) return 0;
+  let scaled: number;
+  if (value > 0 && value <= 5) {
+    scaled = (value / 5) * 100;
+  } else if (value <= 1) {
+    scaled = value * 100;
+  } else {
+    scaled = value;
+  }
+  return Math.round(Math.min(Math.max(scaled, 0), 100));
+}
+
+function getUnitPercentage(value: number): number {
   if (!value || isNaN(value)) return 0;
   const scaled = value > 1 ? value : value * 100;
   return Math.round(Math.min(Math.max(scaled, 0), 100));
 }
 
 export default function AuditPage() {
-  const [tests, setTests] = useState<TestItem[]>([]);
+  const { selectedOrg } = useOrganization();
   const [retrieval, setRetrieval] = useState<RetrievalResult[]>([]);
   const [answers, setAnswers] = useState<AnswerResult[]>([]);
-  const [loadingTests, setLoadingTests] = useState(false);
   const [running, setRunning] = useState(false);
   const [runningStep, setRunningStep] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
+  const [selectedKbId, setSelectedKbId] = useState("");
+
+  const {
+    data: cachedTests,
+    isLoading: loadingTests,
+    isError: testsError,
+    refetch: refetchTests,
+  } = useEvaluationTests();
+  const { data: kbList } = useKnowledgeBases(selectedOrg?.id);
+
+  const tests = (cachedTests as TestItem[] | undefined) ?? [];
+  const knowledgeBases = useMemo(
+    () => (kbList ?? []).map((kb) => ({ id: kb.id, name: kb.name })),
+    [kbList],
+  );
+
+  const evalParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    if (selectedOrg?.id) params.organization_id = selectedOrg.id;
+    if (selectedKbId) params.knowledge_base_id = selectedKbId;
+    return params;
+  }, [selectedOrg?.id, selectedKbId]);
 
   useEffect(() => {
-    void loadTests();
-  }, []);
+    if (testsError) {
+      setError("No se pudieron cargar los tests desde el backend.");
+    }
+  }, [testsError]);
+
+  useEffect(() => {
+    setSelectedKbId((prev) => prev || knowledgeBases[0]?.id || "");
+  }, [knowledgeBases]);
 
   const loadTests = async () => {
-    setLoadingTests(true);
     setError(null);
-    try {
-      const { data } = await api.get<{ tests: TestItem[] }>("/chat/evaluation/tests");
-      setTests(data.tests ?? []);
-    } catch {
-      setError("No se pudieron cargar los tests desde el backend.");
-    } finally {
-      setLoadingTests(false);
-    }
+    await refetchTests();
   };
 
   const runRetrieval = async () => {
@@ -146,7 +196,9 @@ export default function AuditPage() {
 
     try {
       const promises = tests.map((test) =>
-        api.post<RetrievalResult>(`/chat/evaluation/retrieval/${test.id}`)
+        api.post<RetrievalResult>(`/chat/evaluation/retrieval/${test.id}`, null, {
+          params: evalParams,
+        })
       );
       
       const settledResults = await Promise.allSettled(promises);
@@ -176,7 +228,9 @@ export default function AuditPage() {
 
     try {
       const promises = tests.map((test) =>
-        api.post<AnswerResult>(`/chat/evaluation/answer/${test.id}`)
+        api.post<AnswerResult>(`/chat/evaluation/answer/${test.id}`, null, {
+          params: evalParams,
+        })
       );
 
       const settledAnswers = await Promise.allSettled(promises);
@@ -205,8 +259,16 @@ export default function AuditPage() {
     setError(null);
 
     try {
-      const retrievalPromises = tests.map((t) => api.post<RetrievalResult>(`/chat/evaluation/retrieval/${t.id}`));
-      const answerPromises = tests.map((t) => api.post<AnswerResult>(`/chat/evaluation/answer/${t.id}`));
+      const retrievalPromises = tests.map((t) =>
+        api.post<RetrievalResult>(`/chat/evaluation/retrieval/${t.id}`, null, {
+          params: evalParams,
+        })
+      );
+      const answerPromises = tests.map((t) =>
+        api.post<AnswerResult>(`/chat/evaluation/answer/${t.id}`, null, {
+          params: evalParams,
+        })
+      );
 
       const [retrievalSettled, answerSettled] = await Promise.all([
         Promise.allSettled(retrievalPromises),
@@ -238,10 +300,14 @@ export default function AuditPage() {
     return {
       mrr: avg(retrieval.map((r) => getRetrievalMetric(r, "mrr"))),
       ndcg: avg(retrieval.map((r) => getRetrievalMetric(r, "ndcg"))),
-      accuracy: avg(retrieval.map((r) => getRetrievalMetric(r, "accuracy"))),
+      accuracy: avg(answers.map((a) => getAnswerMetric(a, "accuracy"))),
       precision: avg(answers.map((a) => getAnswerMetric(a, "precision"))),
       completeness: avg(answers.map((a) => getAnswerMetric(a, "completeness"))),
       relevance: avg(answers.map((a) => getAnswerMetric(a, "relevance"))),
+      faithfulness: avg(answers.map((a) => getAnswerMetric(a, "faithfulness"))),
+      groundedness: avg(answers.map((a) => getAnswerMetric(a, "groundedness"))),
+      citation_accuracy: avg(answers.map((a) => getAnswerMetric(a, "citation_accuracy"))),
+      abstention: avg(answers.map((a) => getAnswerMetric(a, "abstention"))),
     };
   }, [retrieval, answers]);
 
@@ -334,6 +400,12 @@ export default function AuditPage() {
             <h1 className="text-3xl font-extrabold text-slate-900">
               Evaluación del Asistente ({tests.length} pruebas)
             </h1>
+            <p className="mt-1 text-sm text-slate-600">
+              Scope: {selectedOrg?.name ?? "sin organización"}
+              {selectedKbId
+                ? ` · KB ${knowledgeBases.find((k) => k.id === selectedKbId)?.name ?? selectedKbId}`
+                : ""}
+            </p>
             {runningStep && (
               <p className="mt-1 animate-pulse text-xs font-semibold text-emerald-700">
                 {runningStep}
@@ -341,7 +413,20 @@ export default function AuditPage() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={selectedKbId}
+              onChange={(e) => setSelectedKbId(e.target.value)}
+              disabled={!selectedOrg || running}
+            >
+              <option value="">Todas las KBs del tenant</option>
+              {knowledgeBases.map((kb) => (
+                <option key={kb.id} value={kb.id}>
+                  {kb.name}
+                </option>
+              ))}
+            </select>
             <button
               onClick={() => void loadTests()}
               disabled={running}
@@ -380,7 +465,7 @@ export default function AuditPage() {
         )}
 
         {/* METRICAS PRINCIPALES (TARJETAS KPI) */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <ClientMetricCard
             title="Rapidez de Hallazgo"
             technicalName="MRR"
@@ -416,6 +501,32 @@ export default function AuditPage() {
             technicalName="Relevance"
             description="¿La respuesta realmente solucionó lo consultado?"
             value={averages.relevance}
+          />
+          <ClientMetricCard
+            title="Fidelidad"
+            technicalName="Faithfulness"
+            description="¿La respuesta se ciñe al contexto recuperado (anti-alucinación)?"
+            value={averages.faithfulness}
+          />
+          <ClientMetricCard
+            title="Anclaje"
+            technicalName="Groundedness"
+            description="¿Cada afirmación está respaldada por el contexto?"
+            value={averages.groundedness}
+          />
+          <ClientMetricCard
+            title="Citas"
+            technicalName="Citation"
+            description="¿Las referencias citadas existen en las fuentes?"
+            value={averages.citation_accuracy}
+            asUnit
+          />
+          <ClientMetricCard
+            title="Abstención"
+            technicalName="Abstention"
+            description="¿Se abstuvo correctamente cuando no había conocimiento?"
+            value={averages.abstention}
+            asUnit
           />
         </div>
 
@@ -633,6 +744,10 @@ export default function AuditPage() {
                   const precVal = getSafePercentage(getAnswerMetric(item, "precision"));
                   const compVal = getSafePercentage(getAnswerMetric(item, "completeness"));
                   const relVal = getSafePercentage(getAnswerMetric(item, "relevance"));
+                  const faithVal = getSafePercentage(getAnswerMetric(item, "faithfulness"));
+                  const groundVal = getSafePercentage(getAnswerMetric(item, "groundedness"));
+                  const citeVal = getUnitPercentage(getAnswerMetric(item, "citation_accuracy"));
+                  const abstVal = getUnitPercentage(getAnswerMetric(item, "abstention"));
 
                   return (
                     <div
@@ -657,6 +772,10 @@ export default function AuditPage() {
                         <MiniStat label="Sin Paja" value={`${precVal}%`} percentage={precVal} />
                         <MiniStat label="Completa" value={`${compVal}%`} percentage={compVal} />
                         <MiniStat label="Útil" value={`${relVal}%`} percentage={relVal} />
+                        <MiniStat label="Fidelidad" value={`${faithVal}%`} percentage={faithVal} />
+                        <MiniStat label="Anclaje" value={`${groundVal}%`} percentage={groundVal} />
+                        <MiniStat label="Citas" value={`${citeVal}%`} percentage={citeVal} />
+                        <MiniStat label="Abstención" value={`${abstVal}%`} percentage={abstVal} />
                       </div>
 
                       {item.generated_answer && (
@@ -690,13 +809,15 @@ function ClientMetricCard({
   technicalName,
   description,
   value,
+  asUnit = false,
 }: {
   title: string;
   technicalName: string;
   description: string;
   value: number;
+  asUnit?: boolean;
 }) {
-  const percentage = getSafePercentage(value);
+  const percentage = asUnit ? getUnitPercentage(value) : getSafePercentage(value);
 
   const getStatus = (val: number) => {
     if (val === 0)

@@ -99,6 +99,24 @@ class ChatService {
     return response.data;
 
     }
+
+    async retrieve(question: string, knowledgeBaseId?: string){
+        try{
+            const { data } = await api.post(
+                "/chat/retrieve",
+                {
+                    question,
+                    knowledge_base_id: knowledgeBaseId || undefined,
+                }
+            );
+
+            return data;
+
+        }catch(err:any){
+            console.error("RETRIEVE ERROR", err.response?.data ?? err.message);
+            throw new Error("Error retrieving pipeline");
+        }
+    }
 }
 
 export default new ChatService();
