@@ -66,9 +66,7 @@ class Permission(str, Enum):
     KB_DELETE = "kb:delete"
 
     # Documentos
-    DOC_CREATE = "doc:create"
     DOC_READ = "doc:read"
-    DOC_DELETE = "doc:delete"
 
     # Chat & RAG
     CHAT_CREATE = "chat:create"
@@ -106,7 +104,6 @@ ROLE_PERMISSIONS: Dict[str, List[Permission]] = {
     "org_admin": [p for p in _ALL if p != Permission.DEBUG_ACCESS],
     "farm_manager": _BASE_READ
     + [
-        Permission.DOC_CREATE,
         Permission.FARM_READ,
         Permission.FARM_MANAGE,
         Permission.ANALYTICS_READ,

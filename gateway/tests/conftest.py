@@ -11,9 +11,6 @@ from models.base import Base
 from models.document import Document
 from models.processing_job import ProcessingJob
 
-from services.ingest_service import IngestService
-from services.document_processor import DocumentProcessor
-
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock
@@ -76,14 +73,6 @@ async def processing_job(session, document):
     return job
 
 
-@pytest.fixture
-def ingest_service(session):
-    return IngestService(session)
-
-
-@pytest.fixture
-def document_processor(session):
-    return DocumentProcessor(session)
 
 
 @pytest.fixture

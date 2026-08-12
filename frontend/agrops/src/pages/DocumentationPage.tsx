@@ -172,26 +172,6 @@ interface AnswerAuditRow {
   relevance: number;
 }
 
-/* ============================================================
-UPLOAD
-============================================================ */
-
-interface UploadResponse {
-  id?: string;
-  document_id?: string;
-  job_id?: string;
-
-  status?: string;
-  processing_status?: ProcessingStatus;
-
-  active?: boolean;
-
-  embedding_model?: string;
-  generation_model?: string;
-
-  message?: string;
-}
-
 interface KnowledgeBase {
   id: string;
   name?: string;
@@ -200,29 +180,6 @@ interface KnowledgeBase {
 /* ============================================================
 CONSTANTS
 ============================================================ */
-
-const VIDEO_EXTENSIONS = [
-  ".mp4",
-  ".mov",
-  ".avi",
-  ".mkv",
-  ".webm",
-  ".mpeg",
-  ".mpg",
-  ".m4v",
-];
-
-const ACCEPTED_EXTENSIONS = [
-  ".pdf",
-  ".doc",
-  ".docx",
-  ".txt",
-  ".xls",
-  ".xlsx",
-  ...VIDEO_EXTENSIONS,
-];
-
-const POLL_INTERVAL_MS = 2000;
 
 /* ============================================================
 EVALUATION AUDIT THRESHOLDS (match evaluator.py)
@@ -309,12 +266,6 @@ function formatBytes(bytes?: number) {
   }
 
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
-}
-
-function isVideoFile(file: File) {
-  const extension = `.${file.name.split(".").pop()?.toLowerCase()}`;
-
-  return file.type.startsWith("video/") || VIDEO_EXTENSIONS.includes(extension);
 }
 
 function processingLabel(status?: ProcessingStatus) {
@@ -583,243 +534,6 @@ function StatCard({
 }
 
 /* ============================================================
-UPLOAD MODAL
-============================================================ */
-
-function UploadModal({
-  open,
-  uploading,
-  onClose,
-  onUpload,
-}: {
-  open: boolean;
-  uploading: boolean;
-  onClose: () => void;
-  onUpload: (files: File[]) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const [dragActive, setDragActive] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
-
-  useEffect(() => {
-    if (!open) {
-      setFiles([]);
-      setDragActive(false);
-    }
-  }, [open]);
-
-  if (!open) {
-    return null;
-  }
-
-  const addFiles = (incoming: FileList | File[]) => {
-    const newFiles = Array.from(incoming);
-
-    setFiles((current) => {
-      const map = new Map(
-        current.map((file) => [
-          `${file.name}-${file.size}-${file.lastModified}`,
-          file,
-        ]),
-      );
-
-      newFiles.forEach((file) => {
-        map.set(`${file.name}-${file.size}-${file.lastModified}`, file);
-      });
-
-      return Array.from(map.values());
-    });
-  };
-
-  const removeFile = (index: number) => {
-    setFiles((current) => current.filter((_, i) => i !== index));
-  };
-
-  const submit = () => {
-    if (files.length === 0 || uploading) {
-      return;
-    }
-
-    onUpload(files);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-6">
-      <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-800">
-              Subir documentación
-            </h2>
-
-            <p className="mt-1 text-xs text-slate-400">
-              La indexación comienza automáticamente después de la subida.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={uploading}
-            className="rounded-md p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="p-6">
-          <div
-            onDragOver={(event) => {
-              event.preventDefault();
-              setDragActive(true);
-            }}
-            onDragLeave={() => {
-              setDragActive(false);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragActive(false);
-
-              if (event.dataTransfer.files) {
-                addFiles(event.dataTransfer.files);
-              }
-            }}
-            onClick={() => inputRef.current?.click()}
-            className={`
-              cursor-pointer
-              rounded-xl
-              border-2
-              border-dashed
-              p-10
-              text-center
-              transition
-              ${
-                dragActive
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-              }
-            `}
-          >
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-              ↑
-            </div>
-
-            <p className="text-sm font-medium text-slate-700">
-              Arrastra tus documentos o vídeos aquí
-            </p>
-
-            <p className="mt-1 text-xs text-slate-400">
-              o haz clic para seleccionarlos
-            </p>
-
-            <p className="mt-3 text-[11px] text-slate-400">
-              PDF, DOC, DOCX, TXT, XLS, XLSX, MP4, MOV, AVI, MKV, WEBM
-            </p>
-
-            <input
-              ref={inputRef}
-              type="file"
-              multiple
-              accept={ACCEPTED_EXTENSIONS.join(",")}
-              className="hidden"
-              onChange={(event) => {
-                if (event.target.files) {
-                  addFiles(event.target.files);
-                }
-
-                event.currentTarget.value = "";
-              }}
-            />
-          </div>
-
-          {files.length > 0 && (
-            <div className="mt-5 space-y-2">
-              <div className="text-xs font-medium text-slate-500">
-                Archivos seleccionados
-              </div>
-
-              {files.map((file, index) => {
-                const video = isVideoFile(file);
-
-                return (
-                  <div
-                    key={`${file.name}-${file.size}-${file.lastModified}`}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className={`
-                          flex h-8 w-8 shrink-0 items-center justify-center rounded-md
-                          ${
-                            video
-                              ? "bg-blue-50 text-blue-600"
-                              : "bg-slate-100 text-slate-500"
-                          }
-                        `}
-                      >
-                        {video ? "▶" : "□"}
-                      </div>
-
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-medium text-slate-700">
-                          {file.name}
-                        </p>
-
-                        <p className="text-[10px] text-slate-400">
-                          {video ? "Vídeo" : "Documento"}
-                          {file.size ? ` · ${formatBytes(file.size)}` : ""}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        removeFile(index);
-                      }}
-                      disabled={uploading}
-                      className="ml-3 text-xs text-slate-400 hover:text-red-500 disabled:opacity-50"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={uploading}
-            className="rounded-md border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-
-          <button
-            type="button"
-            onClick={submit}
-            disabled={files.length === 0 || uploading}
-            className="rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {uploading
-              ? "Subiendo..."
-              : `Subir ${files.length || ""} archivo${
-                  files.length === 1 ? "" : "s"
-                }`}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
 DISTANCE METRIC SELECTOR
 ============================================================ */
 
@@ -895,9 +609,6 @@ export default function RagDocumentationPage() {
 
   const [documents, setDocuments] = useState<RagDocument[]>([]);
   const loading = (loadingKbs || loadingDocs) && documents.length === 0;
-
-  const [uploadModal, setUploadModal] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   const [search, setSearch] = useState("");
 
@@ -1433,179 +1144,6 @@ export default function RagDocumentationPage() {
   AUTO REFRESH
   ============================================================ */
 
-  useEffect(() => {
-    if (!knowledgeBaseId) {
-      return;
-    }
-
-    const processing = documents.some(
-      (document) =>
-        document.processing_status === "pending" ||
-        document.processing_status === "running",
-    );
-
-    if (!processing) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      void loadDocuments(knowledgeBaseId, {
-        silent: true,
-      });
-    }, POLL_INTERVAL_MS);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [documents, knowledgeBaseId, loadDocuments]);
-
-  /* ============================================================
-  UPLOAD
-  ============================================================ */
-
-  const uploadDocuments = async (files: File[]) => {
-    if (!knowledgeBaseId) {
-      setError("No hay ninguna Knowledge Base seleccionada.");
-
-      return;
-    }
-
-    try {
-      setUploading(true);
-      setError(null);
-      setMessage(null);
-
-      let uploaded = 0;
-      let videos = 0;
-
-      for (const file of files) {
-        const formData = new FormData();
-
-        formData.append("file", file);
-        formData.append("knowledge_base_id", knowledgeBaseId);
-        formData.append("title", file.name);
-
-        const response = await api.post<UploadResponse>("/documents", formData);
-
-        if (response.data?.id || response.data?.document_id) {
-          uploaded += 1;
-        }
-
-        if (isVideoFile(file)) {
-          videos += 1;
-        }
-      }
-
-      setMessage(
-        videos > 0
-          ? uploaded === 1
-            ? "Vídeo subido y procesamiento iniciado."
-            : `${uploaded} archivos subidos y procesamiento iniciado.`
-          : uploaded === 1
-            ? "Documento subido y procesamiento iniciado."
-            : `${uploaded} documentos subidos y procesamiento iniciado.`,
-      );
-
-      setUploadModal(false);
-
-      await loadDocuments(knowledgeBaseId);
-    } catch (err: any) {
-      console.error("Error subiendo documentos:", err);
-
-      setError(
-        err.response?.data?.detail ||
-          err.response?.data?.message ||
-          err.message ||
-          "Error durante la subida.",
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  /* ============================================================
-  REINDEX
-  ============================================================ */
-
-  const indexDocument = async (documentId: string) => {
-    try {
-      setError(null);
-      setMessage(null);
-
-      setDocuments((current) =>
-        current.map((document) =>
-          document.id === documentId
-            ? {
-                ...document,
-                status: "inactive",
-                processing_status: "pending",
-                active: false,
-              }
-            : document,
-        ),
-      );
-
-      await api.post(`/documents/${documentId}/index`);
-
-      setMessage(
-        "Procesamiento iniciado. La tabla se actualizará automáticamente.",
-      );
-
-      await loadDocuments(knowledgeBaseId, {
-        silent: true,
-      });
-    } catch (err: any) {
-      console.error("Error iniciando la indexación:", err);
-
-      setError(
-        err.response?.data?.detail ||
-          err.response?.data?.message ||
-          err.message ||
-          "Error iniciando la indexación.",
-      );
-    }
-  };
-
-  /* ============================================================
-  DELETE
-  ============================================================ */
-
-  const deleteDocument = async (documentId: string) => {
-    const document = documents.find((item) => item.id === documentId);
-
-    if (!document) {
-      return;
-    }
-
-    const confirmed = window.confirm(`¿Eliminar "${document.name}"?`);
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      setError(null);
-      setMessage(null);
-
-      await api.delete(`/documents/${documentId}`);
-
-      setDocuments((current) =>
-        current.filter((item) => item.id !== documentId),
-      );
-
-      setMessage("Documento eliminado.");
-    } catch (err: any) {
-      console.error("Error eliminando documento:", err);
-
-      setError(
-        err.response?.data?.detail ||
-          err.response?.data?.message ||
-          err.message ||
-          "No se pudo eliminar el documento.",
-      );
-    }
-  };
-
   /* ============================================================
   FILTER
   ============================================================ */
@@ -1761,14 +1299,9 @@ export default function RagDocumentationPage() {
                 <StatCard value={stats.failed} label="Fallidos" />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setUploadModal(true)}
-                disabled={!knowledgeBaseId}
-                className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Subir documentos / vídeos
-              </button>
+              <p className="text-xs text-slate-400">
+                Catálogo histórico en modo solo lectura
+              </p>
             </div>
 
             <div className="mb-4">
@@ -1838,7 +1371,7 @@ export default function RagDocumentationPage() {
                         </p>
 
                         <p className="mt-1 text-xs text-slate-400">
-                          Sube un documento o vídeo para comenzar.
+                          No hay metadatos documentales históricos en esta base.
                         </p>
                       </td>
                     </tr>
@@ -1918,40 +1451,13 @@ export default function RagDocumentationPage() {
 
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2">
-                            {document.processing_status === "completed" && (
-                              <button
-                                type="button"
-                                onClick={() => indexDocument(document.id)}
-                                className="text-xs font-medium text-slate-500 hover:text-slate-900"
-                              >
-                                Reindexar
-                              </button>
-                            )}
-
-                            {document.processing_status === "failed" && (
-                              <button
-                                type="button"
-                                onClick={() => indexDocument(document.id)}
-                                className="text-xs font-medium text-blue-600 hover:text-blue-700"
-                              >
-                                Reintentar
-                              </button>
-                            )}
-
                             {(document.processing_status === "pending" ||
                               document.processing_status === "running") && (
                               <span className="text-xs text-slate-400">
-                                Procesando...
+                                Estado histórico: procesando
                               </span>
                             )}
-
-                            <button
-                              type="button"
-                              onClick={() => deleteDocument(document.id)}
-                              className="text-xs text-slate-400 hover:text-red-500"
-                            >
-                              Eliminar
-                            </button>
+                            <span className="text-xs text-slate-400">Solo lectura</span>
                           </div>
                         </td>
                       </tr>
@@ -2736,16 +2242,6 @@ export default function RagDocumentationPage() {
         )}
       </main>
 
-      {/* ==================================================
-          UPLOAD MODAL
-      ================================================== */}
-
-      <UploadModal
-        open={uploadModal}
-        uploading={uploading}
-        onClose={() => setUploadModal(false)}
-        onUpload={uploadDocuments}
-      />
     </div>
   );
 }

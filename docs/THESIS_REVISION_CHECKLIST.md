@@ -27,7 +27,7 @@ Insertar una tabla que distinga parámetros iniciales y finales. Valores verific
 
 | Campo | Valor verificable | Evidencia/limitación |
 |---|---|---|
-| Generador de ingesta/RAG | `llama3` por defecto | `RAG_GENERATION_MODEL` y `RAGService`; chat puede seleccionar otro modelo. |
+| Generador RAG | `llama3` por defecto | `RAG_GENERATION_MODEL` y `RAGService`; chat puede seleccionar otro modelo. |
 | Generador de chat web | `llama3.2:latest` por defecto | Ruta de chat. Tag/digest instalado no consta. |
 | Generador de evaluación | `llama3.2` por defecto | Request de evaluación. |
 | Embedding | `qwen3-embedding:latest` | Tag móvil; digest y dimensión efectiva pendientes. |
@@ -123,7 +123,7 @@ No se encontró tamaño de muestra, anotaciones expertas ni kappa.
 
 Texto recomendado:
 
-> El prototipo implementa ingesta multimodal: documentos e imágenes se transforman a Markdown y los vídeos a transcripciones temporizadas. El retrieval, la generación y la evaluación versionada operan sobre texto derivado. Por tanto, los resultados demuestran evaluación textual tras OCR/parsing/transcripción, no razonamiento visual end-to-end.
+> El prototipo conserva un corpus histórico derivado de documentos, imágenes y vídeos. El runtime actual no implementa ingesta ni almacenamiento de archivos nuevos. Retrieval, generación y evaluación operan sobre texto y embeddings ya persistidos; no demuestran razonamiento visual end-to-end.
 
 - [ ] Si se desea reivindicar razonamiento multimodal, añadir un dataset con preguntas que dependan de tablas/imágenes, baseline textual, métricas y trazas del modelo visual.
 
@@ -152,4 +152,4 @@ Texto recomendado:
 6. Versiones/digests de modelos y temperatura efectiva.
 7. Evidencia de HNSW y de trazabilidad de página.
 
-Hasta resolverlos, las afirmaciones deben limitarse al repositorio: prototipo contenedorizado, ingesta multimodal con evaluación textual, dataset actual de 21 filas/19 preguntas únicas y resultados exploratorios no concluyentes.
+Hasta resolverlos, las afirmaciones deben limitarse al repositorio: monolito contenedorizado con corpus histórico, evaluación textual, dataset actual de 21 filas/19 preguntas únicas y resultados exploratorios no concluyentes.

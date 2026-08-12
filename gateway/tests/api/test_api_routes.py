@@ -74,20 +74,10 @@ def test_send_chat_message_success(authenticated_client):
 
     assert response.status_code in (200, 201), f"Falló con {response.status_code}: {response.text}"
 
-def test_upload_document(authenticated_client, tmp_path):
-        dummy_file = tmp_path / "test.txt"
-        dummy_file.write_text("Contenido", encoding="utf-8")
-    
-        with patch("routes.documents.DocumentProcessor") as MockProcessorClass, \
-             patch("routes.documents.StorageService") as MockStorageClass: 
-            
-            mock_instance = MockProcessorClass.return_value
-            mock_instance.process = AsyncMock(return_value={"status": "SUCCESS"})
-            
-            MockStorageClass.return_value.save = AsyncMock(return_value="/fake/path/test.txt")
-    
-            with open(dummy_file, "rb") as f:
-                files = {"file": ("test.txt", f, "text/plain")}
-                data = {"knowledge_base_id": VALID_UUID}
-                response = authenticated_client.post(UPLOAD_ROUTE, files=files, data=data)
-        assert response.status_code in (200, 201), f"Falló con {response.status_code}: {response.text}"
+def test_upload_document_is_not_available(authenticated_client):
+    response = authenticated_client.post(
+        UPLOAD_ROUTE,
+        files={"file": ("test.txt", b"Contenido", "text/plain")},
+        data={"knowledge_base_id": VALID_UUID},
+    )
+    assert response.status_code == 405

@@ -3,8 +3,6 @@
 import { useState, useRef, useMemo, useEffect, type FormEvent } from "react";
 import {
   Send,
-  Upload,
-  X,
   Database,
   Layers,
   Loader2,
@@ -15,14 +13,12 @@ import {
   Cpu,
 } from "lucide-react";
 import ChatService from "@/services/chat.service";
-import DocumentService from "@/services/document.service";
 import { useOrganization } from "@/context/OrganizationContext";
 import AvatarPanel from "@/components/AvatarPanel";
 import type { DocumentItem } from "@/types/document";
 import {
   useCrops,
   useDocuments,
-  useInvalidateDocuments,
   useKnowledgeBases,
 } from "@/hooks/useCachedApi";
 import type {
@@ -70,23 +66,12 @@ function takeRecentConversations(list: any[]) {
     .slice(0, MAX_VISIBLE_CONVERSATIONS);
 }
 
-type RagStep = {
-  id: string;
-  label: string;
-  status: "pending" | "running" | "completed" | "error";
-  detail?: string;
-  duration?: number;
-};
-
 export default function ChatPage() {
   const { selectedOrg } = useOrganization();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState("Misc");
   const [isLoading, setIsLoading] = useState(false);
 
   // ESTADO PARA EL MODELO SELECCIONADO
@@ -95,7 +80,6 @@ export default function ChatPage() {
   const [thinkingStep, setThinkingStep] = useState<string>("");
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
 
-  const [isUploadingModal, setIsUploadingModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [context, setContext] = useState<ChatContext[]>([]);
@@ -115,7 +99,6 @@ export default function ChatPage() {
   const { data: documentsCached } = useDocuments(
     knowledgeBaseId || undefined,
   );
-  const invalidateDocuments = useInvalidateDocuments();
 
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
@@ -162,45 +145,6 @@ export default function ChatPage() {
 
   const [showRagParams, setShowRagParams] = useState(false);
 
-  const INITIAL_RAG_STEPS: RagStep[] = [
-    {
-      id: "upload",
-      label: "Subiendo documento",
-      status: "pending",
-    },
-    {
-      id: "extract",
-      label: "Extrayendo contenido del PDF",
-      status: "pending",
-    },
-    {
-      id: "clean",
-      label: "Normalizando texto",
-      status: "pending",
-    },
-    {
-      id: "chunk",
-      label: "Dividiendo en chunks",
-      status: "pending",
-    },
-    {
-      id: "embedding",
-      label: "Generando embeddings con qwen3",
-      status: "pending",
-    },
-    {
-      id: "vector",
-      label: "Almacenando vectores en pgvector",
-      status: "pending",
-    },
-    {
-      id: "finish",
-      label: "Documento disponible en RAG",
-      status: "pending",
-    },
-  ];
-
-  const [ragPipeline, setRagPipeline] = useState<RagStep[]>([]);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -247,24 +191,6 @@ export default function ChatPage() {
     return [...new Set(qs)].slice(0, 6);
   };
 
-  const updateRagStep = (
-    id: string,
-    status: RagStep["status"],
-    detail?: string,
-  ) => {
-    setRagPipeline((prev) =>
-      prev.map((step) =>
-        step.id === id
-          ? {
-              ...step,
-              status,
-              detail,
-            }
-          : step,
-      ),
-    );
-  };
-
   const openConversation = async (id: string) => {
     try {
       const data = await ChatService.getConversation(id);
@@ -281,8 +207,6 @@ export default function ChatPage() {
       console.error("Error al abrir conversación:", error);
     }
   };
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const contextCharacters = useMemo(() => {
     return context.reduce(
@@ -359,64 +283,12 @@ export default function ChatPage() {
       return;
     }
     setKnowledgeBaseId(kbId);
-    await invalidateDocuments(kbId);
   };
 
   const handleKbChange = (newKbId: string) => {
     void fetchDocumentsForKb(newKbId);
   };
 
-  const handleUploadFilesModal = async () => {
-    if (!knowledgeBaseId || uploadedFiles.length === 0) return;
-
-    setIsUploadingModal(true);
-
-    setRagPipeline(
-      INITIAL_RAG_STEPS.map((x) => ({
-        ...x,
-        status: "pending",
-      })),
-    );
-
-    try {
-      for (const file of uploadedFiles) {
-        updateRagStep("upload", "running", file.name);
-
-        await DocumentService.upload({
-          file,
-          knowledge_base_id: knowledgeBaseId,
-          title: file.name,
-          description: selectedCategory,
-        });
-
-        updateRagStep("upload", "completed", "Documento encolado");
-        updateRagStep(
-          "extract",
-          "completed",
-          "Procesamiento en segundo plano (parser → chunks → embeddings)",
-        );
-        updateRagStep("chunk", "completed", "Sin esperas artificiales en UI");
-        updateRagStep(
-          "embedding",
-          "completed",
-          "Ingesta rápida: sin enriquecimiento LLM por chunk",
-        );
-        updateRagStep("vector", "completed", "Persistencia en curso en API");
-        updateRagStep("finish", "completed", "Documento enviado a la pipeline");
-      }
-
-      await fetchDocumentsForKb(knowledgeBaseId);
-
-      setUploadedFiles([]);
-      setShowUploadModal(false);
-    } catch (err) {
-      console.error("Error procesando documentos:", err);
-
-      updateRagStep("upload", "error", "Error durante la ingestión");
-    } finally {
-      setIsUploadingModal(false);
-    }
-  };
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -660,12 +532,6 @@ export default function ChatPage() {
       setIsLoading(false);
       setIsGenerating(false);
       setThinkingStep("");
-    }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setUploadedFiles(Array.from(e.target.files));
     }
   };
 
@@ -1132,128 +998,6 @@ export default function ChatPage() {
 
         {/* Right-side retrieval panel removed: sources now shown inline next to the assistant message and related questions appear under the chat. */}
       </div>
-
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
-          <div className="w-[420px] rounded-xl bg-white shadow-xl overflow-hidden">
-            <div className="flex justify-between border-b px-6 py-4 items-center bg-gray-50/50">
-              <div>
-                <h2 className="font-bold text-slate-800">Subir documentos</h2>
-                <p className="text-xs text-gray-500">
-                  Añadir archivos a {selectedOrg.name}
-                </p>
-              </div>
-              <button
-                onClick={() => !isUploadingModal && setShowUploadModal(false)}
-                disabled={isUploadingModal}
-                className="text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="space-y-5 p-6">
-              <div>
-                <label className="text-xs font-semibold text-slate-700">
-                  Seleccionar Archivos
-                </label>
-                <div
-                  onClick={() =>
-                    !isUploadingModal && fileInputRef.current?.click()
-                  }
-                  className={`mt-2 rounded-lg border border-dashed p-8 text-center transition-colors ${
-                    isUploadingModal
-                      ? "opacity-50 cursor-not-allowed bg-gray-50"
-                      : "cursor-pointer hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    accept=".pdf,.doc,.docx,.txt,.xlsx,.ppt,.pptx,.png,.jpg,.jpeg"
-                    onChange={handleFileSelect}
-                    disabled={isUploadingModal}
-                  />
-                  <Upload className="mx-auto mb-2 text-amber-600 animate-pulse" />
-                  <p className="text-sm font-medium text-slate-700">
-                    Haz clic para buscar archivos
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    PDF, TXT, DOCX, imágenes, etc.
-                  </p>
-                </div>
-
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-3 space-y-2 max-h-36 overflow-y-auto">
-                    {uploadedFiles.map((file, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between rounded-lg bg-amber-50/50 px-3 py-2 text-sm border border-amber-100"
-                      >
-                        <span className="truncate pr-4 text-amber-900 font-medium">
-                          {file.name}
-                        </span>
-                        {!isUploadingModal && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setUploadedFiles((files) =>
-                                files.filter((_, i) => i !== index),
-                              );
-                            }}
-                            className="text-gray-400 hover:text-red-500 shrink-0 cursor-pointer"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700">
-                  Categoría
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  disabled={isUploadingModal}
-                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none focus:border-amber-500 bg-white"
-                >
-                  <option value="Misc">Misc</option>
-                  <option value="Legal">Legal</option>
-                  <option value="Finanzas">Finanzas</option>
-                  <option value="Técnico">Técnico</option>
-                  <option value="RRHH">RRHH</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 border-t bg-gray-50/50 px-6 py-4">
-              <button
-                onClick={() => setShowUploadModal(false)}
-                disabled={isUploadingModal}
-                className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-gray-100 transition-colors cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleUploadFilesModal}
-                disabled={uploadedFiles.length === 0 || isUploadingModal}
-                className="flex items-center gap-2 rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                {isUploadingModal && (
-                  <Loader2 size={16} className="animate-spin" />
-                )}
-                {isUploadingModal ? "Subiendo..." : "Subir archivos"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
         <form

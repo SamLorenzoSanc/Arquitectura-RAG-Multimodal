@@ -4,9 +4,9 @@
 
 Prototipo funcional contenedorizado desarrollado como Trabajo Fin de Máster. Su objetivo es estudiar si una arquitectura Retrieval-Augmented Generation (RAG) puede **reducir o mitigar las alucinaciones en los casos evaluados**, no eliminarlas de forma general.
 
-La interfaz React/Vite consume un gateway FastAPI. El gateway persiste usuarios, documentos, fragmentos y embeddings en PostgreSQL con pgvector; mantiene un índice BM25 por tenant; fusiona recuperación densa y léxica mediante Reciprocal Rank Fusion (RRF); reordena candidatos con un Cross-Encoder; y genera respuestas con modelos servidos por Ollama.
+La interfaz React/Vite consume un monolito FastAPI. El gateway persiste usuarios y datos de negocio en PostgreSQL con pgvector; consulta fragmentos y embeddings documentales históricos; mantiene un índice BM25 por tenant; fusiona recuperación densa y léxica mediante Reciprocal Rank Fusion (RRF); reordena candidatos con un Cross-Encoder; y genera respuestas directamente con Ollama.
 
-> Alcance multimodal: la ingesta admite documentos, imágenes y vídeo. Las imágenes/documentos complejos se convierten a Markdown mediante parsers y el vídeo se transcribe con Whisper. La evaluación conservada en el repositorio es textual; no demuestra una evaluación end-to-end de razonamiento visual.
+> Compatibilidad documental: se conserva el RAG y la visualización de fuentes existentes, pero el runtime ya no admite subida, almacenamiento, descarga, procesamiento o reindexado de archivos.
 
 ## Arquitectura real
 
@@ -17,22 +17,20 @@ React 19 + Vite 8
         v
 FastAPI gateway
   |-- autenticación JWT y selección de tenant/knowledge base
-  |-- ingesta: parser/transcripción -> Markdown -> chunks -> enriquecimiento
   |-- retrieval: pgvector + BM25 -> RRF -> Cross-Encoder
   |-- generación y juez automático -> Ollama (API compatible OpenAI)
         |
-        +--> PostgreSQL 15 + pgvector
+        +--> PostgreSQL + pgvector
         +--> índices BM25 locales por tenant
-        +--> almacenamiento local de originales/Markdown
 ```
 
-Detalles: [arquitectura](docs/ARCHITECTURE.md), [pipeline RAG](docs/RAG_PIPELINE.md), [ingesta](docs/INGEST_PIPELINE.md), [evaluación](docs/EVALUATION.md) y [Docker](docs/DOCKER.md).
+Detalles: [arquitectura](docs/ARCHITECTURE.md), [pipeline RAG](docs/RAG_PIPELINE.md), [estado de ingesta](docs/INGEST_PIPELINE.md), [evaluación](docs/EVALUATION.md) y [Docker](docs/DOCKER.md).
 
 ## Configuración verificada en el código
 
 | Parámetro | Valor por defecto o verificado | Observación |
 |---|---|---|
-| Generación de ingesta/RAG | `llama3`; chat web `llama3.2:latest`; evaluación `llama3.2` | Hay varios puntos de entrada; registrar el tag resuelto por Ollama en cada experimento. |
+| Generación RAG | `llama3`; chat web `llama3.2:latest`; evaluación `llama3.2` | Hay varios puntos de entrada; registrar el tag resuelto por Ollama en cada experimento. |
 | Embedding | `qwen3-embedding:latest` | Tag móvil; la versión/peso exacto no queda fijado. |
 | Cross-Encoder | `BAAI/bge-reranker-v2-m3` | `max_length=512`, lote 16. Revisión/peso exacto no fijado. |
 | Chunking | 1000 caracteres, solapamiento 150 | `RecursiveCharacterTextSplitter`, después de dividir por encabezados Markdown. |
@@ -40,7 +38,7 @@ Detalles: [arquitectura](docs/ARCHITECTURE.md), [pipeline RAG](docs/RAG_PIPELINE
 | Top-k final | 3 en `RAGService`; 5 en simulador/evaluación por defecto | El requisito experimental `top-k=10` solo coincide con `retrieval_k`/`bm25_k`, no con los chunks finales. |
 | Temperatura | No verificable en el pipeline principal | `ChatRequest` declara `0`, pero `RAGService` no la propaga a Ollama. No atribuir resultados a temperatura 0. |
 | Python | `>=3.12`; imagen `python:3.12-slim` | Dependencias exactas se resuelven desde `gateway/uv.lock`. |
-| PostgreSQL | imagen `postgres:15` | El tag menor no está fijado. |
+| PostgreSQL | imagen `pgvector/pgvector:pg18` | El tag menor no está fijado. |
 | Ollama | imagen `ollama/ollama:latest` | Versión exacta no fijada. |
 
 ## Inicio con Docker (Windows)
@@ -133,9 +131,9 @@ El banco textual versionado contiene 21 filas, 19 preguntas únicas y siete cate
 ```text
 frontend/agrops/       React/Vite
 gateway/               API FastAPI, modelos, parsers, servicios y pruebas
-gateway/services/      RAG, ingesta, base de datos e índices BM25
+gateway/services/      RAG, forecast, base de datos y lógica monolítica
 postgres/              inicialización de PostgreSQL/pgvector
-storage/               archivos cargados y artefactos locales
+storage/               datos históricos conservados, fuera del runtime
 docs/                  documentación técnica y auditoría de memoria
 src/                   evaluador/prototipo legado; no es la fuente de verdad
 ```
@@ -144,7 +142,7 @@ La fuente de verdad operativa es `gateway/`. `src/` conserva un evaluador anteri
 
 ## Seguridad y madurez
 
-El sistema puede ejecutarse localmente, pero eso no acredita por sí solo cumplimiento GDPR, AI Act ni preparación productiva. Cambie `SECRET_KEY`, no publique `.env`, restrinja CORS y puertos, revise los documentos almacenados y use secretos gestionados antes de cualquier despliegue compartido.
+El sistema puede ejecutarse localmente, pero eso no acredita por sí solo cumplimiento GDPR, AI Act ni preparación productiva. Cambie `SECRET_KEY`, no publique `.env`, restrinja CORS y puertos, proteja los datos históricos conservados y use secretos gestionados antes de cualquier despliegue compartido.
 
 ## Memoria TFM
 

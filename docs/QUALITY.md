@@ -25,8 +25,6 @@ uv run pytest -q tests/unit -m unit --confcutdir=tests/unit `
   --cov=services.geo_polygon `
   --cov=services.evaluation_metrics `
   --cov=services.farmer_context_service `
-  --cov=services.queue_service `
-  --cov=clients `
   --cov-report=term-missing `
   --cov-report=xml:coverage.xml `
   --cov-report=html:htmlcov `
@@ -83,5 +81,5 @@ En CI, el job `doxygen` publica el artefacto `doxygen-html`.
 
 1. Subir `fail_under` a 40 → 60 cuando el núcleo `services/` esté cubierto.
 2. Añadir tests de `routes` con `TestClient` y mocks.
-3. Tests de microservicios (`services/*/main.py`) con httpx ASGI.
+3. Tests de rutas del monolito con dependencias de PostgreSQL/Ollama simuladas.
 4. (Opcional) Vitest + Coveralls para el frontend React.

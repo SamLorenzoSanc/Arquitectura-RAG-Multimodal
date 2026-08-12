@@ -38,8 +38,6 @@ jobs:
             --cov=services.geo_polygon \
             --cov=services.evaluation_metrics \
             --cov=services.farmer_context_service \
-            --cov=services.queue_service \
-            --cov=clients \
             --cov-report=term-missing \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \

@@ -33,10 +33,7 @@ from services.evaluation_metrics import (
 load_dotenv(override=True)
 WAIT_POLICY = wait_exponential(multiplier=1, min=10, max=240)
 
-from clients.inference_client import resolve_llm_base_url
-from clients.retrieval_client import retrieval_service_enabled, retrieve_remote
-
-OLLAMA_BASE_URL = resolve_llm_base_url()
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
 HNSW_INDEX_DIMENSIONS = int(os.getenv("HNSW_INDEX_DIMENSIONS", "2000"))
 
@@ -623,49 +620,7 @@ class RAGService:
         tenant_id: str,
         collections: list[str] | None = None,
     ) -> list[Result]:
-        """Dense retrieval mediante pgvector, manteniendo el filtro multitenant.
-
-        Si USE_RETRIEVAL_SERVICE=true, delega en retrieval-service (mismo contrato
-        para Hybrid/Agentic/eval).
-        """
-        if retrieval_service_enabled():
-            t0 = time.time()
-            try:
-                data = await retrieve_remote(
-                    question=question,
-                    tenant_id=tenant_id,
-                    collections=collections,
-                    retrieval_k=self.retrieval_k,
-                    final_k=self.retrieval_k,
-                )
-                results = []
-                for ch in data.get("chunks") or []:
-                    results.append(
-                        Result(
-                            page_content=ch.get("page_content") or "",
-                            metadata={
-                                "chunk_id": ch.get("chunk_id"),
-                                "document_id": ch.get("document_id"),
-                                "tenant_id": tenant_id,
-                                "source": ch.get("source"),
-                                "distance": float(
-                                    (ch.get("metadata") or {}).get("distance", 0)
-                                    or 0
-                                ),
-                                "score": ch.get("score"),
-                                "retrieval_source": "dense_remote",
-                                "dense_latency_ms": (time.time() - t0) * 1000,
-                            },
-                        )
-                    )
-                print(
-                    f"      [DENSE-REMOTE] {len(results)} chunks | "
-                    f"tenant={tenant_id} | {(time.time()-t0):.2f}s"
-                )
-                return results
-            except Exception as exc:
-                print(f"      [DENSE-REMOTE] fallback local: {exc}")
-
+        """Dense retrieval local mediante pgvector con filtro multitenant."""
         t0 = time.time()
         raw_embedding = (await self._create_embeddings(question)).data[0].embedding
         t_emb = time.time() - t0

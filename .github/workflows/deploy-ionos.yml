@@ -60,42 +60,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build & push Inference
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/inference
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-inference:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-inference:latest
-
-      - name: Build & push Retrieval
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/retrieval
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-retrieval:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-retrieval:latest
-
-      - name: Build & push Ingest worker
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/ingest-worker
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-ingest-worker:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-ingest-worker:latest
-
-      - name: Build & push Telemetry
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/telemetry
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-telemetry:${{ github.sha }}
-            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-telemetry:latest
-
   deploy-vps:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -109,7 +73,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          source: "docker-compose.prod.yaml,postgres/,services/telemetry/mosquitto.conf"
+          source: "docker-compose.prod.yaml,postgres/"
           target: ${{ secrets.VPS_APP_DIR }}
           overwrite: true
 

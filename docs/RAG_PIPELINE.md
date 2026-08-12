@@ -67,7 +67,7 @@ La caché en memoria usa SHA-256 de `tenant | pregunta | colecciones` y TTL `RET
 
 - no estaba acotada por tamaño;
 - no se desactivaba explícitamente en evaluación;
-- no se invalidaba tras ingesta;
+- no requiere invalidación por ingesta porque el runtime no admite nuevas cargas;
 - solo se comparte dentro del proceso.
 
 Esto puede sesgar latencias de evaluación y devolver contexto obsoleto. Todo experimento debe declarar si la caché estaba fría, caliente o desactivada.

@@ -1,11 +1,3 @@
-# Producción / VPS IONOS — solo imágenes (sin build local).
-# Uso:
-#   export DOCKERHUB_USER=tuusuario
-#   docker compose -f docker-compose.prod.yaml pull
-#   docker compose -f docker-compose.prod.yaml up -d
-#
-# Nota: VPS típico IONOS = CPU (sin GPU). Ollama irá lento; para demo usa modelos pequeños.
-
 x-restart: &restart
   restart: unless-stopped
 
@@ -17,23 +9,16 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     environment:
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
       OLLAMA_HOST: 0.0.0.0:11434
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
       OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
       OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
-    # Sin gpus: VPS CPU. Si tienes GPU NVIDIA en el VPS, descomenta:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - capabilities: [gpu]
     healthcheck:
       test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 15s
       retries: 10
       start_period: 40s
-    # No exponer 11434 públicamente en producción
 
   postgres:
     <<: *restart
@@ -60,7 +45,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # No publicar 5432 a Internet
 
   migrate:
     image: pgvector/pgvector:pg18
@@ -78,93 +62,7 @@ services:
     command:
       - /bin/sh
       - -c
-      - psql -v ON_ERROR_STOP=1 -f /migrations/001_hnsw_embeddings.sql && psql -v ON_ERROR_STOP=1 -f /migrations/002_evaluation_dataset_metadata.sql && psql -v ON_ERROR_STOP=1 -f /migrations/003_revoked_tokens.sql && psql -v ON_ERROR_STOP=1 -f /migrations/004_agrotech_memberships.sql && psql -v ON_ERROR_STOP=1 -f /migrations/005_farmer_parcels.sql && psql -v ON_ERROR_STOP=1 -f /migrations/006_parcel_polygons.sql && psql -v ON_ERROR_STOP=1 -f /migrations/007_sensor_readings.sql
-
-  redis:
-    <<: *restart
-    image: redis:7-alpine
-    container_name: agrops-redis
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
-  mosquitto:
-    <<: *restart
-    image: eclipse-mosquitto:2
-    container_name: agrops-mosquitto
-    volumes:
-      - ./services/telemetry/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-
-  inference:
-    <<: *restart
-    image: ${DOCKERHUB_USER}/agrops-inference:${IMAGE_TAG:-latest}
-    container_name: agrops-inference
-    environment:
-      OLLAMA_BASE_URL: http://ollama:11434/v1
-      OLLAMA_API_KEY: ollama
-      DEFAULT_EMBED_MODEL: ${DEFAULT_EMBED_MODEL:-qwen3-embedding:latest}
-      DEFAULT_CHAT_MODEL: ${DEFAULT_CHAT_MODEL:-llama3.2:latest}
-    depends_on:
-      ollama:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:50051/health', timeout=3)"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-
-  retrieval:
-    <<: *restart
-    image: ${DOCKERHUB_USER}/agrops-retrieval:${IMAGE_TAG:-latest}
-    container_name: agrops-retrieval
-    env_file: [.env]
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      INFERENCE_URL: http://inference:50051
-      DEFAULT_EMBED_MODEL: ${DEFAULT_EMBED_MODEL:-qwen3-embedding:latest}
-    depends_on:
-      inference:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
-
-  ingest-worker:
-    <<: *restart
-    image: ${DOCKERHUB_USER}/agrops-ingest-worker:${IMAGE_TAG:-latest}
-    container_name: agrops-ingest-worker
-    environment:
-      REDIS_URL: redis://redis:6379/0
-      API_INTERNAL_URL: http://api:8000
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-agrops-internal}
-      INGEST_QUEUE: ingest:jobs
-      INGEST_EVENTS: ingest:events
-    depends_on:
-      redis:
-        condition: service_healthy
-      api:
-        condition: service_healthy
-
-  telemetry:
-    <<: *restart
-    image: ${DOCKERHUB_USER}/agrops-telemetry:${IMAGE_TAG:-latest}
-    container_name: agrops-telemetry
-    env_file: [.env]
-    environment:
-      DATABASE_URL: ${DATABASE_URL}
-      MQTT_HOST: mosquitto
-      MQTT_PORT: 1883
-    depends_on:
-      mosquitto:
-        condition: service_started
-      postgres:
-        condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
+      - for file in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -f "$$file"; done
 
   api:
     <<: *restart
@@ -172,29 +70,20 @@ services:
     container_name: agrops-api
     env_file: [.env]
     environment:
-      INFERENCE_URL: http://inference:50051
-      OLLAMA_BASE_URL: http://inference:50051/v1
-      RETRIEVAL_URL: http://retrieval:50052
-      USE_RETRIEVAL_SERVICE: ${USE_RETRIEVAL_SERVICE:-false}
-      REDIS_URL: redis://redis:6379/0
-      USE_INGEST_QUEUE: ${USE_INGEST_QUEUE:-true}
-      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-agrops-internal}
-      INGEST_SKIP_LLM_ENRICHMENT: ${INGEST_SKIP_LLM_ENRICHMENT:-true}
+      DATABASE_URL: ${DATABASE_URL}
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-ollama}
       RAG_MAX_TOKENS: ${RAG_MAX_TOKENS:-192}
       RAG_USE_RERANKER: ${RAG_USE_RERANKER:-false}
-      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-4}
       TOKENIZERS_PARALLELISM: "false"
     depends_on:
-      inference:
-        condition: service_healthy
-      redis:
+      ollama:
         condition: service_healthy
       postgres:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
-    ports:
-      - "8000:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
       interval: 15s

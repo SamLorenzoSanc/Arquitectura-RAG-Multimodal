@@ -24,12 +24,11 @@ docker compose version >/dev/null
 
 echo "==> Directorio app ${APP_DIR}"
 mkdir -p "${APP_DIR}"
-mkdir -p "${APP_DIR}/postgres" "${APP_DIR}/services/telemetry"
+mkdir -p "${APP_DIR}/postgres"
 
-echo "==> Firewall (80 HTTP, 8000 API, 22 SSH)"
+echo "==> Firewall (80 HTTP, 22 SSH)"
 ufw allow OpenSSH || true
 ufw allow 80/tcp || true
-ufw allow 8000/tcp || true
 ufw --force enable || true
 
 echo "==> Placeholder .env (EDITAR antes del primer deploy)"
@@ -41,9 +40,6 @@ POSTGRES_DB=agrops
 DATABASE_URL=postgresql+asyncpg://postgres:CAMBIAR_PASSWORD_FUERTE@postgres:5432/agrops
 SECRET_KEY=CAMBIAR_SECRET_LARGO_ALEATORIO
 OLLAMA_API_KEY=ollama
-INTERNAL_SERVICE_TOKEN=agrops-internal
-USE_INGEST_QUEUE=true
-USE_RETRIEVAL_SERVICE=false
 DOCKERHUB_USER=TU_USUARIO_DOCKERHUB
 IMAGE_TAG=latest
 EOF
