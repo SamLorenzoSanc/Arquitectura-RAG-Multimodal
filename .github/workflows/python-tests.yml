@@ -25,7 +25,7 @@ jobs:
         run: python -m pip install --upgrade pip
 
       - name: Install fast test requirements
-        run: python -m pip install pytest pytest-asyncio pydantic
+        run: python -m pip install pytest pytest-asyncio pydantic httpx sqlalchemy
 
       - name: Run pytest
         env:
