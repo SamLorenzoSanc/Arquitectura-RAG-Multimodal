@@ -1,1 +1,42 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --agro-primary: #0038a8;
+  --agro-accent: #c9a227;
+  --agro-danger: #d91424;
+  --agro-canvas: #f3f6fb;
+  --agro-surface: #ffffff;
+  --agro-border: #d9e2f1;
+  --agro-ink: #0f172a;
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--agro-ink);
+  background: var(--agro-canvas);
+  font-family:
+    "Segoe UI",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Scrollbars suaves en paneles densos */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}

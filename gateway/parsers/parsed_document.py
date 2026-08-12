@@ -1,15 +1,26 @@
-from pydantic import BaseModel, Field
+from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Any
 
-class ParsedDocument(BaseModel):
+
+@dataclass(slots=True)
+class ParsedDocument:
 
     filename: str
-
     extension: str
 
     markdown: str
 
-    metadata: dict = Field(default_factory=dict)
+    title: str | None = None
+    summary: str | None = None
+    language: str | None = None
 
-    images: list[str] = Field(default_factory=list)
+    page_count: int | None = None
+    word_count: int | None = None
+    character_count: int | None = None
 
-    tables: list[str] = Field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    extracted_at: datetime = field(default_factory=datetime.utcnow)

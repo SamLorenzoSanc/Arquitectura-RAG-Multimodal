@@ -1,0 +1,132 @@
+name: Deploy IONOS (Docker Hub + VPS)
+
+# Flujo (Figura 4.2):
+#   push → GitHub Actions → build imágenes → Docker Hub → SSH VPS → docker compose up
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".github/workflows/quality.yml"
+      - ".github/workflows/python-tests.yml"
+
+env:
+  DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      image_tag: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & push API
+        uses: docker/build-push-action@v6
+        with:
+          context: ./gateway
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-api:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push Frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend/agrops
+          push: true
+          build-args: |
+            VITE_API_URL=${{ secrets.VITE_API_URL }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-frontend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push Inference
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/inference
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-inference:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-inference:latest
+
+      - name: Build & push Retrieval
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/retrieval
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-retrieval:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-retrieval:latest
+
+      - name: Build & push Ingest worker
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/ingest-worker
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-ingest-worker:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-ingest-worker:latest
+
+      - name: Build & push Telemetry
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/telemetry
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-telemetry:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/agrops-telemetry:latest
+
+  deploy-vps:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync compose + migrations to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          source: "docker-compose.prod.yaml,postgres/,services/telemetry/mosquitto.conf"
+          target: ${{ secrets.VPS_APP_DIR }}
+          overwrite: true
+
+      - name: Deploy via SSH (pull + up)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd "${{ secrets.VPS_APP_DIR }}"
+            export DOCKERHUB_USER="${{ secrets.DOCKERHUB_USERNAME }}"
+            export IMAGE_TAG="${{ github.sha }}"
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            docker compose -f docker-compose.prod.yaml pull
+            docker compose -f docker-compose.prod.yaml up -d --remove-orphans
+            docker image prune -f
+            docker compose -f docker-compose.prod.yaml ps

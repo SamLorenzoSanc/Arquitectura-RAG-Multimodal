@@ -4,7 +4,12 @@ from uuid import UUID
 
 class TenantCreate(BaseModel):
     name: str = Field(..., min_length=3, max_length=100)
+    description: str | None = None
 
 class AssignTenantRequest(BaseModel):
     user_id: str
     tenant_id: str
+class TenantUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    active: bool | None = None

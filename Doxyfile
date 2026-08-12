@@ -1,0 +1,65 @@
+# Doxyfile — documentación de API del gateway y microservicios (calidad TFM)
+PROJECT_NAME           = "AgroPS / AgroRAG"
+PROJECT_NUMBER         = "1.0"
+PROJECT_BRIEF          = "Gateway FastAPI + microservicios RAG agrícola"
+OUTPUT_DIRECTORY       = docs/doxygen
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = Spanish
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+ALWAYS_DETAILED_SEC    = NO
+FULL_PATH_NAMES        = YES
+STRIP_FROM_PATH        = .
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+OPTIMIZE_OUTPUT_JAVA   = NO
+EXTENSION_MAPPING      = py=Python
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+EXTRACT_LOCAL_CLASSES  = YES
+HIDE_UNDOC_MEMBERS     = NO
+HIDE_UNDOC_CLASSES     = NO
+CASE_SENSE_NAMES       = YES
+SHOW_INCLUDE_FILES     = YES
+SHOW_FILES             = YES
+SHOW_NAMESPACES        = YES
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+INPUT                  = gateway/services \
+                         gateway/clients \
+                         gateway/routes \
+                         gateway/schemas \
+                         gateway/middleware \
+                         services \
+                         protos \
+                         docs/architecture-microservices.md
+FILE_PATTERNS          = *.py \
+                         *.proto \
+                         *.md
+RECURSIVE              = YES
+EXCLUDE                = gateway/.venv \
+                         gateway/tests \
+                         gateway/bm25_indexes \
+                         gateway/extracted_md \
+                         gateway/video_tmp \
+                         **/__pycache__ \
+                         **/node_modules
+EXCLUDE_PATTERNS       = */.venv/* */__pycache__/* */node_modules/*
+EXAMPLE_PATH           =
+IMAGE_PATH             =
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
+HAVE_DOT               = NO
+CLASS_DIAGRAMS         = NO
+SEARCHENGINE           = YES
+PYTHON_DOCSTRING       = YES

@@ -1,233 +1,280 @@
-import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-import { useOrganization } from "@/context/OrganizationContext"; // Ajusta la ruta a tu contexto
-import {NewOrgModal} from "./NewOrgModal"; // El componente modal popup que has creado
+"use client";
 
+import { useMemo, useState } from "react";
+import { NavLink } from "react-router-dom";
+import { useOrganization } from "@/context/OrganizationContext";
+import { useShell } from "@/context/ShellContext";
+import { NewOrgModal } from "./NewOrgModal";
 import {
-    Building2,
-    MessageSquare,
-    Settings,
-    ChevronDown,
-    Wheat,
-    Tractor,
-    LogOut,
-    Plus,
+  Building2,
+  MessageSquare,
+  Settings,
+  ChevronDown,
+  Wheat,
+  Tractor,
+  Plus,
+  Network,
+  BrainCircuit,
+  Database,
+  TrendingUp,
+  Ship,
+  FileText,
+  Container,
+  Route,
+  Navigation,
+  X,
 } from "lucide-react";
 
+type NavGroupId = "work" | "ops" | "admin" | "labs";
+
+const NAV_GROUPS: Record<NavGroupId, string> = {
+  work: "Trabajo diario",
+  ops: "Operaciones",
+  admin: "Administración",
+  labs: "Laboratorio",
+};
+
+const NAV_ITEMS: Array<{
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  group: NavGroupId;
+}> = [
+  { to: "/dashboard/chat", label: "Chat IA", icon: MessageSquare, group: "work" },
+  {
+    to: "/dashboard/recogida",
+    label: "Planificador de rutas",
+    icon: Navigation,
+    group: "work",
+  },
+  {
+    to: "/dashboard/documentation",
+    label: "Documentación",
+    icon: FileText,
+    group: "work",
+  },
+  { to: "/dashboard/fincas", label: "Fincas y mapas", icon: Tractor, group: "ops" },
+  { to: "/dashboard/cultivos", label: "Cultivos", icon: Wheat, group: "ops" },
+  { to: "/dashboard/analytics", label: "Analítica", icon: TrendingUp, group: "ops" },
+  { to: "/dashboard/logistics", label: "Trazabilidad", icon: Ship, group: "ops" },
+  { to: "/dashboard/flota", label: "Flota", icon: Ship, group: "ops" },
+  {
+    to: "/dashboard/reefer",
+    label: "Contenedores reefer",
+    icon: Container,
+    group: "ops",
+  },
+  { to: "/dashboard/transito", label: "Tránsito", icon: Route, group: "ops" },
+  {
+    to: "/dashboard/organization",
+    label: "Organización",
+    icon: Building2,
+    group: "admin",
+  },
+  { to: "/dashboard/tenants", label: "Inquilinos", icon: Tractor, group: "admin" },
+  { to: "/dashboard/settings", label: "Configuración", icon: Settings, group: "admin" },
+  {
+    to: "/dashboard/knowledge-graph",
+    label: "Grafo de conocimiento",
+    icon: Network,
+    group: "labs",
+  },
+  {
+    to: "/dashboard/evaluacion",
+    label: "Auditoría RAG",
+    icon: BrainCircuit,
+    group: "labs",
+  },
+  {
+    to: "/dashboard/chroma-debug",
+    label: "Base de datos",
+    icon: Database,
+    group: "labs",
+  },
+];
+
 export default function Sidebar() {
-    const navigate = useNavigate();
-    const { user, logout } = useAuth();
-    
-    // 1. Estados y variables de las organizaciones globales
-    const { organizations, selectedOrg, setSelectedOrg, addOrganization } = useOrganization();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [showOrgDropdown, setShowOrgDropdown] = useState(false);
-    const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null);
+  const { organizations, selectedOrg, setSelectedOrg, addOrganization } =
+    useOrganization();
+  const { sidebarOpen, closeSidebar } = useShell();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showOrgDropdown, setShowOrgDropdown] = useState(false);
 
-    const handleLogout = () => {
-        logout();
-        navigate("/login", { replace: true });
-    };
+  const grouped = useMemo(() => {
+    const order: NavGroupId[] = ["work", "ops", "admin", "labs"];
+    return order
+      .map((group) => ({
+        group,
+        label: NAV_GROUPS[group],
+        items: NAV_ITEMS.filter((item) => item.group === group),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, []);
 
-    const initials =
-        user?.name
-            ?.split(" ")
-            .map((name) => name[0])
-            .join("")
-            .slice(0, 2)
-            .toUpperCase() ?? "U";
-
-    return (
-        <aside className="w-72 h-screen flex flex-col bg-gradient-to-b from-white via-slate-50 to-slate-100/70 border-r border-slate-200 shadow-2xl shadow-slate-200/40 relative">
-            
-            {/* Logo */}
-            <div className="px-7 py-8">
-                <div className="flex items-center gap-4">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-green-700 via-emerald-600 to-lime-500 shadow-lg shadow-green-500/30">
-                        <Wheat className="text-white" size={30} />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">AgroPS</h1>
-                        <p className="text-xs uppercase tracking-widest text-slate-500">Agricultural Operations</p>
-                    </div>
-                </div>
-            </div>
-
-            <div className="mx-6 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
-
-            {/* Selector de Organización Dinámico */}
-            <div className="px-6 mt-6 relative">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500 flex justify-between items-center">
-                    <span>Organización</span>
-                    <button 
-                        onClick={() => setIsModalOpen(true)}
-                        className="text-emerald-600 hover:text-emerald-700 p-0.5 rounded-full hover:bg-emerald-50 transition-colors"
-                        title="Nueva Organización"
-                    >
-                        <Plus size={14} />
-                    </button>
-                </p>
-
-                {/* Botón Principal del Selector */}
-                <button 
-                    onClick={() => setShowOrgDropdown(!showOrgDropdown)}
-                    className="group w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 flex justify-between items-center transition-all duration-300 hover:border-green-300 hover:shadow-lg focus:outline-none"
-                >
-                    <div className="text-left min-w-0 flex-1 pr-2">
-                        <p className="font-semibold text-slate-800 truncate">
-                            {selectedOrg ? selectedOrg.name : "Select Workspace"}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate">
-                            {selectedOrg?.description || "Ninguna seleccionada"}
-                        </p>
-                    </div>
-                    <ChevronDown size={18} className={`text-slate-400 transition-transform duration-200 ${showOrgDropdown ? "rotate-180" : ""}`} />
-                </button>
-
-                {/* Menú desplegable flotante de selección */}
-                {showOrgDropdown && (
-                    <div className="absolute left-6 right-6 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden max-h-48 overflow-y-auto animate-fade-in">
-                        {organizations.length === 0 ? (
-                            <div className="p-3 text-sm text-slate-400 text-center">No hay organizaciones creadas.</div>
-                        ) : (
-                            organizations.map((org) => {
-                                const isExpanded = expandedOrgId === org.id;
-                                return (
-                                    <div key={org.id} className="border-b border-slate-100 last:border-b-0">
-                                        <button
-                                            onClick={() => setExpandedOrgId(isExpanded ? null : org.id)}
-                                            className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors ${
-                                                selectedOrg?.id === org.id
-                                                    ? "bg-emerald-50 text-emerald-700 font-medium"
-                                                    : "text-slate-700 hover:bg-slate-50"
-                                            }`}
-                                        >
-                                            <span className="truncate">{org.name}</span>
-                                            <ChevronDown
-                                                size={16}
-                                                className={`shrink-0 text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
-                                            />
-                                        </button>
-                                        {isExpanded && (
-                                            <div className="border-t border-slate-100 bg-slate-50/70 px-4 py-3">
-                                                <p className="text-xs text-slate-500">
-                                                    {org.description || "Sin descripción disponible."}
-                                                </p>
-                                                <button
-                                                    onClick={(event) => {
-                                                        event.stopPropagation();
-                                                        setSelectedOrg(org);
-                                                        setShowOrgDropdown(false);
-                                                        setExpandedOrgId(null);
-                                                    }}
-                                                    className="mt-2 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
-                                                >
-                                                    Seleccionar
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })
-                        )}
-                        <div className="border-t border-slate-100 p-1.5 bg-slate-50/50">
-                            <button
-                                onClick={() => {
-                                    setIsModalOpen(true);
-                                    setShowOrgDropdown(false);
-                                }}
-                                className="w-full py-1.5 text-center text-xs text-emerald-600 font-semibold hover:bg-white rounded-xl border border-dashed border-emerald-200 transition-colors flex items-center justify-center gap-1"
-                            >
-                                <Plus size={12} /> Añadir nueva
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Tenant */}
-            <div className="px-6 mt-6">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-slate-500">Tenant</p>
-                <button className="group w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 flex justify-between items-center transition-all duration-300 hover:border-green-300 hover:shadow-lg">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-                            <Tractor className="text-green-700" size={18} />
-                        </div>
-                        <div>
-                            <p className="font-semibold text-slate-800">Producción</p>
-                            <p className="text-xs text-slate-500">Tenant activo</p>
-                        </div>
-                    </div>
-                    <ChevronDown size={18} className="text-slate-400" />
-                </button>
-            </div>
-
-            <div className="mx-6 my-8 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
-
-            {/* Navegación */}
-            <nav className="flex-1 px-4 space-y-2">
-                <MenuItem to="/dashboard/chat" icon={<MessageSquare size={20} />} text="Chat IA" />
-                <MenuItem to="/dashboard/organization" icon={<Building2 size={20} />} text="Organización" />
-                <MenuItem to="/dashboard/tenants" icon={<Tractor size={20} />} text="Tenants" />
-                <MenuItem to="/dashboard/settings" icon={<Settings size={20} />} text="Configuración" />
-            </nav>
-
-            {/* Usuario */}
-            <div className="mt-auto border-t border-slate-200 bg-white/60 backdrop-blur-xl p-5">
-                <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-lg shadow-slate-200/40">
-                    <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-green-700 via-emerald-600 to-lime-500 text-lg font-bold text-white">
-                            {initials}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="truncate font-semibold text-slate-900">{user?.name}</p>
-                            <p className="truncate text-sm text-slate-500">{user?.email}</p>
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleLogout}
-                        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-50 py-3 font-medium text-red-600 transition-all duration-200 hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md active:scale-95"
-                    >
-                        <LogOut size={18} />
-                        Cerrar sesión
-                    </button>
-                </div>
-            </div>
-
-            {/* 2. Inyección del Pop-up Modal */}
-            <NewOrgModal
-                isOpen={isModalOpen} 
-                onClose={() => setIsModalOpen(false)} 
-                onSave={async (name, description) => {
-                    await addOrganization(name, description);
-                    setIsModalOpen(false);
-                }} 
-            />
-        </aside>
-    );
-}
-
-interface MenuItemProps {
-    to: string;
-    icon: React.ReactNode;
-    text: string;
-}
-
-function MenuItem({ to, icon, text }: MenuItemProps) {
-    return (
-        <NavLink
-            to={to}
-            className={({ isActive }) => `
-                group relative flex items-center gap-4 overflow-hidden rounded-2xl px-5 py-3.5 text-sm font-medium transition-all duration-300
-                ${isActive
-                    ? "bg-gradient-to-r from-green-100 via-emerald-50 to-lime-50 text-green-700 shadow-md ring-1 ring-green-200"
-                    : "text-slate-600 hover:bg-white hover:text-green-700 hover:shadow-md hover:-translate-y-0.5"
-                }
-            `}
+  const panel = (
+    <aside className="flex h-full w-72 max-w-[85vw] flex-col border-r border-[color:var(--agro-border)] bg-[color:var(--agro-surface)] shadow-xl shadow-slate-900/5 lg:w-64">
+      <div className="flex items-center justify-between px-5 py-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--agro-primary)] shadow-md shadow-blue-900/20">
+            <Wheat className="text-white" size={20} />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold tracking-tight text-slate-900">
+              AgroPS
+            </h1>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--agro-accent)]">
+              Agricultural Ops
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={closeSidebar}
+          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
+          aria-label="Cerrar menú"
         >
-            {icon}
-            <span>{text}</span>
-        </NavLink>
-    );
+          <X size={18} />
+        </button>
+      </div>
+
+      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+
+      <div className="relative mt-4 px-4">
+        <p className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+          <span>Organización</span>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="rounded-full p-0.5 text-[color:var(--agro-primary)] hover:bg-blue-50"
+            title="Nueva organización"
+          >
+            <Plus size={12} />
+          </button>
+        </p>
+
+        <button
+          type="button"
+          onClick={() => setShowOrgDropdown((v) => !v)}
+          className="flex w-full items-center justify-between rounded-xl border border-[color:var(--agro-border)] bg-white px-3.5 py-2.5 transition hover:border-blue-300"
+        >
+          <div className="min-w-0 flex-1 pr-2 text-left">
+            <p className="truncate text-sm font-semibold text-slate-800">
+              {selectedOrg ? selectedOrg.name : "Seleccionar espacio"}
+            </p>
+            <p className="truncate text-[11px] text-slate-500">
+              {selectedOrg?.description || "Ninguna seleccionada"}
+            </p>
+          </div>
+          <ChevronDown
+            size={16}
+            className={`text-slate-400 transition ${showOrgDropdown ? "rotate-180" : ""}`}
+          />
+        </button>
+
+        {showOrgDropdown && (
+          <div className="absolute left-4 right-4 z-50 mt-1.5 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+            {organizations.length === 0 ? (
+              <div className="p-3 text-center text-xs text-slate-400">
+                No hay organizaciones.
+              </div>
+            ) : (
+              organizations.map((org) => (
+                <button
+                  key={org.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedOrg(org);
+                    setShowOrgDropdown(false);
+                    closeSidebar();
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition ${
+                    selectedOrg?.id === org.id
+                      ? "bg-blue-50 font-semibold text-blue-900"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <Building2 size={14} className="shrink-0 text-blue-600" />
+                  <span className="min-w-0 flex-1 truncate">{org.name}</span>
+                  {(org.is_global ||
+                    org.name?.toLowerCase() === "agrotech") && (
+                    <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+                      Global
+                    </span>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="mx-4 my-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
+
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-6">
+        {grouped.map(({ group, label, items }) => (
+          <div key={group}>
+            <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              {label}
+            </p>
+            <div className="space-y-0.5">
+              {items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    onClick={closeSidebar}
+                    className={({ isActive }) =>
+                      `group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium transition ${
+                        isActive
+                          ? "bg-[color:var(--agro-primary)] text-white shadow-md shadow-blue-900/15"
+                          : "text-slate-600 hover:bg-white hover:text-[color:var(--agro-primary)] hover:shadow-sm"
+                      }`
+                    }
+                  >
+                    <Icon size={17} className="shrink-0 opacity-90" />
+                    <span className="truncate">{item.label}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      <NewOrgModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={async (name, description) => {
+          await addOrganization(name, description);
+          setIsModalOpen(false);
+        }}
+      />
+    </aside>
+  );
+
+  return (
+    <>
+      <div className="hidden h-screen shrink-0 lg:block">{panel}</div>
+      <div
+        className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}
+      >
+        <button
+          type="button"
+          aria-label="Cerrar menú"
+          onClick={closeSidebar}
+          className={`absolute inset-0 bg-slate-950/40 transition ${
+            sidebarOpen ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        <div
+          className={`absolute inset-y-0 left-0 transition-transform duration-300 ease-out ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          {panel}
+        </div>
+      </div>
+    </>
+  );
 }

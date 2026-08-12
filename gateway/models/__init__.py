@@ -5,6 +5,7 @@ Importar todos los modelos aquí garantiza que estén registrados en el
 mismo registry antes de que se configuren los mappers. Esto evita errores
 de resolución de referencias por nombre (strings) en los relationship().
 """
+
 from .base import Base
 from .associations import document_tags
 
@@ -24,8 +25,6 @@ from .conversation import Conversation
 from .message import Message
 from .message_source import MessageSource
 from .revoked_token import RevokedToken
-from .api_log import ApiLog
-from .api_key import ApiKey
 
 __all__ = [
     "Base",
@@ -46,6 +45,4 @@ __all__ = [
     "Message",
     "MessageSource",
     "RevokedToken",
-    "ApiLog",
-    "ApiKey",
 ]

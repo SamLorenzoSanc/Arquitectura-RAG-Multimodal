@@ -1,0 +1,37 @@
+[
+    {
+        "name": "Registro Oficial Productos Fitosanitarios",
+        "category": "fitosanitarios",
+        "url": "https://servicio.mapa.gob.es/regfiweb/"
+    },
+    {
+        "name": "Ministerio de Agricultura - Sanidad Vegetal",
+        "category": "fitosanitarios",
+        "url": "https://www.mapa.gob.es/es/agricultura/temas/sanidad-vegetal/"
+    },
+    {
+        "name": "MAPA - Productos Fitosanitarios",
+        "category": "fitosanitarios",
+        "url": "https://www.mapa.gob.es/es/agricultura/temas/sanidad-vegetal/productos-fitosanitarios/"
+    },
+    {
+        "name": "MAPA - Gestión Integrada de Plagas",
+        "category": "fitosanitarios",
+        "url": "https://www.mapa.gob.es/es/agricultura/temas/sanidad-vegetal/gestion-integrada-plagas/"
+    },
+    {
+        "name": "EFSA - Pesticides",
+        "category": "fitosanitarios",
+        "url": "https://www.efsa.europa.eu/en/topics/topic/pesticides"
+    },
+    {
+        "name": "Comisión Europea - Sustainable Use of Pesticides",
+        "category": "fitosanitarios",
+        "url": "https://food.ec.europa.eu/plants/pesticides/sustainable-use-pesticides_en"
+    },
+    {
+        "name": "Comisión Europea - EU Pesticides Database",
+        "category": "fitosanitarios",
+        "url": "https://food.ec.europa.eu/plants/pesticides/eu-pesticides-database_en"
+    }
+]

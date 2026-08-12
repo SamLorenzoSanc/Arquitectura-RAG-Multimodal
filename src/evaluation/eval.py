@@ -1,18 +1,26 @@
 import sys
 import os
 import math
+import json
+import urllib.request
 from pydantic import BaseModel, Field
-from litellm import completion
 from dotenv import load_dotenv
 
-from .test import TestQuestion, load_tests
+# Manejo de la importación para evitar ImportError si se ejecuta directamente
+try:
+    from .test import TestQuestion, load_tests
+except ImportError:
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from evaluation.test import TestQuestion, load_tests
+
 from advanced_implementation.answer import answer_question, fetch_context
 
 
 load_dotenv(override=True)
 
-MODEL = "ollama/llama3"
-db_name = "vector_db"
+MODEL = "llama3"  # Nombre directo del modelo en Ollama
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+db_name = "preprocessed_db"
 
 
 class RetrievalEval(BaseModel):
@@ -81,26 +89,15 @@ def calculate_ndcg(keyword: str, retrieved_docs: list, k: int = 10) -> float:
 def evaluate_retrieval(test: TestQuestion, k: int = 10) -> RetrievalEval:
     """
     Evaluate retrieval performance for a test question.
-
-    Args:
-        test: TestQuestion object containing question and keywords
-        k: Number of top documents to retrieve (default 10)
-
-    Returns:
-        RetrievalEval object with MRR, nDCG, and keyword coverage metrics
     """
-    # Retrieve documents using shared answer module
     retrieved_docs = fetch_context(test.question)
 
-    # Calculate MRR (average across all keywords)
     mrr_scores = [calculate_mrr(keyword, retrieved_docs) for keyword in test.keywords]
     avg_mrr = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
 
-    # Calculate nDCG (average across all keywords)
     ndcg_scores = [calculate_ndcg(keyword, retrieved_docs, k) for keyword in test.keywords]
     avg_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
 
-    # Calculate keyword coverage
     keywords_found = sum(1 for score in mrr_scores if score > 0)
     total_keywords = len(test.keywords)
     keyword_coverage = (keywords_found / total_keywords * 100) if total_keywords > 0 else 0.0
@@ -116,18 +113,10 @@ def evaluate_retrieval(test: TestQuestion, k: int = 10) -> RetrievalEval:
 
 def evaluate_answer(test: TestQuestion) -> tuple[AnswerEval, str, list]:
     """
-    Evaluate answer quality using LLM-as-a-judge (async).
-
-    Args:
-        test: TestQuestion object containing question and reference answer
-
-    Returns:
-        Tuple of (AnswerEval object, generated_answer string, retrieved_docs list)
+    Evaluate answer quality using LLM-as-a-judge calling Ollama directly via HTTP/REST.
     """
-    # Get RAG response using shared answer module
     generated_answer, retrieved_docs = answer_question(test.question)
 
-    # LLM judge prompt
     judge_messages = [
         {
             "role": "system",
@@ -149,27 +138,30 @@ def evaluate_answer(test: TestQuestion) -> tuple[AnswerEval, str, list]:
             2. Exhaustividad: ¿En qué medida aborda de forma exhaustiva todos los aspectos de la pregunta, cubriendo toda la información de la respuesta de referencia?
             3. Pertinencia: ¿En qué medida responde directamente a la pregunta específica formulada, sin aportar información adicional?
 
-            Proporcione comentarios detallados y puntuaciones del 1 (muy deficiente) al 5 (ideal) para cada aspecto. Si la respuesta es incorrecta, la puntuación de precisión debe ser 1.«»"Por favor, evalúe la respuesta generada en tres aspectos:
-            1. Precisión: ¿En qué medida es correcta desde el punto de vista fáctico en comparación con la respuesta de referencia? Solo otorgue una puntuación de 5/5 a las respuestas perfectas.
-            2. Exhaustividad: ¿Hasta qué punto aborda de forma exhaustiva todos los aspectos de la pregunta, cubriendo toda la información de la respuesta de referencia?
-            3. Pertinencia: ¿En qué medida responde directamente a la pregunta específica formulada, sin aportar información adicional?""",
+            Proporciona comentarios detallados y puntuaciones del 1 (muy deficiente) al 5 (ideal) para cada aspecto. Si la respuesta es incorrecta, la puntuación de precisión debe ser 1.""",
         },
     ]
 
-    # Call LLM judge with structured outputs (async)
-    judge_response = completion(
-        model=MODEL, 
-        messages=judge_messages,
-        custom_llm_provider="ollama",
-        response_format={ "type": "json_object", "schema": AnswerEval.model_json_schema()},
-        api_base="http://localhost:11434"
+    # Petición HTTP nativa a la API de Ollama
+    payload = {
+        "model": MODEL,
+        "messages": judge_messages,
+        "format": AnswerEval.model_json_schema(),  # Estructurado vía Pydantic Schema
+        "stream": False
+    }
+
+    req = urllib.request.Request(
+        f"{OLLAMA_API_BASE}/api/chat",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
     )
 
-    print(judge_response)
+    with urllib.request.urlopen(req) as response:
+        res_data = json.loads(response.read().decode("utf-8"))
+        json_content = res_data["message"]["content"]
 
-    judge_response = completion(model=MODEL, messages=judge_messages, response_format=AnswerEval)
-
-    answer_eval = AnswerEval.model_validate_json(judge_response.choices[0].message.content)
+    answer_eval = AnswerEval.model_validate_json(json_content)
 
     return answer_eval, generated_answer, retrieved_docs
 
@@ -196,17 +188,14 @@ def evaluate_all_answers():
 
 def run_cli_evaluation(test_number: int):
     """Run evaluation for a specific test (async helper for CLI)."""
-    # Load tests
-    tests = load_tests("tests.jsonl")
+    tests = load_tests()
 
     if test_number < 0 or test_number >= len(tests):
         print(f"Error: test_row_number must be between 0 and {len(tests) - 1}")
         sys.exit(1)
 
-    # Get the test
     test = tests[test_number]
 
-    # Print test info
     print(f"\n{'=' * 80}")
     print(f"Test #{test_number}")
     print(f"{'=' * 80}")
@@ -246,7 +235,7 @@ def run_cli_evaluation(test_number: int):
 def main():
     """CLI to evaluate a specific test by row number."""
     if len(sys.argv) != 2:
-        print("Usage: uv run eval.py <test_row_number>")
+        print("Usage: python eval.py <test_row_number>")
         sys.exit(1)
 
     try:

@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
-
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 load_dotenv()
@@ -10,17 +11,20 @@ DATABASE_URL = os.getenv(
     "postgresql+asyncpg://postgres:postgres@postgres:5432/agrops",
 )
 
+print("=" * 80)
+print("DATABASE_URL:", DATABASE_URL)
+print("=" * 80)
+
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 # 1. Motor async
 engine = create_async_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
-    # echo=True,  # útil en desarrollo para ver el SQL
+    DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20
 )
+
+sync_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
 
 
 AsyncSessionLocal = async_sessionmaker(
@@ -29,6 +33,7 @@ AsyncSessionLocal = async_sessionmaker(
     autoflush=False,
     expire_on_commit=False,
 )
+
 
 # 3. Dependencia para las rutas
 async def get_db():

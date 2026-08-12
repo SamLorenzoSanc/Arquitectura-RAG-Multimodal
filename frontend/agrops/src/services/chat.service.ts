@@ -1,11 +1,122 @@
 import api from "@/api";
 
-export async function askQuestion(question: string) {
+import type {
+    ChatRequest,
+    ChatResponse,
+    ConversationResponse
+} from "@/types/chat";
 
-    const response = await api.post("/chat", {
-        question,
-        history: [],
-    });
+class ChatService {
+
+    async send(request: ChatRequest): Promise<ChatResponse> {
+
+        console.log("=== CHAT REQUEST ===");
+        console.log(request);
+
+        try {
+
+            const { data } = await api.post<ChatResponse>(
+                "/chat/",
+                request
+            );
+
+            console.log("=== CHAT RESPONSE ===");
+            console.log(data);
+
+            return data;
+
+        } catch (error: any) {
+
+            console.error(
+                "CHAT ERROR",
+                error.response?.data ?? error.message
+            );
+
+            throw new Error(
+                error.response?.data?.detail ??
+                "No se pudo enviar la pregunta"
+            );
+
+        }
+    }
+
+    async getConversation(
+        conversationId: string,
+    ): Promise<ConversationResponse> {
+
+        try {
+
+            const { data } = await api.get<ConversationResponse>(
+                `/chat/${conversationId}`
+            );
+
+            return data;
+
+        } catch (error: any) {
+
+            console.error(
+                "GET CONVERSATION ERROR",
+                error.response?.data ?? error.message
+            );
+
+            throw new Error(
+                "No se pudo cargar la conversación"
+            );
+
+        }
+    }
+
+    async deleteConversation(
+        conversationId: string,
+    ): Promise<void> {
+
+        try {
+
+            await api.delete(
+                `/chat/${conversationId}`
+            );
+
+        } catch (error: any) {
+
+            console.error(
+                "DELETE CONVERSATION ERROR",
+                error.response?.data ?? error.message
+            );
+
+            throw new Error(
+                "No se pudo eliminar la conversación"
+            );
+
+        }
+    }
+
+    async listConversations(){
+
+    const response = await api.get(
+        "/chat/conversations"
+    );
 
     return response.data;
+
+    }
+
+    async retrieve(question: string, knowledgeBaseId?: string){
+        try{
+            const { data } = await api.post(
+                "/chat/retrieve",
+                {
+                    question,
+                    knowledge_base_id: knowledgeBaseId || undefined,
+                }
+            );
+
+            return data;
+
+        }catch(err:any){
+            console.error("RETRIEVE ERROR", err.response?.data ?? err.message);
+            throw new Error("Error retrieving pipeline");
+        }
+    }
 }
+
+export default new ChatService();

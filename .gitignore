@@ -37,7 +37,8 @@ pip-log.txt
 pip-delete-this-directory.txt
 
 # Unit test / coverage reports
-htmlcov/
+docs/doxygen/
+gateway/htmlcov/
 .tox/
 .nox/
 .coverage
@@ -205,3 +206,4 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+docker-compose.yaml

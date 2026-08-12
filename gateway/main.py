@@ -12,18 +12,24 @@ from routes.tenant import router as tenant_router
 from routes.knowledge import router as knowledge_router
 from routes.organization import router as organization_router
 from routes.department import router as department_router
-import models
+from routes.forecast import router as forecast_router
+from routes.logistic import router as logicstic_router
+from routes.map import router as map_router
+from routes.crops import router as crop_router
+from routes.speech import router as speech_router
+from routes.recogida import router as recogida_router
+from routes.internal import router as internal_router
+import models as models
+from middleware.timing import register_logging_middleware
 
-
-app = FastAPI(
-    title="AgroRAG Gateway",
-    version="1.0.0"
-)
+app = FastAPI(title="AgroRAG Gateway", version="1.0.0")
+register_logging_middleware(app)
 
 origins = [
     "http://localhost",
     "http://localhost:80",
     "http://localhost:8080",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
@@ -45,6 +51,14 @@ app.include_router(tenant_router, prefix="/api/v1")
 app.include_router(knowledge_router, prefix="/api/v1")
 app.include_router(organization_router, prefix="/api/v1")
 app.include_router(department_router, prefix="/api/v1")
+app.include_router(forecast_router, prefix="/api/v1")
+app.include_router(logicstic_router, prefix="/api/v1")
+app.include_router(map_router, prefix="/api/v1")
+app.include_router(crop_router, prefix="/api/v1")
+app.include_router(speech_router, prefix="/api/v1")
+app.include_router(recogida_router, prefix="/api/v1")
+app.include_router(internal_router, prefix="/api/v1")
+
 
 def main():
     uvicorn.run(app, host="0.0.0.0", port=8000)

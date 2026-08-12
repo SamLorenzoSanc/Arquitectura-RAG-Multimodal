@@ -1,81 +1,114 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
-from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.database import get_db
+from routes.auth import get_current_user
+from models.user import User
 from schemas.department import (
     DepartmentCreateRequest,
     DepartmentUpdateRequest,
-    DepartmentMemberRequest,
+    AddMemberPayload,
 )
-from routes.auth import get_current_user
-from models.user import User
 
-router = APIRouter(prefix="/department", tags=["Department"])
+router = APIRouter(
+    prefix="/department",
+    tags=["Department"],
+)
+
+# ============================================================
+# Crear departamento
+# ============================================================
 
 
-async def ensure_department_members_table(db: AsyncSession) -> None:
-    try:
-        await db.execute(text("SELECT 1 FROM department_members LIMIT 1"))
-    except ProgrammingError as exc:
-        if "relation \"department_members\" does not exist" not in str(exc).lower():
-            raise
+@router.post("")
+async def create_department(
+    request: DepartmentCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
 
-        await db.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS department_members (
-                    department_id UUID NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
-                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (department_id, user_id)
+    department = (
+        (
+            await db.execute(
+                text("""
+                INSERT INTO departments(
+                    organization_id,
+                    name,
+                    description
                 )
-                """
+                VALUES(
+                    :organization_id,
+                    :name,
+                    :description
+                )
+                RETURNING
+                    id,
+                    organization_id,
+                    name,
+                    description
+                """),
+                request.model_dump(),
             )
         )
-        await db.commit()
+        .mappings()
+        .first()
+    )
+
+    await db.commit()
+
+    return department
 
 
-# ---------------------------------------------------------
-# Obtener todos los departamentos de una organización
-# ---------------------------------------------------------
+# ============================================================
+# Listar departamentos de una organización
+# ============================================================
+
 
 @router.get("/organization/{organization_id}")
-async def get_departments(
+async def list_departments(
     organization_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_department_members_table(db)
 
     departments = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     d.id,
                     d.name,
                     d.description,
                     COUNT(dm.user_id) AS members
                 FROM departments d
+
                 LEFT JOIN department_members dm
-                    ON dm.department_id = d.id
-                WHERE d.organization_id = :organization_id
-                GROUP BY d.id
+                    ON dm.department_id=d.id
+
+                WHERE d.organization_id=:organization_id
+
+                GROUP BY
+                    d.id,
+                    d.name,
+                    d.description
+
                 ORDER BY d.name
-                """
-            ),
-            {"organization_id": organization_id},
+                """),
+                {"organization_id": organization_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
     return departments
 
 
-# ---------------------------------------------------------
+# ============================================================
 # Obtener un departamento
-# ---------------------------------------------------------
+# ============================================================
+
 
 @router.get("/{department_id}")
 async def get_department(
@@ -83,22 +116,25 @@ async def get_department(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+
     department = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     id,
                     organization_id,
                     name,
                     description
                 FROM departments
-                WHERE id = :id
-                """
-            ),
-            {"id": department_id},
+                WHERE id=:id
+                """),
+                {"id": department_id},
+            )
         )
-    ).mappings().first()
+        .mappings()
+        .first()
+    )
 
     if not department:
         raise HTTPException(
@@ -109,67 +145,10 @@ async def get_department(
     return department
 
 
-# ---------------------------------------------------------
-# Crear departamento
-# ---------------------------------------------------------
-
-@router.post("", status_code=status.HTTP_201_CREATED)
-async def create_department(
-    request: DepartmentCreateRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    exists = await db.scalar(
-        text(
-            """
-            SELECT id
-            FROM departments
-            WHERE organization_id=:organization_id
-            AND name=:name
-            """
-        ),
-        {
-            "organization_id": request.organization_id,
-            "name": request.name,
-        },
-    )
-
-    if exists:
-        raise HTTPException(
-            status_code=400,
-            detail="Ya existe un departamento con ese nombre.",
-        )
-
-    department_id = await db.scalar(
-        text(
-            """
-            INSERT INTO departments(
-                organization_id,
-                name,
-                description
-            )
-            VALUES(
-                :organization_id,
-                :name,
-                :description
-            )
-            RETURNING id
-            """
-        ),
-        request.model_dump(),
-    )
-
-    await db.commit()
-
-    return {
-        "status": "success",
-        "department_id": str(department_id),
-    }
-
-
-# ---------------------------------------------------------
+# ============================================================
 # Actualizar departamento
-# ---------------------------------------------------------
+# ============================================================
+
 
 @router.put("/{department_id}")
 async def update_department(
@@ -178,16 +157,15 @@ async def update_department(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+
     await db.execute(
-        text(
-            """
+        text("""
             UPDATE departments
             SET
                 name=:name,
                 description=:description
             WHERE id=:id
-            """
-        ),
+            """),
         {
             "id": department_id,
             **request.model_dump(),
@@ -199,9 +177,10 @@ async def update_department(
     return {"status": "updated"}
 
 
-# ---------------------------------------------------------
+# ============================================================
 # Eliminar departamento
-# ---------------------------------------------------------
+# ============================================================
+
 
 @router.delete("/{department_id}")
 async def delete_department(
@@ -209,13 +188,13 @@ async def delete_department(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+
     await db.execute(
-        text(
-            """
-            DELETE FROM departments
+        text("""
+            DELETE
+            FROM departments
             WHERE id=:id
-            """
-        ),
+            """),
         {"id": department_id},
     )
 
@@ -224,100 +203,144 @@ async def delete_department(
     return {"status": "deleted"}
 
 
-# ---------------------------------------------------------
-# Miembros del departamento
-# ---------------------------------------------------------
+# ============================================================
+# Listar miembros de un departamento
+# ============================================================
+
 
 @router.get("/{department_id}/members")
-async def get_department_members(
+async def list_department_members(
     department_id: str,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_department_members_table(db)
 
     members = (
-        await db.execute(
-            text(
-                """
+        (
+            await db.execute(
+                text("""
                 SELECT
                     u.id,
                     u.name,
                     u.email
                 FROM department_members dm
+
                 JOIN users u
                     ON u.id = dm.user_id
+
                 WHERE dm.department_id=:department_id
+
                 ORDER BY u.name
-                """
-            ),
-            {"department_id": department_id},
+                """),
+                {"department_id": department_id},
+            )
         )
-    ).mappings().all()
+        .mappings()
+        .all()
+    )
 
-    return members
+    return {"items": members, "total": len(members)}
 
 
-# ---------------------------------------------------------
-# Añadir miembro
-# ---------------------------------------------------------
+# ============================================================
+# Añadir usuario a un departamento
+# ============================================================
+
 
 @router.post("/{department_id}/members")
 async def add_department_member(
     department_id: str,
-    request: DepartmentMemberRequest,
+    request: AddMemberPayload,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_department_members_table(db)
+    # El frontend envía email (+ role_id opcional); resolvemos a user_id.
+    user_id = await db.scalar(
+        text("SELECT id FROM users WHERE email = :email AND active = true"),
+        {"email": request.email.strip().lower()},
+    )
+    if user_id is None:
+        # Intento case-insensitive por si el email se guardó con mayúsculas.
+        user_id = await db.scalar(
+            text(
+                "SELECT id FROM users WHERE lower(email) = lower(:email) AND active = true"
+            ),
+            {"email": request.email.strip()},
+        )
+    if user_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No existe un usuario activo con el email '{request.email}'.",
+        )
 
-    exists = await db.scalar(
-        text(
-            """
-            SELECT 1
-            FROM department_members
-            WHERE department_id=:department_id
-            AND user_id=:user_id
-            """
-        ),
+    dept = (
+        (
+            await db.execute(
+                text(
+                    "SELECT id, organization_id FROM departments WHERE id = :id"
+                ),
+                {"id": department_id},
+            )
+        )
+        .mappings()
+        .first()
+    )
+    if dept is None:
+        raise HTTPException(status_code=404, detail="Departamento no encontrado")
+
+    # Asegurar membresía en la organización del departamento.
+    await db.execute(
+        text("""
+            INSERT INTO organization_members (organization_id, user_id, role_id, active)
+            VALUES (:org_id, :user_id, :role_id, true)
+            ON CONFLICT (organization_id, user_id) DO UPDATE
+            SET
+                role_id = COALESCE(EXCLUDED.role_id, organization_members.role_id),
+                active = true
+            """),
         {
-            "department_id": department_id,
-            "user_id": request.user_id,
+            "org_id": dept["organization_id"],
+            "user_id": user_id,
+            "role_id": request.role_id,
         },
     )
 
-    if exists:
-        raise HTTPException(
-            status_code=400,
-            detail="El usuario ya pertenece al departamento.")
-
     await db.execute(
-        text(
-            """
-            INSERT INTO department_members(
+        text("""
+            INSERT INTO department_members (
                 department_id,
-                user_id
+                user_id,
+                role_id
             )
-            VALUES(
+            VALUES (
                 :department_id,
-                :user_id
+                :user_id,
+                :role_id
             )
-            """
-        ),
+            ON CONFLICT (department_id, user_id)
+            DO UPDATE SET role_id = COALESCE(EXCLUDED.role_id, department_members.role_id)
+            """),
         {
             "department_id": department_id,
-            "user_id": request.user_id,
+            "user_id": user_id,
+            "role_id": request.role_id,
         },
     )
 
     await db.commit()
 
-    return {"status": "member_added"}
+    return {
+        "status": "member_added",
+        "user_id": str(user_id),
+        "email": request.email,
+        "role_id": request.role_id,
+    }
 
 
-# ---------------------------------------------------------
-# Eliminar miembro
-# ---------------------------------------------------------
+# ============================================================
+# Eliminar usuario de un departamento
+# ============================================================
+
 
 @router.delete("/{department_id}/members/{user_id}")
 async def remove_department_member(
@@ -326,16 +349,16 @@ async def remove_department_member(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await ensure_department_members_table(db)
 
     await db.execute(
-        text(
-            """
-            DELETE FROM department_members
-            WHERE department_id=:department_id
-            AND user_id=:user_id
-            """
-        ),
+        text("""
+            DELETE
+            FROM department_members
+            WHERE
+                department_id=:department_id
+            AND
+                user_id=:user_id
+            """),
         {
             "department_id": department_id,
             "user_id": user_id,
@@ -345,3 +368,85 @@ async def remove_department_member(
     await db.commit()
 
     return {"status": "member_removed"}
+
+
+# ============================================================
+# Departamentos de un usuario
+# ============================================================
+
+
+@router.get("/user/{user_id}")
+async def get_user_departments(
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+
+    departments = (
+        (
+            await db.execute(
+                text("""
+                SELECT
+                    d.id,
+                    d.name,
+                    d.description
+                FROM department_members dm
+
+                JOIN departments d
+                    ON d.id = dm.department_id
+
+                WHERE dm.user_id=:user_id
+
+                ORDER BY d.name
+                """),
+                {"user_id": user_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+
+    return {"items": departments, "total": len(departments)}
+
+
+# ============================================================
+# Usuarios disponibles para añadir
+# ============================================================
+
+
+@router.get("/{department_id}/available-users")
+async def available_users(
+    department_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+
+    users = (
+        (
+            await db.execute(
+                text("""
+                SELECT
+                    u.id,
+                    u.name,
+                    u.email
+                FROM users u
+
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM department_members dm
+                    WHERE
+                        dm.department_id=:department_id
+                    AND
+                        dm.user_id=u.id
+                )
+
+                ORDER BY u.name
+                """),
+                {"department_id": department_id},
+            )
+        )
+        .mappings()
+        .all()
+    )
+
+    return {"items": users, "total": len(users)}

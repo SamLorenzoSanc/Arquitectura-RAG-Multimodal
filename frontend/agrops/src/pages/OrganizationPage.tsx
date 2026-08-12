@@ -3,12 +3,13 @@
 import { useEffect, useState, type FormEvent } from "react";
 import api from "@/api";
 import { useOrganization } from "@/context/OrganizationContext";
+import DepartmentService from "@/services/department.service";
 
 interface Organization {
     id: string;
     name: string;
     description?: string;
-    status: string;
+    status?: string;
 }
 
 interface Department {
@@ -25,12 +26,6 @@ interface Member {
     role?: string;
 }
 
-interface UserOption {
-    id: string;
-    name: string;
-    email: string;
-}
-
 interface RoleOption {
     id: string;
     name: string;
@@ -38,6 +33,31 @@ interface RoleOption {
     organization_id?: string;
 }
 
+// --- DEFINICIÓN DE ROLES OPERATIVOS Y ACCESO RAG ---
+const ROLE_DEFINITIONS: Record<string, { label: string; context: string }> = {
+    "ORG_ADMIN": { 
+        label: "Administrador de Organización", 
+        context: "Acceso Total RAG" 
+    },
+    "FARM_MANAGER": { 
+        label: "Gestor de Fincas / Producción", 
+        context: "RAG: Fincas, Cultivos e IGP" 
+    },
+    "LOGISTICS_OPERATOR": { 
+        label: "Operador Logístico", 
+        context: "RAG: Flota, Rutas y Contenedores" 
+    },
+    "QUALITY_CONTROLLER": { 
+        label: "Controlador de Calidad", 
+        context: "RAG: Cadena de Frío e Inspección" 
+    },
+    "USER": { 
+        label: "Usuario Estándar", 
+        context: "Consulta básica" 
+    }
+};
+
+// --- SERVICIOS DE API GATEWAY ---
 export const getOrganizations = async () => {
     const { data } = await api.get("/organization");
     return data;
@@ -57,18 +77,8 @@ export const deleteOrganization = async (id: string) => {
     await api.delete(`/organization/${id}`);
 };
 
-export const getUsers = async () => {
-    const { data } = await api.get("/users/");
-    return data;
-};
-
 export const getRoles = async () => {
     const { data } = await api.get("/users/roles");
-    return data;
-};
-
-export const getDepartmentMembers = async (departmentId: string) => {
-    const { data } = await api.get(`/department/${departmentId}/members`);
     return data;
 };
 
@@ -77,7 +87,7 @@ export const createDepartment = async (payload: { organization_id: string; name:
     return data;
 };
 
-export const addDepartmentMember = async (departmentId: string, payload: { user_id: string }) => {
+export const addDepartmentMember = async (departmentId: string, payload: { email: string; role_id?: string }) => {
     const { data } = await api.post(`/department/${departmentId}/members`, payload);
     return data;
 };
@@ -91,111 +101,113 @@ export default function OrganizationPage() {
     } = useOrganization();
 
     const [activeDept, setActiveDept] = useState<Department | null>(null);
-    const [users, setUsers] = useState<UserOption[]>([]);
     const [roles, setRoles] = useState<RoleOption[]>([]);
-    const [loading, setLoading] = useState<boolean>(organizations.length === 0);
+    const [loading, setLoading] = useState<boolean>(true);
     const [orgDetails, setOrgDetails] = useState<Record<string, { departments: Department[]; roles: RoleOption[]; members: Member[]; departmentMembers: Record<string, Member[]>; activeDeptId: string | null }>>({});
+    
+    // Modales y formularios
     const [showDeptModal, setShowDeptModal] = useState(false);
     const [showMemberModal, setShowMemberModal] = useState(false);
     const [departmentName, setDepartmentName] = useState("");
     const [departmentDescription, setDepartmentDescription] = useState("");
-    const [selectedUserId, setSelectedUserId] = useState("");
+    
+    const [selectedUserEmail, setSelectedUserEmail] = useState("");
     const [selectedRoleId, setSelectedRoleId] = useState("");
+    
     const [submittingDepartment, setSubmittingDepartment] = useState(false);
     const [submittingMember, setSubmittingMember] = useState(false);
     const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null);
-    const [, setDepartmentMembers] = useState<Record<string, any[]>>({});
 
+    // Carga inicial optimizada cargando organizaciones y roles globales en paralelo
     useEffect(() => {
+        let isMounted = true;
+        const fetchInitialData = async () => {
+            try {
+                setLoading(true);
+                const [orgsData, rolesData] = await Promise.all([
+                    getOrganizations(),
+                    getRoles().catch(() => [])
+                ]);
+
+                if (!isMounted) return;
+
+                setOrganizations(orgsData);
+                setRoles(rolesData);
+
+                if (orgsData.length > 0 && !selectedOrg) {
+                    setSelectedOrg(orgsData[0]);
+                }
+            } catch (error) {
+                console.error("Error al cargar datos iniciales", error);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
         if (organizations.length === 0) {
             void fetchInitialData();
-        } else if (selectedOrg) {
-            void syncDetails(selectedOrg);
-        }
-    }, [selectedOrg?.id, organizations.length]);
-
-    const fetchInitialData = async () => {
-        try {
-            setLoading(true);
-            const data = await getOrganizations();
-            setOrganizations(data);
-
-            if (data.length > 0 && !selectedOrg) {
-                setSelectedOrg(data[0]);
-            }
-        } catch (error) {
-            console.error("Error al cargar organizaciones", error);
-        } finally {
+        } else {
             setLoading(false);
         }
-    };
 
-    const syncDetails = async (org: Organization) => {
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    // Sincronización eficiente usando Promise.all para realizar peticiones concurrentes
+    const syncDetails = async (org: Organization, forceRefresh = false) => {
+        if (orgDetails[org.id] && !forceRefresh) return;
+
         try {
-            setLoading(true);
-            // Hacer las llamadas de forma individual con mejor manejo de errores
-            const deptData = await getDepartments(org.id).catch((err) => {
-                console.error("Error al cargar departamentos:", err);
-                return [];
-            });
-            
-            const rolesData = await getRoles().catch((err) => {
-                console.error("Error al cargar roles:", err);
-                return [];
-            });
-            
-            const usersData = await getUsers().catch((err) => {
-                console.error("Error al cargar usuarios:", err);
-                return [];
-            });
-            
-            const membersData = await getOrganizationMembers(org.id).catch((err) => {
-                console.error("Error al cargar miembros de la organización:", err);
-                return [];
-            });
+            const [deptData, membersData] = await Promise.all([
+                getDepartments(org.id).catch(() => []),
+                getOrganizationMembers(org.id).catch(() => [])
+            ]);
 
-            setRoles(rolesData);
-            setUsers(usersData);
+            const defaultDeptId = deptData.length > 0 ? deptData[0].id : null;
+
             setOrgDetails((prev) => ({
                 ...prev,
                 [org.id]: {
                     departments: deptData,
-                    roles: rolesData,
+                    roles: roles,
                     members: membersData,
                     departmentMembers: prev[org.id]?.departmentMembers ?? {},
-                    activeDeptId: prev[org.id]?.activeDeptId ?? null,
+                    activeDeptId: prev[org.id]?.activeDeptId ?? defaultDeptId,
                 },
             }));
 
             if (deptData.length > 0) {
                 const firstDept = deptData[0];
                 setActiveDept(firstDept);
-                await loadDepartmentMembers(org.id, firstDept.id);
+                if (!orgDetails[org.id]?.departmentMembers?.[firstDept.id]) {
+                    void loadDepartmentMembers(org.id, firstDept.id);
+                }
             } else {
                 setActiveDept(null);
             }
         } catch (error) {
-            console.error("Error no manejado en syncDetails:", error);
-        } finally {
-            setLoading(false);
-        }
+            console.error("Error en syncDetails:", error);
+        } 
     };
 
     const loadDepartmentMembers = async (orgId: string, departmentId: string) => {
         try {
-            const membersData = await getDepartmentMembers(departmentId);
+            const members = await DepartmentService.getDepartmentMembers(departmentId);
+            
             setOrgDetails((prev) => ({
                 ...prev,
                 [orgId]: {
                     ...(prev[orgId] ?? { departments: [], roles: [], members: [], departmentMembers: {}, activeDeptId: null }),
                     departmentMembers: {
                         ...(prev[orgId]?.departmentMembers ?? {}),
-                        [departmentId]: membersData,
+                        [departmentId]: members,
                     },
                 },
             }));
         } catch (error) {
-            console.error("Error al cargar miembros del departamento", error);
+            console.error("Error cargando miembros del departamento", error);
         }
     };
 
@@ -210,7 +222,7 @@ export default function OrganizationPage() {
             },
         }));
 
-        if (!orgDetails[org.id]?.departmentMembers[dept.id]) {
+        if (!orgDetails[org.id]?.departmentMembers?.[dept.id]) {
             await loadDepartmentMembers(org.id, dept.id);
         }
     };
@@ -222,15 +234,14 @@ export default function OrganizationPage() {
         }
 
         setExpandedOrgId(org.id);
-        if (!orgDetails[org.id]) {
-            await syncDetails(org);
-        }
+        setSelectedOrg(org);
+        await syncDetails(org);
     };
 
     const handleSelectOrganization = async (org: Organization) => {
         setSelectedOrg(org);
         setExpandedOrgId(org.id);
-        await syncDetails(org);
+        await syncDetails(org, true);
     };
 
     const handleCreateDepartment = async (event: FormEvent) => {
@@ -248,7 +259,7 @@ export default function OrganizationPage() {
             setDepartmentName("");
             setDepartmentDescription("");
             setShowDeptModal(false);
-            await syncDetails(selectedOrg);
+            await syncDetails(selectedOrg, true);
         } catch (error) {
             console.error("Error al crear el departamento", error);
         } finally {
@@ -258,42 +269,23 @@ export default function OrganizationPage() {
 
     const handleAddMember = async (event: FormEvent) => {
         event.preventDefault();
-        if (!activeDept || !selectedUserId) return;
+        if (!activeDept || !selectedUserEmail || !selectedOrg) return;
 
         setSubmittingMember(true);
         try {
-            await addDepartmentMember(activeDept.id, { user_id: selectedUserId });
-
-            const selectedRole = roles.find((role) => role.id === selectedRoleId);
-            const assignedRole = selectedRole?.name ?? "user";
-
-            setDepartmentMembers((prev) => {
-                const currentMembers = prev[activeDept.id] ?? [];
-                const user = users.find((item) => item.id === selectedUserId);
-                if (!user) return prev;
-
-                return {
-                    ...prev,
-                    [activeDept.id]: [
-                        ...currentMembers,
-                        {
-                            id: selectedUserId,
-                            name: user.name,
-                            email: user.email,
-                            role: assignedRole,
-                        },
-                    ],
-                };
+            await addDepartmentMember(activeDept.id, { 
+                email: selectedUserEmail,
+                role_id: selectedRoleId || undefined
             });
 
-            setSelectedUserId("");
+            setSelectedUserEmail("");
             setSelectedRoleId("");
             setShowMemberModal(false);
-            if (selectedOrg) {
-                await loadDepartmentMembers(selectedOrg.id, activeDept.id);
-            }
-        } catch (error) {
-            console.error("Error al añadir el miembro", error);
+            
+            await loadDepartmentMembers(selectedOrg.id, activeDept.id);
+        } catch (error: any) {
+            console.error("Error al añadir el miembro al departamento", error);
+            alert(error.response?.data?.detail || "No se pudo añadir al usuario. Verifica que el correo electrónico pertenezca a un usuario registrado en la plataforma.");
         } finally {
             setSubmittingMember(false);
         }
@@ -305,30 +297,34 @@ export default function OrganizationPage() {
 
         const confirm = window.confirm(`¿Seguro que deseas desactivar ${targetOrg.name}?`);
         if (confirm) {
-            await deleteOrganization(targetOrg.id);
-            const updatedOrgs = organizations.filter((orgItem) => orgItem.id !== targetOrg.id);
-            setOrganizations(updatedOrgs);
-            setSelectedOrg(updatedOrgs.length > 0 ? updatedOrgs[0] : null);
-            if (expandedOrgId === targetOrg.id) {
-                setExpandedOrgId(null);
+            try {
+                await deleteOrganization(targetOrg.id);
+                const updatedOrgs = organizations.filter((orgItem) => orgItem.id !== targetOrg.id);
+                setOrganizations(updatedOrgs);
+                setSelectedOrg(updatedOrgs.length > 0 ? updatedOrgs[0] : null);
+                if (expandedOrgId === targetOrg.id) {
+                    setExpandedOrgId(null);
+                }
+            } catch (error) {
+                console.error("Error al eliminar organización", error);
             }
         }
     };
 
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-gray-50">
-                <div className="animate-pulse font-medium text-emerald-600">Sincronizando Workspace...</div>
+            <div className="flex min-h-screen items-center justify-center bg-slate-50">
+                <div className="animate-pulse font-medium text-[#0055A5]">Sincronizando Workspace Multi-tenant...</div>
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-screen flex-col gap-6 bg-gray-50 p-8">
-            <div className="flex items-center justify-between">
+        <div className="flex min-h-screen flex-col gap-6 bg-slate-50 p-4 md:p-8 overflow-x-hidden w-full">
+            <div className="flex items-center justify-between border-b-4 border-[#FFCD00] pb-4">
                 <div>
-                    <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-emerald-600">Workspace</h4>
-                    <h1 className="text-3xl font-extrabold text-slate-900">Configuración Organizacional</h1>
+                    <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-[#0055A5]">Workspace</h4>
+                    <h1 className="text-3xl font-extrabold text-slate-900">Configuración Organizacional y Roles</h1>
                 </div>
             </div>
 
@@ -338,44 +334,44 @@ export default function OrganizationPage() {
                         const summary = orgDetails[org.id];
                         const orgDepartments = summary?.departments ?? [];
                         const deptCount = orgDepartments.length;
-                        const roleCount = summary?.roles.length ?? 0;
+                        const roleCount = roles.length;
                         const memberCount = summary?.members.length ?? 0;
                         const isExpanded = expandedOrgId === org.id;
                         const isSelected = selectedOrg?.id === org.id;
                         const activeDeptForOrg = summary?.activeDeptId
                             ? orgDepartments.find((dept) => dept.id === summary.activeDeptId) ?? null
-                            : null;
+                            : (orgDepartments.length > 0 ? orgDepartments[0] : null);
                         const currentMembers = activeDeptForOrg ? (summary?.departmentMembers[activeDeptForOrg.id] ?? []) : [];
 
                         return (
-                            <div key={org.id} className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
+                            <div key={org.id} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                                 <button
                                     onClick={() => void handleToggleOrganization(org)}
                                     className="flex w-full items-start justify-between gap-4 text-left"
                                 >
                                     <div>
                                         <h2 className="text-xl font-bold text-slate-800">{org.name}</h2>
-                                        <p className="mt-1 text-sm text-gray-500">{org.description || "Sin descripción proporcionada."}</p>
+                                        <p className="mt-1 text-sm text-slate-500">{org.description || "Sin descripción proporcionada."}</p>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-emerald-600">
+                                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-[#0055A5]">
                                             {org.status || "Active"}
                                         </span>
-                                        <span className="text-sm text-gray-400">{isExpanded ? "▲" : "▼"}</span>
+                                        <span className="text-sm text-slate-400">{isExpanded ? "▲" : "▼"}</span>
                                     </div>
                                 </button>
 
                                 {isExpanded && (
                                     <div className="mt-6 space-y-6">
-                                        <div className="flex flex-wrap gap-3 border-b border-gray-100 pb-5">
+                                        <div className="flex flex-wrap gap-3 border-b border-slate-100 pb-5">
                                             <button
                                                 onClick={(event) => {
                                                     event.stopPropagation();
                                                     void handleSelectOrganization(org);
                                                 }}
-                                                className="rounded-xl bg-emerald-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+                                                className="rounded-xl bg-[#0055A5] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                                             >
-                                                Editar detalles
+                                                Sincronizar detalles
                                             </button>
                                             <button
                                                 onClick={(event) => {
@@ -383,7 +379,7 @@ export default function OrganizationPage() {
                                                     setSelectedOrg(org);
                                                     setShowDeptModal(true);
                                                 }}
-                                                className="rounded-xl border border-gray-200 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                                className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                             >
                                                 + Departamento
                                             </button>
@@ -391,18 +387,12 @@ export default function OrganizationPage() {
                                                 onClick={(event) => {
                                                     event.stopPropagation();
                                                     setSelectedOrg(org);
-                                                }}
-                                                className="rounded-xl border border-gray-200 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-                                            >
-                                                Definir Roles
-                                            </button>
-                                            <button
-                                                onClick={(event) => {
-                                                    event.stopPropagation();
-                                                    setSelectedOrg(org);
+                                                    if (orgDepartments.length > 0 && !activeDept) {
+                                                        setActiveDept(orgDepartments[0]);
+                                                    }
                                                     setShowMemberModal(true);
                                                 }}
-                                                className="rounded-xl border border-gray-200 bg-white px-4 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                                                className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                             >
                                                 + Añadir Miembro
                                             </button>
@@ -418,16 +408,16 @@ export default function OrganizationPage() {
                                         </div>
 
                                         <div className="flex flex-wrap gap-2 text-xs">
-                                            <span className="rounded-full bg-gray-100 px-2.5 py-1">{deptCount} departamentos</span>
-                                            <span className="rounded-full bg-gray-100 px-2.5 py-1">{roleCount} roles</span>
-                                            <span className="rounded-full bg-gray-100 px-2.5 py-1">{memberCount} miembros</span>
+                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{deptCount} departamentos</span>
+                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{roleCount} roles</span>
+                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{memberCount} miembros</span>
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
-                                            <div className="flex flex-col gap-3 lg:col-span-5">
+                                            <div className="flex flex-col gap-3 lg:col-span-5 min-w-0">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Departamentos</h3>
-                                                    <span className="text-xs text-gray-400">{orgDepartments.length} totales</span>
+                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Departamentos</h3>
+                                                    <span className="text-xs text-slate-400">{orgDepartments.length} totales</span>
                                                 </div>
                                                 <div className="flex flex-col gap-2">
                                                     {orgDepartments.length > 0 ? (
@@ -437,14 +427,14 @@ export default function OrganizationPage() {
                                                                 onClick={() => void handleSelectDepartmentForOrg(org, dept)}
                                                                 className={`cursor-pointer rounded-xl border p-4 transition-all ${
                                                                     isSelected && activeDeptForOrg?.id === dept.id
-                                                                        ? "border-emerald-500 bg-emerald-50/40 shadow-xs"
-                                                                        : "border-gray-100 hover:bg-gray-50"
+                                                                        ? "border-[#0055A5] bg-blue-50/40 shadow-xs"
+                                                                        : "border-slate-100 hover:bg-slate-50"
                                                                 }`}
                                                             >
                                                                 <div className="flex items-start justify-between gap-2">
                                                                     <div>
-                                                                        <h4 className="text-sm font-bold text-gray-800">{dept.name}</h4>
-                                                                        <p className="mt-0.5 text-xs text-gray-400">{dept.description}</p>
+                                                                        <h4 className="text-sm font-bold text-slate-800">{dept.name}</h4>
+                                                                        <p className="mt-0.5 text-xs text-slate-400">{dept.description}</p>
                                                                     </div>
                                                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                                                                         {dept.members ?? 0} miembros
@@ -453,8 +443,8 @@ export default function OrganizationPage() {
                                                             </div>
                                                         ))
                                                     ) : (
-                                                        <div className="rounded-xl border border-dashed border-gray-200 p-4 text-center text-xs text-gray-400">
-                                                            No hay departamentos.
+                                                        <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                                                            No hay departamentos registrados.
                                                         </div>
                                                     )}
                                                 </div>
@@ -462,30 +452,31 @@ export default function OrganizationPage() {
 
                                             <div className="flex flex-col gap-3 lg:col-span-7">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                                                        Miembros de: <span className="font-bold normal-case text-emerald-600">{activeDeptForOrg ? activeDeptForOrg.name : "Ninguno"}</span>
+                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                                                        Miembros de: <span className="font-bold normal-case text-[#0055A5]">{activeDeptForOrg ? activeDeptForOrg.name : "Ninguno"}</span>
                                                     </h3>
                                                     {activeDeptForOrg && (
                                                         <button
                                                             onClick={(event) => {
                                                                 event.stopPropagation();
                                                                 setSelectedOrg(org);
+                                                                setActiveDept(activeDeptForOrg);
                                                                 setShowMemberModal(true);
                                                             }}
-                                                            className="text-sm font-semibold text-emerald-600 hover:underline"
+                                                            className="text-sm font-semibold text-[#0055A5] hover:underline"
                                                         >
                                                             + Añadir
                                                         </button>
                                                     )}
                                                 </div>
-                                                <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
+                                                <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
                                                     {activeDeptForOrg ? (
                                                         currentMembers.length > 0 ? (
                                                             currentMembers.map((member) => (
-                                                                <div key={member.id} className="flex items-center justify-between border-b border-gray-100 p-4 last:border-0 hover:bg-gray-50/60">
+                                                                <div key={member.id} className="flex items-center justify-between border-b border-slate-100 p-4 last:border-0 hover:bg-slate-50/60">
                                                                     <div>
-                                                                        <h4 className="text-sm font-semibold text-gray-800">{member.name}</h4>
-                                                                        <p className="text-xs text-gray-400">{member.email}</p>
+                                                                        <h4 className="text-sm font-semibold text-slate-800">{member.name}</h4>
+                                                                        <p className="text-xs text-slate-400 truncate">{member.email}</p>
                                                                     </div>
                                                                     <span className="rounded-lg border border-slate-200 bg-slate-100/80 px-2.5 py-1 text-xs font-medium text-slate-600">
                                                                         {member.role ?? "user"}
@@ -493,10 +484,10 @@ export default function OrganizationPage() {
                                                                 </div>
                                                             ))
                                                         ) : (
-                                                            <div className="p-8 text-center text-xs text-gray-400">No hay miembros en este departamento.</div>
+                                                            <div className="p-8 text-center text-xs text-slate-400">No hay miembros en este departamento.</div>
                                                         )
                                                     ) : (
-                                                        <div className="p-8 text-center text-xs text-gray-400">Selecciona un departamento para ver sus miembros.</div>
+                                                        <div className="p-8 text-center text-xs text-slate-400">Selecciona un departamento para ver sus miembros.</div>
                                                     )}
                                                 </div>
                                             </div>
@@ -507,7 +498,7 @@ export default function OrganizationPage() {
                         );
                     })
                 ) : (
-                    <div className="rounded-xl border border-dashed p-4 text-sm text-gray-400">
+                    <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
                         No hay organizaciones registradas.
                     </div>
                 )}
@@ -515,34 +506,34 @@ export default function OrganizationPage() {
 
             {showDeptModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="w-full max-w-md rounded-xl border border-gray-100 bg-white p-6 shadow-xl">
+                    <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
                         <h3 className="mb-4 text-xl font-bold text-slate-900">Nuevo departamento</h3>
                         <form onSubmit={handleCreateDepartment} className="flex flex-col gap-4">
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Nombre</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Nombre</label>
                                 <input
                                     required
                                     value={departmentName}
                                     onChange={(e) => setDepartmentName(e.target.value)}
-                                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-emerald-500"
-                                    placeholder="Ej. Operaciones"
+                                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5]"
+                                    placeholder="Ej. Logística y Calidad"
                                 />
                             </div>
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Descripción</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Descripción</label>
                                 <textarea
                                     value={departmentDescription}
                                     onChange={(e) => setDepartmentDescription(e.target.value)}
-                                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-emerald-500"
+                                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5]"
                                     rows={3}
                                     placeholder="Describe el propósito del departamento"
                                 />
                             </div>
                             <div className="flex justify-end gap-2">
-                                <button type="button" onClick={() => setShowDeptModal(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+                                <button type="button" onClick={() => setShowDeptModal(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
                                     Cancelar
                                 </button>
-                                <button type="submit" disabled={submittingDepartment} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+                                <button type="submit" disabled={submittingDepartment} className="rounded-lg bg-[#0055A5] px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
                                     {submittingDepartment ? "Creando..." : "Crear departamento"}
                                 </button>
                             </div>
@@ -553,54 +544,70 @@ export default function OrganizationPage() {
 
             {showMemberModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="w-full max-w-md rounded-xl border border-gray-100 bg-white p-6 shadow-xl">
-                        <h3 className="mb-4 text-xl font-bold text-slate-900">Añadir miembro</h3>
+                    <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+                        <h3 className="mb-4 text-xl font-bold text-slate-900">Añadir miembro al departamento</h3>
                         <form onSubmit={handleAddMember} className="flex flex-col gap-4">
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Departamento</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Departamento activo</label>
                                 <input
                                     readOnly
                                     value={activeDept?.name ?? "Selecciona un departamento"}
-                                    className="w-full rounded-lg border border-gray-200 bg-gray-50 p-2.5 text-sm"
+                                    className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm text-slate-600"
                                 />
                             </div>
+                            
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Usuario</label>
-                                <select
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Correo del Usuario (Registrado)
+                                </label>
+                                <input
+                                    type="email"
                                     required
-                                    value={selectedUserId}
-                                    onChange={(e) => setSelectedUserId(e.target.value)}
-                                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-emerald-500"
-                                >
-                                    <option value="">Selecciona un usuario</option>
-                                    {users.map((user) => (
-                                        <option key={user.id} value={user.id}>
-                                            {user.name} ({user.email})
-                                        </option>
-                                    ))}
-                                </select>
+                                    value={selectedUserEmail}
+                                    onChange={(e) => setSelectedUserEmail(e.target.value)}
+                                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5]"
+                                    placeholder="ejemplo@correo.com"
+                                />
+                                <p className="mt-1 text-[11px] text-slate-400">
+                                    * El usuario debe estar previamente registrado en la plataforma global para ser añadido.
+                                </p>
                             </div>
+
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-500">Rol</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                    Rol Organizacional (Contexto RAG)
+                                </label>
                                 <select
                                     value={selectedRoleId}
                                     onChange={(e) => setSelectedRoleId(e.target.value)}
-                                    className="w-full rounded-lg border border-gray-200 p-2.5 text-sm outline-emerald-500"
+                                    className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5] font-medium"
+                                    required
                                 >
-                                    <option value="">Selecciona un rol</option>
-                                    {roles.map((role) => (
-                                        <option key={role.id} value={role.id}>
-                                            {role.name}
-                                        </option>
-                                    ))}
+                                    <option value="">Selecciona el rol y alcance...</option>
+                                    {roles.map((role) => {
+                                        const roleDef = ROLE_DEFINITIONS[role.name] || { 
+                                            label: role.name, 
+                                            context: role.description || "Sin contexto RAG asignado" 
+                                        };
+
+                                        return (
+                                            <option key={role.id} value={role.id}>
+                                                {roleDef.label} — [{roleDef.context}]
+                                            </option>
+                                        );
+                                    })}
                                 </select>
+                                <p className="mt-1 text-[11px] text-slate-400">
+                                    * El rol seleccionado define los metadatos de filtrado para las consultas del Asistente IA.
+                                </p>
                             </div>
-                            <div className="flex justify-end gap-2">
-                                <button type="button" onClick={() => setShowMemberModal(false)} className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50">
+                            
+                            <div className="flex justify-end gap-2 mt-2">
+                                <button type="button" onClick={() => setShowMemberModal(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
                                     Cancelar
                                 </button>
-                                <button type="submit" disabled={submittingMember} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-                                    {submittingMember ? "Guardando..." : "Añadir miembro"}
+                                <button type="submit" disabled={submittingMember} className="rounded-lg bg-[#0055A5] px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+                                    {submittingMember ? "Añadiendo..." : "Añadir miembro"}
                                 </button>
                             </div>
                         </form>

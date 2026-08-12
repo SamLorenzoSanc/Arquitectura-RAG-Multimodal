@@ -1,11 +1,8 @@
-
-
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from uuid import UUID, uuid4
-
+import aiofiles
 from fastapi import UploadFile
 
 
@@ -21,37 +18,19 @@ class StorageService:
         )
 
     async def save(
-        self,
-        file: UploadFile,
-        tenant_id: UUID,
-        knowledge_base_id: UUID,
+        self, file: UploadFile, tenant_id: UUID, knowledge_base_id: UUID
     ) -> Path:
-
         extension = Path(file.filename).suffix
-
         filename = f"{uuid4()}{extension}"
-
-        folder = (
-            self.STORAGE_ROOT
-            / str(tenant_id)
-            / str(knowledge_base_id)
-        )
-
-        folder.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        folder = self.STORAGE_ROOT / str(tenant_id) / str(knowledge_base_id)
+        folder.mkdir(parents=True, exist_ok=True)
 
         destination = folder / filename
+        await file.seek(0)
 
-        file.file.seek(0)
-
-        with destination.open("wb") as buffer:
-
-            shutil.copyfileobj(
-                file.file,
-                buffer,
-            )
+        async with aiofiles.open(destination, "wb") as out_file:
+            while content := await file.read(1024 * 1024):  # Lee en bloques de 1MB
+                await out_file.write(content)
 
         return destination
 

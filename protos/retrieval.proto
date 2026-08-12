@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package agrops.retrieval.v1;
+
+// Contrato gRPC del retrieval-service (Dense + BM25 + RRF).
+
+service RetrievalService {
+  rpc Retrieve (RetrieveRequest) returns (RetrieveResponse);
+}
+
+message RetrieveRequest {
+  string question = 1;
+  string tenant_id = 2;
+  repeated string collections = 3;
+  int32 retrieval_k = 4;
+  int32 final_k = 5;
+  bool use_reranking = 6;
+  bool use_query_rewrite = 7;
+}
+
+message RetrievedChunk {
+  string chunk_id = 1;
+  string document_id = 2;
+  string page_content = 3;
+  string source = 4;
+  float score = 5;
+  map<string, string> metadata = 6;
+}
+
+message RetrieveResponse {
+  string architecture = 1;
+  string original_query = 2;
+  string rewritten_query = 3;
+  repeated RetrievedChunk chunks = 4;
+  int32 retrieved_chunks = 5;
+  int32 final_chunks = 6;
+}

@@ -1,0 +1,46 @@
+# Contexto de build de la API — NO incluir entornos ni datos locales.
+# Sin esto, Docker transfiere .venv (~5 GB) en cada build.
+
+.venv/
+venv/
+env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.git/
+.gitignore
+*.md
+.env
+.env.*
+!.env.example
+
+# Datos / artefactos locales (runtime, no imagen)
+storage/
+chroma_db/
+out/
+*.sqlite
+*.db
+*.log
+tmp/
+temp/
+.cache/
+huggingface/
+.transformers_cache/
+sentence-transformers/
+
+# Tests no necesarios en la imagen de runtime
+tests/
+.pytest_cache/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

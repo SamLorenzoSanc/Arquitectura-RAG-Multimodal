@@ -1,24 +1,255 @@
 services:
-  postgres:
-    build:
-      context: ./postgres
-    image: postgres_db
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agrops-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - C:\Users\Usuario\.ollama\models:/root/.ollama/models
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-2}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-2}
+      OLLAMA_FLASH_ATTENTION: ${OLLAMA_FLASH_ATTENTION:-1}
+      OLLAMA_HOST: 0.0.0.0:11434
+    gpus: all
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: agrops-postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./postgres/init/00_create_dump_role.sql:/docker-entrypoint-initdb.d/00_create_dump_role.sql:ro
+      - ./postgres/seed.sql:/docker-entrypoint-initdb.d/10_seed.sql:ro
+      - ./postgres/migrations/001_hnsw_embeddings.sql:/docker-entrypoint-initdb.d/20_hnsw.sql:ro
+      - ./postgres/migrations/002_evaluation_dataset_metadata.sql:/docker-entrypoint-initdb.d/30_evaluation.sql:ro
+      - ./postgres/migrations/003_revoked_tokens.sql:/docker-entrypoint-initdb.d/40_revoked_tokens.sql:ro
+      - ./postgres/migrations/004_agrotech_memberships.sql:/docker-entrypoint-initdb.d/50_agrotech_memberships.sql:ro
+      - ./postgres/migrations/005_farmer_parcels.sql:/docker-entrypoint-initdb.d/60_farmer_parcels.sql:ro
+      - ./postgres/migrations/006_parcel_polygons.sql:/docker-entrypoint-initdb.d/70_parcel_polygons.sql:ro
+      - ./postgres/migrations/007_sensor_readings.sql:/docker-entrypoint-initdb.d/80_sensor_readings.sql:ro
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  api-gateway:
+  migrate:
+    image: pgvector/pgvector:pg18
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    volumes:
+      - ./postgres/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -c
+      - psql -v ON_ERROR_STOP=1 -f /migrations/001_hnsw_embeddings.sql && psql -v ON_ERROR_STOP=1 -f /migrations/002_evaluation_dataset_metadata.sql && psql -v ON_ERROR_STOP=1 -f /migrations/003_revoked_tokens.sql && psql -v ON_ERROR_STOP=1 -f /migrations/004_agrotech_memberships.sql && psql -v ON_ERROR_STOP=1 -f /migrations/005_farmer_parcels.sql && psql -v ON_ERROR_STOP=1 -f /migrations/006_parcel_polygons.sql && psql -v ON_ERROR_STOP=1 -f /migrations/007_sensor_readings.sql
+
+  redis:
+    image: redis:7-alpine
+    container_name: agrops-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: agrops-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./services/telemetry/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  inference:
+    build:
+      context: ./services/inference
+    image: agrops-inference
+    container_name: agrops-inference
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      OLLAMA_API_KEY: ollama
+      DEFAULT_EMBED_MODEL: ${DEFAULT_EMBED_MODEL:-qwen3-embedding:latest}
+      DEFAULT_CHAT_MODEL: ${DEFAULT_CHAT_MODEL:-llama3.2:latest}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    ports:
+      - "50051:50051"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:50051/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  retrieval:
+    build:
+      context: ./services/retrieval
+    image: agrops-retrieval
+    container_name: agrops-retrieval
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      INFERENCE_URL: http://inference:50051
+      DEFAULT_EMBED_MODEL: ${DEFAULT_EMBED_MODEL:-qwen3-embedding:latest}
+    depends_on:
+      inference:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "50052:50052"
+
+  ingest-worker:
+    build:
+      context: ./services/ingest-worker
+    image: agrops-ingest-worker
+    container_name: agrops-ingest-worker
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      API_INTERNAL_URL: http://api:8000
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-agrops-internal}
+      INGEST_QUEUE: ingest:jobs
+      INGEST_EVENTS: ingest:events
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+  telemetry:
+    build:
+      context: ./services/telemetry
+    image: agrops-telemetry
+    container_name: agrops-telemetry
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+    depends_on:
+      mosquitto:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "50053:50053"
+
+  # Opcionales (profile: optional)
+  forecast:
+    profiles: ["optional"]
+    build:
+      context: ./services/forecast
+    image: agrops-forecast
+    container_name: agrops-forecast
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "50054:50054"
+
+  notification:
+    profiles: ["optional"]
+    build:
+      context: ./services/notification
+    image: agrops-notification
+    container_name: agrops-notification
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: 1883
+    depends_on:
+      mosquitto:
+        condition: service_started
+    ports:
+      - "50055:50055"
+
+  api:
     build:
       context: ./gateway
-    image: api-gateway
-    container_name: agrops-api-gateway
+    image: agrops-api
+    container_name: agrops-api
+    env_file:
+      - .env
+    environment:
+      # Orquestación: LLM vía inference-service (GPU/latencia aislados)
+      INFERENCE_URL: http://inference:50051
+      OLLAMA_BASE_URL: http://inference:50051/v1
+      RETRIEVAL_URL: http://retrieval:50052
+      USE_RETRIEVAL_SERVICE: ${USE_RETRIEVAL_SERVICE:-false}
+      REDIS_URL: redis://redis:6379/0
+      USE_INGEST_QUEUE: ${USE_INGEST_QUEUE:-true}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-agrops-internal}
+      INGEST_ENRICHMENT_CONCURRENCY: ${INGEST_ENRICHMENT_CONCURRENCY:-8}
+      INGEST_SKIP_LLM_ENRICHMENT: ${INGEST_SKIP_LLM_ENRICHMENT:-true}
+      INGEST_SAVE_MARKDOWN: ${INGEST_SAVE_MARKDOWN:-false}
+      INGEST_EMBED_BATCH_SIZE: ${INGEST_EMBED_BATCH_SIZE:-32}
+      RAG_MAX_TOKENS: ${RAG_MAX_TOKENS:-192}
+      RAG_TEMPERATURE: ${RAG_TEMPERATURE:-0}
+      RAG_CHUNK_CHAR_LIMIT: ${RAG_CHUNK_CHAR_LIMIT:-600}
+      RAG_KEEP_ALIVE: ${RAG_KEEP_ALIVE:-30m}
+      RAG_USE_RERANKER: ${RAG_USE_RERANKER:-false}
+      RAG_USE_QUERY_REWRITE: ${RAG_USE_QUERY_REWRITE:-false}
+      RAG_RELATED_QUESTIONS: ${RAG_RELATED_QUESTIONS:-5}
+      RETRIEVAL_CACHE_TTL: ${RETRIEVAL_CACHE_TTL:-120}
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-8}
+      MKL_NUM_THREADS: ${MKL_NUM_THREADS:-8}
+      OPENBLAS_NUM_THREADS: ${OPENBLAS_NUM_THREADS:-8}
+      TOKENIZERS_PARALLELISM: "false"
+    gpus: all
     depends_on:
-      - postgres
+      inference:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   frontend:
     build:
@@ -26,6 +257,10 @@ services:
     image: agrops-frontend
     container_name: agrops-frontend
     depends_on:
-      - api-gateway
+      api:
+        condition: service_healthy
     ports:
       - "80:80"
+
+volumes:
+  postgres_data:

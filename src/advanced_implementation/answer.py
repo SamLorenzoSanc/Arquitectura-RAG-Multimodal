@@ -1,24 +1,30 @@
-from openai import OpenAI
+import sys
+import os
+import json
+import urllib.request
+from pathlib import Path
 from dotenv import load_dotenv
 from chromadb import PersistentClient
-from litellm import completion
+from openai import OpenAI
 from pydantic import BaseModel, Field
-from pathlib import Path
 from tenacity import retry, wait_exponential
-
 
 load_dotenv(override=True)
 
-# MODEL = "openai/gpt-4.1-nano"
-MODEL = "ollama/llama3"
+MODEL = "llama3"  # Nombre directo del modelo en Ollama
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+
 DB_NAME = str(Path(__file__).parent.parent.parent / "notebooks/preprocessed_db")
 KNOWLEDGE_BASE_PATH = Path(__file__).parent.parent.parent / "knowledge-base"
 
 collection_name = "docs"
-embedding_model = "text-embedding-3-large"
+embedding_model = "qwen3-embedding:latest"
 wait = wait_exponential(multiplier=1, min=10, max=240)
 
-openai = OpenAI()
+openai = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"
+)
 
 chroma = PersistentClient(path=DB_NAME)
 collection = chroma.get_or_create_collection(collection_name)
@@ -49,6 +55,30 @@ class RankOrder(BaseModel):
     )
 
 
+def ollama_chat(messages: list[dict], response_format: type[BaseModel] | None = None) -> str:
+    """Función auxiliar para realizar llamadas directas a Ollama vía HTTP REST."""
+    payload = {
+        "model": MODEL,
+        "messages": messages,
+        "stream": False
+    }
+    
+    # Si se requiere un output estructurado (JSON Schema de Pydantic)
+    if response_format:
+        payload["format"] = response_format.model_json_schema()
+
+    req = urllib.request.Request(
+        f"{OLLAMA_API_BASE}/api/chat",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST"
+    )
+
+    with urllib.request.urlopen(req) as response:
+        res_data = json.loads(response.read().decode("utf-8"))
+        return res_data["message"]["content"]
+
+
 @retry(wait=wait)
 def rerank(question, chunks):
     system_prompt = """
@@ -67,8 +97,8 @@ def rerank(question, chunks):
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
-    response = completion(model=MODEL, messages=messages, response_format=RankOrder)
-    reply = response.choices[0].message.content
+    
+    reply = ollama_chat(messages=messages, response_format=RankOrder)
     order = RankOrder.model_validate_json(reply).order
     return [chunks[i - 1] for i in order]
 
@@ -102,8 +132,7 @@ def rewrite_query(question, history=[]):
         Debe ser una pregunta MUY breve y específica que tenga más probabilidades de mostrar resultados. Céntrate en los detalles de la pregunta.
         IMPORTANTE: Responde ÚNICAMENTE con la consulta exacta de la base de conocimientos, nada más.
     """
-    response = completion(model=MODEL, messages=[{"role": "system", "content": message}])
-    return response.choices[0].message.content
+    return ollama_chat(messages=[{"role": "system", "content": message}])
 
 
 def merge_chunks(chunks, reranked):
@@ -140,5 +169,5 @@ def answer_question(question: str, history: list[dict] = []) -> tuple[str, list]
     """
     chunks = fetch_context(question)
     messages = make_rag_messages(question, history, chunks)
-    response = completion(model=MODEL, messages=messages)
-    return response.choices[0].message.content, chunks
+    answer = ollama_chat(messages=messages)
+    return answer, chunks
