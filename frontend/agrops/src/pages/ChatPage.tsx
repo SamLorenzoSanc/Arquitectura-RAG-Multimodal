@@ -761,22 +761,12 @@ export default function ChatPage() {
               <div className="flex h-full items-center justify-center">
                 <div className="text-center max-w-md">
                   <h2 className="mb-3 text-2xl font-bold text-slate-900">
-                    Asistente de {selectedOrg.name}
+                    Asistente de campo · {selectedOrg.name}
                   </h2>
                   <p className="text-sm text-gray-500 leading-relaxed">
-                    Comparación controlada para el TFM:{" "}
-                    <span className="font-semibold text-emerald-700">
-                      Hybrid RAG
-                    </span>{" "}
-                    (Dense+BM25+RRF) frente a{" "}
-                    <span className="font-semibold text-indigo-700">
-                      Agentic RAG
-                    </span>{" "}
-                    (tools KB/clima/precios). Modelo{" "}
-                    <span className="font-semibold text-amber-600">
-                      {selectedModel}
-                    </span>
-                    · parcela{" "}
+                    Describe el problema de tu finca. Recibirás diagnóstico,
+                    procedimiento paso a paso, datos técnicos y las herramientas
+                    o recambios necesarios. Parcela{" "}
                     {(farmerCrops || []).find((c) => c.id === selectedCropId)
                       ?.nombre ||
                       CROPS.find((c) => c.id === crop)?.name}{" "}
@@ -784,7 +774,8 @@ export default function ChatPage() {
                     {(farmerCrops || []).find((c) => c.id === selectedCropId)
                       ?.isla ||
                       ISLANDS.find((i) => i.id === island)?.name}
-                    .                  </p>
+                    .
+                  </p>
                 </div>
               </div>
             ) : (
@@ -1029,7 +1020,7 @@ export default function ChatPage() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder={`Pregunta a ${selectedOrg.name} usando ${selectedModel}...`}
+              placeholder="Describe el problema (riego, plaga, frío, maquinaria…)"
               disabled={isLoading}
               className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-amber-500 focus:bg-white transition-all shadow-xs pr-12"
             />

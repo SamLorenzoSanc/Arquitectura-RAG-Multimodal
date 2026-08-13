@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import Sidebar from "./Sidebar";
 import Header from "./Header";
 import DashboardKeepAlive from "./DashboardKeepAlive";
+import ChatWidget from "./ChatWidget";
 import {
   OrganizationProvider,
   useOrganization,
@@ -41,6 +42,7 @@ function DashboardShell() {
           </div>
         </main>
       </div>
+      <ChatWidget />
     </div>
   );
 }

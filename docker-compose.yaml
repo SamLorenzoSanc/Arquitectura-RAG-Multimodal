@@ -19,6 +19,20 @@ services:
       retries: 10
       start_period: 20s
 
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: agrops-ollama-init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: ollama:11434
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      ollama pull ${RAG_EMBEDDING_MODEL:-qwen3-embedding:latest} &&
+      ollama pull ${RAG_GENERATION_MODEL:-llama3.2:latest}
+
   postgres:
     image: pgvector/pgvector:pg18
     container_name: agrops-postgres
@@ -77,12 +91,14 @@ services:
       OLLAMA_BASE_URL: http://ollama:11434/v1
       OLLAMA_URL: http://ollama:11434
       OLLAMA_API_KEY: ${OLLAMA_API_KEY:-ollama}
-      RAG_MAX_TOKENS: ${RAG_MAX_TOKENS:-192}
+      RAG_MAX_TOKENS: ${RAG_MAX_TOKENS:-640}
       RAG_TEMPERATURE: ${RAG_TEMPERATURE:-0}
       RAG_CHUNK_CHAR_LIMIT: ${RAG_CHUNK_CHAR_LIMIT:-600}
       RAG_KEEP_ALIVE: ${RAG_KEEP_ALIVE:-30m}
       RAG_USE_RERANKER: ${RAG_USE_RERANKER:-false}
       RAG_USE_QUERY_REWRITE: ${RAG_USE_QUERY_REWRITE:-false}
+      RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-qwen3-embedding:latest}
+      RAG_GENERATION_MODEL: ${RAG_GENERATION_MODEL:-llama3.2:latest}
       RETRIEVAL_CACHE_TTL: ${RETRIEVAL_CACHE_TTL:-120}
       TOKENIZERS_PARALLELISM: "false"
     depends_on:

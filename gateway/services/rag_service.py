@@ -36,9 +36,12 @@ WAIT_POLICY = wait_exponential(multiplier=1, min=10, max=240)
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
 HNSW_INDEX_DIMENSIONS = int(os.getenv("HNSW_INDEX_DIMENSIONS", "2000"))
+DEFAULT_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "qwen3-embedding:latest")
+DEFAULT_CHAT_MODEL = os.getenv("RAG_GENERATION_MODEL", "llama3.2:latest")
 
 # Límites de generación: el cuello de botella típico está en Ollama, no en retrieval.
-RAG_MAX_TOKENS = int(os.getenv("RAG_MAX_TOKENS", "192"))
+# 640 permite procedimiento + datos técnicos + recambios sin recortar la respuesta.
+RAG_MAX_TOKENS = int(os.getenv("RAG_MAX_TOKENS", "640"))
 RAG_TEMPERATURE = float(os.getenv("RAG_TEMPERATURE", "0"))
 RAG_CHUNK_CHAR_LIMIT = int(os.getenv("RAG_CHUNK_CHAR_LIMIT", "600"))
 RAG_KEEP_ALIVE = os.getenv("RAG_KEEP_ALIVE", "30m")
@@ -63,6 +66,11 @@ _AGRO_SYNONYMS: dict[str, str] = {
     "suelo": "suelo edafologia materia organica",
     "sequía": "sequía deficit hidrico estres hidrico",
     "sequia": "sequía deficit hidrico estres hidrico",
+    "gotero": "gotero goteros goteo filtro recambio taponamiento",
+    "recambio": "recambio recambios pieza filtro junta fusible sonda gotero",
+    "herramienta": "herramienta tijera podadora llave destornillador EPI",
+    "cámara": "cámara camara frio reefer temperatura sonda",
+    "camara": "cámara camara frio reefer temperatura sonda",
 }
 # Por defecto sin Cross-Encoder: el ranking final es el de RRF (mucho más rápido).
 RAG_USE_RERANKER = os.getenv("RAG_USE_RERANKER", "false").lower() in {
@@ -171,12 +179,30 @@ class RAGService:
     """RAG híbrido multitenant: Dense + BM25 + RRF + Cross-Encoder."""
 
     SYSTEM_PROMPT = """
-    Eres AgroPS, un asistente agrario experto (cultivos, riego, plagas, suelos,
-    ayudas/POSEI, normativa y buenas prácticas en explotación agrícola).
-    Responde SIEMPRE en español, de forma breve, clara y accionable.
-    Usa el perfil operativo del agricultor cuando exista (hechos de su parcela).
-    Usa la información del Contexto documental; si falta evidencia, dilo sin inventar.
-    Prioriza cifras, plazos, dosis y requisitos cuando aparezcan en el Contexto.
+    Eres AgroPS, el asistente de campo para agricultores de Canarias.
+    Tu misión es resolver problemas reales de la explotación: riego, plagas,
+    poda, cosecha, fertilización, maquinaria, cámara de frío y recambios.
+
+    Responde SIEMPRE en español. Usa el perfil operativo del agricultor cuando exista.
+    Usa la información del Contexto documental; si falta evidencia, dilo sin inventar
+    y ofrece un procedimiento genérico seguro marcado como orientación.
+
+    Estructura OBLIGATORIA de cada respuesta (usa exactamente estos títulos):
+    1. Diagnóstico
+       Qué ocurre y la causa más probable, en 2-4 frases.
+    2. Procedimiento paso a paso
+       Lista numerada de acciones concretas, en orden, que el agricultor pueda ejecutar.
+    3. Información técnica
+       Dosis, tiempos, temperaturas, caudales, presiones, carencias, umbrales o
+       normativa que aparezcan en el Contexto. Si no hay cifras, indícalo.
+    4. Herramientas y recambios
+       Lista de herramientas, EPI, consumibles y piezas (goteros, filtros, juntas,
+       fusibles, sondas, etc.). Si el documento no las nombra, sugiere lo habitual
+       y márcalo como orientación.
+    5. Precauciones
+       Seguridad, plazos de seguridad y cuándo llamar a un técnico o a Sanidad Vegetal.
+
+    No resumas documentos: prioriza la tarea a realizar.
     No añadas avisos de confidencialidad salvo que el documento los contenga.
 
     {farmer_context}
@@ -191,8 +217,8 @@ class RAGService:
 
     def __init__(
         self,
-        model: str = "llama3",
-        embedding_model: str = "qwen3-embedding:latest",
+        model: str = DEFAULT_CHAT_MODEL,
+        embedding_model: str = DEFAULT_EMBEDDING_MODEL,
         retrieval_k: int = 10,
         bm25_k: int = 10,
         rrf_k: int = 60,
@@ -269,11 +295,11 @@ class RAGService:
         """Preguntas relacionadas agrícolas a partir del retrieval (sin LLM)."""
         limit = max_questions or RAG_RELATED_QUESTIONS
         templates = [
-            "¿Cuáles son los requisitos o condiciones de {topic}?",
-            "¿Qué ayudas o subvenciones se mencionan sobre {topic}?",
-            "¿Cómo afecta {topic} al cultivo o a la explotación?",
-            "¿Qué plazos o dosis aparecen relacionados con {topic}?",
-            "¿Qué prácticas de riego o manejo se recomiendan para {topic}?",
+            "¿Cuáles son los pasos para resolver un problema de {topic}?",
+            "¿Qué herramientas y recambios se necesitan para {topic}?",
+            "¿Qué datos técnicos (dosis, tiempos, temperaturas) aplican a {topic}?",
+            "¿Cómo diagnosticar y corregir un fallo de {topic}?",
+            "¿Qué precauciones de seguridad hay al trabajar {topic}?",
         ]
         seen: set[str] = set()
         out: list[str] = []
@@ -304,10 +330,11 @@ class RAGService:
 
         # Fallbacks útiles si hay poco contexto recuperado.
         fallbacks = [
-            "¿Qué ayudas agrícolas o POSEI aplican a mi explotación?",
-            "¿Cómo optimizar el riego ante estrés hídrico?",
-            "¿Qué tratamientos fitosanitarios se recomiendan ante plagas comunes?",
-            "¿Qué requisitos de fertilización aparecen en la documentación?",
+            "Tengo goteros taponados: ¿cómo los limpio paso a paso y qué recambios llevo?",
+            "¿Cómo podo el plátano y qué herramientas necesito?",
+            "La cámara no mantiene el frío: ¿qué reviso y qué piezas pueden fallar?",
+            "Hay manchas en hoja: ¿cómo identifico la plaga y qué tratamiento aplico?",
+            "¿Cuál es el procedimiento de carga a reefer y qué controles de frío hago?",
         ]
         for fb in fallbacks:
             if fb.lower() in seen:
