@@ -59,28 +59,6 @@ POST_BODIES: dict[str, dict[str, Any]] = {
         "name": f"Dept smoke {uuid.uuid4().hex[:8]}",
         "organization_id": None,
     },
-    "/crops/": {
-        "name": f"Crop smoke {uuid.uuid4().hex[:8]}",
-        "island": "Tenerife",
-    },
-    "/forecast/prophet": {
-        "series": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        "periods": 3,
-    },
-    "/forecast/arimax": {
-        "series": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        "periods": 3,
-    },
-    "/forecast/compare": {
-        "series": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        "periods": 3,
-    },
-    "/logistics/shipments": {
-        "origin": "Santa Cruz",
-        "destination": "Las Palmas",
-        "product": "plátano",
-        "quantity_kg": 100,
-    },
 }
 
 SKIP_PATH_MARKERS = (

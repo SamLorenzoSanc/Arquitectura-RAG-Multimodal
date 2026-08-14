@@ -51,9 +51,6 @@ services:
       - ./postgres/migrations/002_evaluation_dataset_metadata.sql:/docker-entrypoint-initdb.d/30_evaluation.sql:ro
       - ./postgres/migrations/003_revoked_tokens.sql:/docker-entrypoint-initdb.d/40_revoked_tokens.sql:ro
       - ./postgres/migrations/004_agrotech_memberships.sql:/docker-entrypoint-initdb.d/50_agrotech_memberships.sql:ro
-      - ./postgres/migrations/005_farmer_parcels.sql:/docker-entrypoint-initdb.d/60_farmer_parcels.sql:ro
-      - ./postgres/migrations/006_parcel_polygons.sql:/docker-entrypoint-initdb.d/70_parcel_polygons.sql:ro
-      - ./postgres/migrations/007_sensor_readings.sql:/docker-entrypoint-initdb.d/80_sensor_readings.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 10s
@@ -80,11 +77,15 @@ services:
 
   api:
     <<: *restart
-    image: ${DOCKERHUB_USER}/agrops-api:${IMAGE_TAG:-latest}
+    build:
+      context: ./gateway
+    image: ${DOCKERHUB_USER:-local}/agrops-api:${IMAGE_TAG:-latest}
     container_name: agrops-api
     env_file: [.env]
     environment:
       DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       OLLAMA_BASE_URL: http://ollama:11434/v1
       OLLAMA_URL: http://ollama:11434
       OLLAMA_API_KEY: ${OLLAMA_API_KEY:-ollama}
@@ -109,7 +110,11 @@ services:
 
   frontend:
     <<: *restart
-    image: ${DOCKERHUB_USER}/agrops-frontend:${IMAGE_TAG:-latest}
+    build:
+      context: ./frontend/agrops
+      args:
+        VITE_API_URL: /api/v1
+    image: ${DOCKERHUB_USER:-local}/agrops-frontend:${IMAGE_TAG:-latest}
     container_name: agrops-frontend
     depends_on:
       api:

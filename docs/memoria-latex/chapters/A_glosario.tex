@@ -1,0 +1,117 @@
+% -*- coding: utf-8 -*-
+\chapter{Glosario}
+
+Adaptador: Implementación concreta de un puerto hexagonal. En este trabajo, los adaptadores de salida conectan el RAG con pgvector, el índice BM25, Ollama y el Cross-Encoder; los de entrada son las rutas FastAPI que delegan en los casos de uso.
+
+ANN (Approximate Nearest Neighbors): Técnica de búsqueda aproximada que permite localizar de forma eficiente los vectores más similares en bases de datos de gran tamaño, reduciendo significativamente el tiempo de consulta respecto a una búsqueda exhaustiva.
+
+Arquitectura hexagonal (Ports and Adapters): Estilo arquitectónico propuesto por Cockburn (2005) en el que el dominio de negocio no depende de frameworks ni de infraestructura. El núcleo se comunica con el exterior mediante puertos (interfaces); los adaptadores implementan esos puertos hacia HTTP, bases de datos o modelos de lenguaje.
+
+Backpropagation (Retropropagación): Algoritmo de entrenamiento utilizado en redes neuronales artificiales que ajusta los pesos de las conexiones minimizando el error mediante el cálculo del gradiente de la función de pérdida.
+
+Base de datos vectorial (Vector Database): Sistema especializado para almacenar, indexar y recuperar vectores de alta dimensión generados por modelos de embeddings. Facilita búsquedas semánticas rápidas mediante métricas de similitud.
+
+PostgreSQL/pgvector: Base de datos vectorial de código abierto diseñada para aplicaciones de inteligencia artificial y sistemas RAG. Destaca por su facilidad de integración con Python y LangChain.
+
+Chunk: Fragmento de un documento utilizado como unidad mínima de procesamiento en sistemas RAG. Cada fragmento conserva parte del contexto original para facilitar la recuperación de información.
+
+Chunking: Proceso de dividir documentos extensos en fragmentos más pequeños y manejables antes de generar sus embeddings e indexarlos en una base de datos vectorial.
+
+CLIP (Contrastive Language-Image Pretraining): Modelo multimodal desarrollado por OpenAI capaz de representar imágenes y texto dentro del mismo espacio vectorial, permitiendo búsquedas cruzadas entre ambos formatos.
+
+Context Precision: Métrica utilizada para evaluar la proporción de fragmentos recuperados que realmente son relevantes para responder una consulta.
+
+Context Recall: Métrica que mide la capacidad de un sistema RAG para recuperar toda la información necesaria existente en el corpus documental.
+
+Cosine Similarity (Similitud del coseno): Medida matemática utilizada para calcular el grado de semejanza entre dos vectores mediante el ángulo formado entre ellos.
+
+Cross Encoder: Modelo de reranking que evalúa conjuntamente una consulta y un documento para calcular una puntuación de relevancia más precisa que los modelos bi-encoder
+
+Docker: Plataforma de virtualización ligera basada en contenedores que permite desplegar aplicaciones de forma reproducible e independiente del sistema operativo.
+
+Embedding: Representación numérica de alta dimensión que captura el significado semántico de palabras, frases, documentos o imágenes para permitir comparaciones matemáticas entre ellos.
+
+Faithfulness: Métrica de evaluación que determina el grado en que una respuesta generada por un modelo está fundamentada exclusivamente en la información recuperada del contexto documental.
+
+FAISS (Facebook AI Similarity Search): Biblioteca desarrollada por Meta para realizar búsquedas eficientes de similitud vectorial en colecciones de gran tamaño.
+
+Fine-Tuning: Proceso mediante el cual un modelo de lenguaje previamente entrenado se adapta a una tarea específica utilizando un conjunto adicional de datos especializados.
+
+GPT (Generative Pre-trained Transformer): Familia de modelos de lenguaje basados en la arquitectura Transformer capaces de comprender y generar texto mediante aprendizaje profundo.
+
+GPT-4V (GPT-4 Vision): Variante multimodal de GPT que incorpora capacidades de comprensión tanto de texto como de imágenes.
+
+GraphRAG: Arquitectura RAG que combina recuperación documental con grafos de conocimiento para representar relaciones complejas entre entidades.
+
+Guardrails: Conjunto de reglas, validaciones y mecanismos de control implementados para evitar respuestas incorrectas, peligrosas o alucinadas generadas por modelos de lenguaje.
+
+Hallucination (Alucinación): Fenómeno por el cual un modelo de lenguaje genera información falsa, inventada o no respaldada por los datos disponibles, presentándola como verdadera.
+
+HNSW (Hierarchical Navigable Small World): Algoritmo de indexación utilizado en bases de datos vectoriales que organiza los vectores en grafos jerárquicos para acelerar las búsquedas por similitud.
+
+IA (Inteligencia Artificial): Disciplina de la informática dedicada al desarrollo de sistemas capaces de realizar tareas que normalmente requieren inteligencia humana.
+
+LangChain: Framework de desarrollo que facilita la construcción de aplicaciones basadas en modelos de lenguaje, especialmente arquitecturas RAG y agentes inteligentes.
+
+Layout Analysis: Técnica de visión artificial utilizada para identificar automáticamente títulos, tablas, imágenes y otros elementos estructurales dentro de documentos PDF.
+
+LlamaIndex: Framework especializado en la indexación y recuperación documental para aplicaciones basadas en modelos de lenguaje e inteligencia artificial generativa.
+
+LLM (Large Language Model): Modelo de lenguaje entrenado sobre enormes volúmenes de texto capaz de comprender, generar y razonar utilizando lenguaje natural.
+
+Milvus: Base de datos vectorial de código abierto optimizada para almacenar miles de millones de embeddings con alto rendimiento.
+
+Modelo multimodal: Modelo de inteligencia artificial capaz de procesar simultáneamente distintos tipos de información, como texto, imágenes, tablas, audio o vídeo.
+
+Multi-Head Attention: Mecanismo de la arquitectura Transformer que permite atender simultáneamente diferentes relaciones semánticas presentes dentro de una secuencia.
+
+NLP (Natural Language Processing): Rama de la inteligencia artificial dedicada al procesamiento automático del lenguaje humano.
+
+NLU (Natural Language Understanding): Subdisciplina del NLP centrada en la comprensión del significado, intención y contexto del lenguaje natural.
+
+NLG (Natural Language Generation): Área del NLP encargada de generar automáticamente texto coherente y comprensible a partir de información estructurada.
+
+OCR (Optical Character Recognition): Tecnología que convierte imágenes o documentos escaneados en texto editable mediante reconocimiento óptico de caracteres.
+
+Ollama: Plataforma para ejecutar modelos de lenguaje de forma local, preservando la privacidad y evitando la dependencia de servicios en la nube.
+
+PAC (Política Agraria Común): Política de la Unión Europea destinada a apoyar el sector agrícola mediante ayudas económicas, regulación del mercado y desarrollo rural.
+
+PDF Parsing: Proceso de extracción automática de texto, tablas e imágenes desde documentos PDF para su posterior procesamiento.
+
+Pinecone: Servicio gestionado de base de datos vectorial diseñado para aplicaciones de inteligencia artificial y búsqueda semántica a gran escala.
+
+POSEI (Programa de Opciones Específicas por la Lejanía y la Insularidad): Programa europeo destinado a compensar las dificultades derivadas de la insularidad y ultraperiferia en determinadas regiones agrícolas.
+
+Puerto: Contrato (interfaz) que el dominio o los casos de uso exigen al exterior, sin conocer la tecnología concreta. En el núcleo RAG los puertos salientes cubren embeddings, LLM, repositorio de chunks, índice léxico y reranker.
+
+Prompt Engineering: Disciplina orientada al diseño y optimización de instrucciones dirigidas a modelos de lenguaje con el fin de obtener respuestas más precisas.
+
+PyMuPDF: Biblioteca de Python utilizada para extraer texto, imágenes y metadatos desde documentos PDF.
+
+Qdrant: Base de datos vectorial de código abierto desarrollada en Rust, optimizada para búsquedas semánticas con filtrado avanzado de metadatos.
+
+RAG (Retrieval-Augmented Generation): Arquitectura que combina recuperación de información documental con generación de texto mediante modelos de lenguaje para producir respuestas fundamentadas en fuentes externas.
+
+RAG Multimodal: Evolución del RAG tradicional que incorpora recuperación y procesamiento conjunto de texto, tablas, imágenes, diagramas y otros contenidos multimodales.
+
+RAGAS (Retrieval Augmented Generation Assessment): Framework utilizado para evaluar automáticamente sistemas RAG mediante métricas como fidelidad, precisión contextual y relevancia de las respuestas.
+
+Re-ranking: Etapa posterior a la recuperación documental donde los resultados iniciales se reordenan según su relevancia utilizando modelos más precisos.
+
+Self-Attention (Autoatención): Mecanismo fundamental de los Transformers que permite calcular la importancia relativa entre todos los elementos de una secuencia.
+
+Token: Unidad mínima de información procesada por un modelo de lenguaje, que puede corresponder a una palabra completa, una parte de ella o un signo de puntuación.
+
+Tokenización: Proceso de dividir un texto en tokens antes de ser procesado por un modelo de lenguaje.
+
+Transformer: Arquitectura de redes neuronales presentada en 2017 basada en mecanismos de autoatención, considerada el fundamento de los actuales modelos de lenguaje de gran tamaño.
+
+TruLens: Framework empleado para monitorizar y evaluar el rendimiento, precisión y seguridad de aplicaciones basadas en modelos de lenguaje
+
+Vectorización: Proceso mediante el cual un documento, imagen o texto se transforma en un embedding para su almacenamiento y recuperación semántica.
+
+Vision Transformer (ViT): Arquitectura basada en Transformers adaptada al procesamiento de imágenes mediante la división de estas en pequeños fragmentos o patches.
+
+
+

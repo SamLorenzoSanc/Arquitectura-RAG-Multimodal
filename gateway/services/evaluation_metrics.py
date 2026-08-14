@@ -82,20 +82,39 @@ def numeric_match(reference: str | None, generated: str | None, tolerance: float
 
 
 _CITATION_RE = re.compile(
-    r"(?:\[(?:\d+|[^\]]+\.(?:pdf|md)(?::p(?:ágina)?\.?\s*\d+)?)\]|"
-    r"(?:p(?:ágina)?\.?\s*\d+|anexo\s+[ivxlcdm\d]+))",
+    r"(?:\[(?:\d+|[^\]]+\.(?:pdf|md|docx?)(?::p(?:ágina)?\.?\s*\d+)?)\]|"
+    r"(?:p(?:ágina)?\.?\s*\d+|anexo\s+[ivxlcdm\d]+)|"
+    r"[\w.-]+\.(?:pdf|md|docx?))",
     re.I,
 )
 
 
 def citation_accuracy(answer: str | None, available_sources: Iterable[str] = ()) -> float:
-    citations = _CITATION_RE.findall(answer or "")
+    """Precisión de citas: 1.0 si no hay citas inventadas.
+
+    Sin marcadores de cita no se penaliza (el asistente no está obligado a
+    emitir [archivo.pdf]). Si cita, cada referencia debe existir en las fuentes.
+    """
+    citations = [match for match in _CITATION_RE.findall(answer or "") if match]
+    sources = [normalize_text(source) for source in available_sources if source]
+    if sources:
+        informal = [
+            source
+            for source in sources
+            if source and source in normalize_text(answer)
+        ]
+        citations = list(dict.fromkeys([*citations, *informal]))
     if not citations:
-        return 0.0
-    sources = [normalize_text(source) for source in available_sources]
+        return 1.0
     if not sources:
         return 1.0
-    valid = sum(any(source in normalize_text(citation) or normalize_text(citation) in source for source in sources) for citation in citations)
+    valid = sum(
+        any(
+            source in normalize_text(citation) or normalize_text(citation) in source
+            for source in sources
+        )
+        for citation in citations
+    )
     return valid / len(citations)
 
 

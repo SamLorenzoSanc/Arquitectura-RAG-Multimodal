@@ -1,33 +1,67 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-
 import { useOrganization } from "@/context/OrganizationContext";
-import {
-  useKnowledgeBases,
-  useKnowledgeMap,
-} from "@/hooks/useCachedApi";
+import { useKnowledgeBases, useKnowledgeMap } from "@/hooks/useCachedApi";
 
-const NODE_COLORS: Record<string, string> = {
-  document: "#2563eb",
-  chunk: "#10b981",
-  entity: "#f59e0b",
-  word: "#f59e0b",
-  concept: "#8b5cf6",
-  relation: "#ef4444",
+const BG = "#ffffff";
+const CANARY_BLUE = "#0768A9";
+const CANARY_YELLOW = "#FFCC00";
+const PALETTE = [CANARY_BLUE, CANARY_YELLOW, "#ffffff"];
+
+type GraphNode = {
+  id: string;
+  label: string;
+  type?: string;
+  document?: string;
+  content?: string;
+  group?: string;
+  has_embedding?: boolean;
+  words?: number;
+  weight?: number;
+  color: string;
+  val: number;
+  x?: number;
+  y?: number;
 };
 
+type GraphLink = {
+  source: string | GraphNode;
+  target: string | GraphNode;
+  value: number;
+};
+
+function hashHue(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = value.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return PALETTE[Math.abs(hash) % PALETTE.length];
+}
+
+function nodeId(ref: string | GraphNode): string {
+  return typeof ref === "object" ? String(ref.id) : String(ref);
+}
+
+function fileName(path?: string) {
+  if (!path) return "Sin documento";
+  return path.split(/[\\/]/).pop() ?? path;
+}
+
 export default function KnowledgeGraphPage() {
-  const { selectedOrg, setSelectedOrg, organizations } = useOrganization();
-
-  const [selectedNode, setSelectedNode] = useState<any | null>(null);
-  const [preview, setPreview] = useState(false);
-  const [selectedKbId, setSelectedKbId] = useState<string>("");
+  const { selectedOrg } = useOrganization();
+  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [hoverNode, setHoverNode] = useState<GraphNode | null>(null);
+  const [selectedKbId, setSelectedKbId] = useState("");
   const [similarityThreshold, setSimilarityThreshold] = useState(0.45);
+  const [search, setSearch] = useState("");
+  const [localGraph, setLocalGraph] = useState(false);
+  const [showOrphans, setShowOrphans] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
+  const [charge, setCharge] = useState(-90);
+  const [linkDistance, setLinkDistance] = useState(55);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
-  const { data: kbList } = useKnowledgeBases(
-    selectedOrg?.id,
-  );
+  const { data: kbList } = useKnowledgeBases(selectedOrg?.id);
   const knowledgeBases = useMemo(
     () => (kbList ?? []).map((kb) => ({ id: kb.id, name: kb.name })),
     [kbList],
@@ -36,422 +70,410 @@ export default function KnowledgeGraphPage() {
   const {
     data: graph,
     isLoading: loadingGraph,
+    error: graphError,
     refetch: refetchGraph,
   } = useKnowledgeMap(selectedOrg?.id, selectedKbId || null, {
-    preview,
+    preview: false,
     similarityThreshold,
   });
 
-  const loadingOrganizations = false;
-
   const graphRef = useRef<any>(null);
-
   const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
-  const [size, setSize] = useState({
-    width: 0,
-    height: 0,
-  });
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-  const graphStatistics = useMemo(() => {
-    if (!graph) {
-      return {
-        nodes: 0,
-        edges: 0,
-        documents: 0,
-        chunks: 0,
-        chunks_with_embedding: 0,
-        average_similarity: 0,
-      };
-    }
-
-    return {
-      nodes: graph.statistics?.nodes ?? 0,
-      edges: graph.statistics?.edges ?? 0,
-      documents: graph.statistics?.documents ?? 0,
-      chunks: graph.statistics?.chunks ?? 0,
-      chunks_with_embedding: graph.statistics?.chunks_with_embedding ?? 0,
-      average_similarity: graph.statistics?.average_similarity ?? 0,
-    };
-  }, [graph]);
-
-  const getFileName = (path?: string) => {
-    if (!path) return "";
-
-    return path.split(/[\/\\]/).pop() ?? "";
-  };
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const observer = new ResizeObserver(([entry]) => {
+    const measure = () => {
+      const rect = container.getBoundingClientRect();
       setSize({
-        width: entry.contentRect.width,
-        height: entry.contentRect.height,
+        width: Math.max(1, Math.floor(rect.width)),
+        height: Math.max(1, Math.floor(rect.height)),
       });
-    });
+    };
 
-    observer.observe(containerRef.current);
+    measure();
+    const frame = requestAnimationFrame(measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    window.addEventListener("resize", measure);
 
-    return () => observer.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
   }, []);
 
   useEffect(() => {
     setSelectedKbId("");
+    setSelectedNode(null);
   }, [selectedOrg?.id]);
 
-  const loadGraph = () => {
-    void refetchGraph();
-  };
+  const rawData = useMemo(() => {
+    const nodes = (graph?.graph?.nodes ?? []).map((node) => {
+      const group = node.group || node.document || "general";
+      return {
+        ...node,
+        group,
+        color: node.has_embedding === false ? "#94a3b8" : hashHue(group),
+        val: Math.max(1.4, Math.min(6, (node.weight ?? 8) / 6)),
+      } as GraphNode;
+    });
+    const links: GraphLink[] = (graph?.graph?.edges ?? []).map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      value: edge.weight ?? 1,
+    }));
+    return { nodes, links };
+  }, [graph]);
+
+  const groups = useMemo(() => {
+    const counts = new Map<string, { color: string; count: number }>();
+    for (const node of rawData.nodes) {
+      const key = fileName(node.group);
+      const prev = counts.get(key) ?? { color: node.color, count: 0 };
+      counts.set(key, { color: node.color, count: prev.count + 1 });
+    }
+    return [...counts.entries()].sort((a, b) => b[1].count - a[1].count);
+  }, [rawData.nodes]);
 
   const graphData = useMemo(() => {
-    if (!graph || !graph.graph) {
-      return {
-        nodes: [],
-        links: [],
-      };
+    const term = search.trim().toLowerCase();
+    let nodes = rawData.nodes.filter((node) =>
+      showOrphans ? true : node.has_embedding !== false,
+    );
+    if (term) {
+      nodes = nodes.filter(
+        (node) =>
+          node.label?.toLowerCase().includes(term) ||
+          node.document?.toLowerCase().includes(term) ||
+          node.content?.toLowerCase().includes(term),
+      );
     }
+    if (localGraph && selectedNode) {
+      const neighborIds = new Set<string>([selectedNode.id]);
+      for (const link of rawData.links) {
+        const source = nodeId(link.source);
+        const target = nodeId(link.target);
+        if (source === selectedNode.id) neighborIds.add(target);
+        if (target === selectedNode.id) neighborIds.add(source);
+      }
+      nodes = nodes.filter((node) => neighborIds.has(node.id));
+    }
+    const ids = new Set(nodes.map((node) => node.id));
+    const links = rawData.links.filter(
+      (link) => ids.has(nodeId(link.source)) && ids.has(nodeId(link.target)),
+    );
+    return { nodes, links };
+  }, [rawData, search, showOrphans, localGraph, selectedNode]);
 
-    return {
-      nodes: graph.graph.nodes.map((node) => ({
-        ...node,
-
-        color: NODE_COLORS[node.type] ?? "#64748b",
-
-        val: node.weight ?? 10,
-      })),
-
-      links: graph.graph.edges.map((edge) => ({
-        source: edge.source,
-
-        target: edge.target,
-
-        relation: edge.label ?? "relación",
-
-        value: edge.weight ?? 1,
-      })),
-    };
-  }, [graph]);
-  console.log(size);
-  /*
-|--------------------------------------------------------------------------
-| AJUSTAR ZOOM AL CARGAR
-|--------------------------------------------------------------------------
-*/
+  const focusId = hoverNode?.id ?? selectedNode?.id ?? null;
+  const highlight = useMemo(() => {
+    if (!focusId) return null;
+    const ids = new Set<string>([focusId]);
+    for (const link of graphData.links) {
+      const source = nodeId(link.source);
+      const target = nodeId(link.target);
+      if (source === focusId) ids.add(target);
+      if (target === focusId) ids.add(source);
+    }
+    return ids;
+  }, [focusId, graphData.links]);
 
   useEffect(() => {
-    if (!graphRef.current) return;
+    const fg = graphRef.current;
+    if (!fg) return;
+    fg.d3Force("charge")?.strength(charge);
+    fg.d3Force("link")?.distance(linkDistance).strength(0.35);
+    fg.d3Force("center")?.strength(0.04);
+    fg.d3ReheatSimulation?.();
+  }, [charge, linkDistance, graphData]);
 
-    if (graphData.nodes.length === 0) return;
-
+  useEffect(() => {
+    if (!graphRef.current || graphData.nodes.length === 0) return;
     requestAnimationFrame(() => {
-      graphRef.current.zoomToFit(400, 80);
+      graphRef.current.zoomToFit(500, 70);
     });
-  }, [graphData]);
+  }, [graphData.nodes.length, localGraph]);
 
-  /*
-|--------------------------------------------------------------------------
-| ESTADOS
-|--------------------------------------------------------------------------
-*/
+  const stats = graph?.statistics;
+
+  const paintNode = (
+    node: GraphNode,
+    ctx: CanvasRenderingContext2D,
+    globalScale: number,
+  ) => {
+    const dimmed = Boolean(highlight && !highlight.has(node.id));
+    const focused = node.id === focusId;
+    const radius = (focused ? 5.4 : 3.2) * Math.sqrt(node.val || 1);
+    ctx.save();
+    ctx.globalAlpha = dimmed ? 0.12 : 1;
+    ctx.beginPath();
+    ctx.arc(node.x ?? 0, node.y ?? 0, radius, 0, Math.PI * 2);
+    ctx.fillStyle = node.color;
+    ctx.shadowColor = node.color;
+    ctx.shadowBlur = dimmed ? 0 : focused ? 16 : 6;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = node.color === "#ffffff" ? CANARY_BLUE : "rgba(15, 23, 42, 0.2)";
+    ctx.lineWidth = focused ? 1.8 : 0.8;
+    ctx.stroke();
+    const showText =
+      showLabels ||
+      focused ||
+      globalScale > 2.4 ||
+      Boolean(search.trim());
+    if (showText && !dimmed) {
+      const label = fileName(node.label || node.document);
+      ctx.font = `${Math.max(9, 11 / globalScale)}px Inter, ui-sans-serif, system-ui`;
+      ctx.fillStyle = "rgba(15,23,42,0.9)";
+      ctx.fillText(label.slice(0, 42), (node.x ?? 0) + radius + 4, (node.y ?? 0) + 3);
+    }
+    ctx.restore();
+  };
 
   if (!selectedOrg) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="rounded-xl bg-white p-8 shadow">
-          <h2 className="mb-4 text-xl font-bold">Seleccionar organización</h2>
-
-          {loadingOrganizations ? (
-            <p>Cargando...</p>
-          ) : (
-            <select
-              className="rounded border px-4 py-2"
-              onChange={(e) => {
-                const org = organizations.find((o) => o.id === e.target.value);
-
-                if (org) {
-                  setSelectedOrg(org);
-                }
-              }}
-            >
-              <option>Selecciona</option>
-
-              {organizations.map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+      <div className="flex h-full items-center justify-center bg-white text-slate-500">
+        Selecciona una organización para ver el grafo.
       </div>
-    );
-  }
-
-  if (loadingGraph) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        Generando Knowledge Graph...
-      </div>
-    );
-  }
-
-  if (!graph) {
-    return (
-      <div className="p-10">No existe información para esta organización.</div>
     );
   }
 
   return (
-    <div
-      className="
-            flex
-            h-full
-            w-full
-            flex-col
-            overflow-hidden
-            bg-slate-100
-        "
-    >
-      <header
-        className="
-            flex
-            shrink-0
-            items-center
-            justify-between
-            border-b
-            bg-white
-            px-8
-            py-5
-        "
-      >
-        <div
-          className="
-                mt-2
-                flex
-                flex-wrap
-                gap-4
-                text-sm
-            "
-        >
-          <span>Nodes: {graphStatistics.nodes}</span>
+    <div className="relative flex h-full min-h-[calc(100vh-64px)] w-full overflow-hidden bg-white text-slate-800">
+      <div ref={containerRef} className="absolute inset-0">
+        {loadingGraph && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/85 text-sm text-slate-500">
+            Trazando el grafo de embeddings…
+          </div>
+        )}
+        {graphError && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 p-6 text-center text-sm text-red-600">
+            No se pudo cargar el grafo. Revisa la sesión y vuelve a intentarlo.
+          </div>
+        )}
+        {!loadingGraph && !graphError && rawData.nodes.length === 0 && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white text-sm text-slate-500">
+            No hay chunks con los filtros seleccionados.
+          </div>
+        )}
+        {size.width > 0 && size.height > 0 && (
+          <ForceGraph2D
+            key={`${selectedKbId || "all"}:${rawData.nodes.length}:${rawData.links.length}`}
+            ref={graphRef}
+            width={size.width}
+            height={size.height}
+            graphData={graphData}
+            backgroundColor={BG}
+            nodeRelSize={4}
+            nodeVal={(node: GraphNode) => node.val}
+            nodeColor={(node: GraphNode) => node.color}
+            nodeLabel={(node: GraphNode) => fileName(node.label || node.document)}
+            nodeCanvasObject={paintNode}
+            nodePointerAreaPaint={(node: GraphNode, color, ctx) => {
+              ctx.fillStyle = color;
+              ctx.beginPath();
+              ctx.arc(node.x ?? 0, node.y ?? 0, 8, 0, Math.PI * 2);
+              ctx.fill();
+            }}
+            linkColor={(link: GraphLink) => {
+              if (!highlight) return "rgba(7,104,169,0.18)";
+              const source = nodeId(link.source);
+              const target = nodeId(link.target);
+              const active =
+                highlight.has(source) &&
+                highlight.has(target) &&
+                (source === focusId || target === focusId);
+              return active ? CANARY_BLUE : "rgba(7,104,169,0.05)";
+            }}
+            linkWidth={(link: GraphLink) => {
+              if (!highlight) return 0.6;
+              const source = nodeId(link.source);
+              const target = nodeId(link.target);
+              return source === focusId || target === focusId ? 1.4 : 0.4;
+            }}
+            cooldownTicks={140}
+            onEngineStop={() => graphRef.current?.zoomToFit?.(500, 70)}
+            enableNodeDrag
+            onNodeHover={(node: GraphNode | null) => setHoverNode(node)}
+            onNodeClick={(node: GraphNode) => setSelectedNode(node)}
+            onBackgroundClick={() => {
+              setSelectedNode(null);
+              setHoverNode(null);
+            }}
+          />
+        )}
+      </div>
 
-          <span>Edges: {graphStatistics.edges}</span>
-
-          <span>Documents: {graphStatistics.documents}</span>
-
-          <span>Chunks: {graphStatistics.chunks}</span>
-
-          <span>
-            Con embedding: {graphStatistics.chunks_with_embedding}
-          </span>
-
-          <span>
-            Sim. media:{" "}
-            {(graphStatistics.average_similarity * 100).toFixed(0)}%
-          </span>
+      <aside className="absolute left-4 top-4 z-20 w-72 rounded-xl border border-blue-100 bg-white/95 p-4 shadow-xl backdrop-blur">
+        <div className="mb-3 flex h-1.5 overflow-hidden rounded-full">
+          <span className="flex-1 bg-white ring-1 ring-inset ring-slate-200" />
+          <span className="flex-1 bg-[#0768A9]" />
+          <span className="flex-1 bg-[#FFCC00]" />
         </div>
-
-        <select
-          className="
-                rounded
-                border
-                px-4
-                py-2
-            "
-          value={selectedOrg.id}
-          onChange={(e) => {
-            const org = organizations.find((o) => o.id === e.target.value);
-
-            if (org) {
-              setSelectedOrg(org);
-            }
-          }}
-        >
-          {organizations.map((org) => (
-            <option key={org.id} value={org.id}>
-              {org.name}
-            </option>
-          ))}
-        </select>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <select
-            className="rounded border px-3 py-1 text-sm"
-            value={selectedKbId}
-            onChange={(e) => setSelectedKbId(e.target.value)}
-          >
-            <option value="">Todas las KBs</option>
-            {knowledgeBases.map((kb) => (
-              <option key={kb.id} value={kb.id}>
-                {kb.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="flex items-center gap-2 text-sm">
-            Umbral
-            <input
-              type="number"
-              min={0.2}
-              max={0.95}
-              step={0.05}
-              value={similarityThreshold}
-              onChange={(e) =>
-                setSimilarityThreshold(Number(e.target.value) || 0.45)
-              }
-              className="w-20 rounded border px-2 py-1"
-            />
-          </label>
-
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={preview}
-              onChange={(e) => setPreview(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">Preview (word-level)</span>
-          </label>
-
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0768A9]">
+              Grafo
+            </p>
+            <h1 className="text-sm font-semibold text-slate-900">
+              Vista de embeddings
+            </h1>
+          </div>
           <button
-            className="rounded border px-3 py-1 text-sm"
-            onClick={() => void loadGraph()}
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            className="text-[11px] text-slate-500 hover:text-[#0768A9]"
           >
-            Reload
+            {filtersOpen ? "Ocultar" : "Filtros"}
           </button>
         </div>
-      </header>
-
-      <main
-        className="
-                flex
-                flex-1
-                min-h-0
-                overflow-hidden
-            "
-      >
-        <div
-          ref={containerRef}
-          className="
-                    relative
-                    flex-1
-                    min-w-0
-                    overflow-hidden
-                "
-        >
-          {
-            <ForceGraph2D
-              ref={graphRef}
-              width={1200}
-              height={800}
-              graphData={graphData}
-              backgroundColor="#f8fafc"
-              nodeLabel="label"
-              nodeColor={(node: any) => node.color}
-              nodeVal={(node: any) => node.val}
-              linkWidth={(link: any) => Math.max(1, link.value)}
-              linkDirectionalParticles={1}
-              linkDirectionalParticleSpeed={() => 0.002}
-              cooldownTicks={120}
-              onNodeClick={(node: any) => setSelectedNode(node)}
-            />
-          }
-        </div>
-
-        {selectedNode && (
-          <aside
-            className="
-                        w-96
-                        shrink-0
-                        overflow-y-auto
-                        border-l
-                        bg-white
-                        p-6
-                    "
-          >
+        <p className="mb-3 text-[11px] text-slate-500">
+          {stats?.nodes ?? 0} notas · {stats?.edges ?? 0} enlaces ·{" "}
+          {stats?.chunks_with_embedding ?? 0} con vector
+        </p>
+        <input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Filtrar notas…"
+          className="mb-3 h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#0768A9]"
+        />
+        {filtersOpen && (
+          <div className="space-y-3 text-xs">
+            <select
+              className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-slate-800"
+              value={selectedKbId}
+              onChange={(event) => setSelectedKbId(event.target.value)}
+            >
+              <option value="">Todas las bases</option>
+              {knowledgeBases.map((kb) => (
+                <option key={kb.id} value={kb.id}>
+                  {kb.name}
+                </option>
+              ))}
+            </select>
+            <label className="flex items-center justify-between text-slate-600">
+              Grafo local
+              <input
+                type="checkbox"
+                checked={localGraph}
+                onChange={(event) => setLocalGraph(event.target.checked)}
+              />
+            </label>
+            <label className="flex items-center justify-between text-slate-600">
+              Huérfanos (sin embedding)
+              <input
+                type="checkbox"
+                checked={showOrphans}
+                onChange={(event) => setShowOrphans(event.target.checked)}
+              />
+            </label>
+            <label className="flex items-center justify-between text-slate-600">
+              Etiquetas siempre
+              <input
+                type="checkbox"
+                checked={showLabels}
+                onChange={(event) => setShowLabels(event.target.checked)}
+              />
+            </label>
+            <label className="block text-slate-500">
+              Umbral {similarityThreshold.toFixed(2)}
+              <input
+                type="range"
+                min={0.2}
+                max={0.9}
+                step={0.05}
+                value={similarityThreshold}
+                onChange={(event) =>
+                  setSimilarityThreshold(Number(event.target.value))
+                }
+                className="mt-1 w-full accent-[#0768A9]"
+              />
+            </label>
+            <label className="block text-slate-500">
+              Repulsión
+              <input
+                type="range"
+                min={-180}
+                max={-20}
+                step={5}
+                value={charge}
+                onChange={(event) => setCharge(Number(event.target.value))}
+                className="mt-1 w-full accent-[#FFCC00]"
+              />
+            </label>
+            <label className="block text-slate-500">
+              Distancia de enlace
+              <input
+                type="range"
+                min={20}
+                max={140}
+                step={5}
+                value={linkDistance}
+                onChange={(event) => setLinkDistance(Number(event.target.value))}
+                className="mt-1 w-full accent-[#0768A9]"
+              />
+            </label>
             <button
-              className="
-                            float-right
-                            text-xl
-                            text-gray-500
-                            hover:text-black
-                        "
+              type="button"
+              onClick={() => void refetchGraph()}
+              className="h-8 w-full rounded-md border border-[#0768A9]/30 text-[#0768A9] hover:bg-blue-50"
+            >
+              Recargar grafo
+            </button>
+            <div className="max-h-36 space-y-1 overflow-y-auto pt-1">
+              {groups.slice(0, 12).map(([name, info]) => (
+                <div key={name} className="flex items-center gap-2 text-[11px] text-slate-600">
+                  <span
+                    className="h-2 w-2 rounded-full border border-slate-300"
+                    style={{
+                      background: info.color,
+                      boxShadow: `0 0 6px ${info.color}`,
+                    }}
+                  />
+                  <span className="truncate">{name}</span>
+                  <span className="ml-auto text-slate-400">{info.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </aside>
+
+      {selectedNode && (
+        <aside className="absolute bottom-4 right-4 z-20 w-80 max-h-[70%] overflow-y-auto rounded-xl border border-yellow-200 bg-white/95 p-4 shadow-xl backdrop-blur">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-[#0768A9]">
+                Nota
+              </p>
+              <h2 className="text-sm font-semibold text-slate-900">
+                {fileName(selectedNode.label || selectedNode.document)}
+              </h2>
+            </div>
+            <button
+              type="button"
               onClick={() => setSelectedNode(null)}
+              className="text-slate-400 hover:text-[#0768A9]"
             >
               ✕
             </button>
-
-            <h2
-              className="
-                            mb-6
-                            text-xl
-                            font-bold
-                        "
-            >
-              {selectedNode.label}
-            </h2>
-
-            <div className="space-y-5">
-              <div>
-                <strong>Archivo</strong>
-
-                <p className="break-all">
-                  {getFileName(selectedNode.document)}
-                </p>
-              </div>
-
-              <div>
-                <strong>Tipo</strong>
-
-                <p>{selectedNode.type}</p>
-              </div>
-
-              {selectedNode.content && (
-                <div>
-                  <strong>Contenido</strong>
-
-                  <p
-                    className="
-                                        whitespace-pre-wrap
-                                        break-words
-                                        text-sm
-                                    "
-                  >
-                    {selectedNode.content}
-                  </p>
-                </div>
-              )}
-
-              {selectedNode.words && (
-                <div>
-                  <strong>Palabras</strong>
-
-                  <p>{selectedNode.words}</p>
-                </div>
-              )}
-
-              {selectedNode.metadata && (
-                <div>
-                  <strong>Metadata</strong>
-
-                  <pre
-                    className="
-                                        overflow-x-auto
-                                        rounded
-                                        bg-gray-100
-                                        p-3
-                                        text-xs
-                                    "
-                  >
-                    {JSON.stringify(selectedNode.metadata, null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </aside>
-        )}
-      </main>
+          </div>
+          <p className="mb-2 text-[11px] text-slate-500">
+            {fileName(selectedNode.document)} ·{" "}
+            {selectedNode.has_embedding === false ? "sin vector" : "con embedding"}
+            {selectedNode.words ? ` · ${selectedNode.words} palabras` : ""}
+          </p>
+          {selectedNode.content && (
+            <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700">
+              {selectedNode.content}
+            </p>
+          )}
+        </aside>
+      )}
     </div>
   );
 }

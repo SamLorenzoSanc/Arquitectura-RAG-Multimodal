@@ -72,12 +72,6 @@ class Permission(str, Enum):
     CHAT_CREATE = "chat:create"
     CHAT_READ = "chat:read"
 
-    # Dominios operativos
-    FARM_READ = "farm:read"
-    FARM_MANAGE = "farm:manage"
-    LOGISTICS_READ = "logistics:read"
-    LOGISTICS_MANAGE = "logistics:manage"
-    ANALYTICS_READ = "analytics:read"
     EVAL_READ = "eval:read"
     EVAL_MANAGE = "eval:manage"
     SETTINGS_MANAGE = "settings:manage"
@@ -95,6 +89,9 @@ _BASE_READ = [
     Permission.DOC_READ,
     Permission.CHAT_CREATE,
     Permission.CHAT_READ,
+    Permission.EVAL_READ,
+    Permission.EVAL_MANAGE,
+    Permission.DEPT_READ,
 ]
 
 # Mapa global de permisos por rol (legacy + seed operativo)
@@ -104,31 +101,24 @@ ROLE_PERMISSIONS: Dict[str, List[Permission]] = {
     "org_admin": [p for p in _ALL if p != Permission.DEBUG_ACCESS],
     "farm_manager": _BASE_READ
     + [
-        Permission.FARM_READ,
-        Permission.FARM_MANAGE,
-        Permission.ANALYTICS_READ,
         Permission.EVAL_READ,
         Permission.METRICS_READ,
         Permission.DEPT_READ,
     ],
     "logistics_operator": _BASE_READ
     + [
-        Permission.LOGISTICS_READ,
-        Permission.LOGISTICS_MANAGE,
-        Permission.ANALYTICS_READ,
+        Permission.EVAL_READ,
         Permission.METRICS_READ,
         Permission.DEPT_READ,
     ],
     "quality_controller": _BASE_READ
     + [
-        Permission.LOGISTICS_READ,
-        Permission.FARM_READ,
         Permission.EVAL_READ,
-        Permission.ANALYTICS_READ,
         Permission.METRICS_READ,
         Permission.DEPT_READ,
     ],
-    "user": _BASE_READ + [Permission.DEPT_READ],
+    "user": _BASE_READ + [Permission.DEPT_READ, Permission.EVAL_READ],
+    "member": _BASE_READ + [Permission.DEPT_READ, Permission.EVAL_READ],
     "viewer": [
         Permission.ORG_READ,
         Permission.KB_READ,
@@ -136,6 +126,7 @@ ROLE_PERMISSIONS: Dict[str, List[Permission]] = {
         Permission.CHAT_CREATE,
         Permission.CHAT_READ,
         Permission.DEPT_READ,
+        Permission.EVAL_READ,
     ],
 }
 
@@ -146,8 +137,33 @@ def _normalize_role_key(user_role: str) -> str:
 
 def has_permission(user_role: str, permission: Permission) -> bool:
     """Verifica si el rol posee el permiso requerido."""
-    allowed_permissions = ROLE_PERMISSIONS.get(_normalize_role_key(user_role), [])
+    allowed_permissions = ROLE_PERMISSIONS.get(_normalize_role_key(user_role))
+    if allowed_permissions is None:
+        allowed_permissions = ROLE_PERMISSIONS["user"]
     return permission in allowed_permissions
+
+
+async def user_is_admin(db: AsyncSession, user_id: object) -> bool:
+    """Comprueba si el usuario posee una membresía administrativa activa."""
+    return bool(
+        await db.scalar(
+            text(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM organization_members AS membership
+                    JOIN roles AS role ON role.id = membership.role_id
+                    WHERE membership.user_id = :user_id
+                      AND membership.active = true
+                      AND lower(role.name) IN (
+                          'admin', 'super_admin', 'org_admin'
+                      )
+                )
+                """
+            ),
+            {"user_id": user_id},
+        )
+    )
 
 
 # ==========================================

@@ -14,10 +14,35 @@ El job `migrate` de Docker solo aplica migraciones SQL; no es un servicio de neg
 
 ## Responsabilidades del gateway
 
-El gateway concentra autenticación JWT, multitenancy, CRUD agrícola, logística,
-forecast, chat, evaluación y RAG híbrido. La recuperación se ejecuta en proceso:
-dense sobre pgvector, BM25 por tenant, fusión RRF y reranking opcional. Generación y
-embeddings consumen Ollama directamente mediante `OLLAMA_BASE_URL`.
+El gateway concentra autenticación JWT, multitenancy, documentos, chat,
+evaluación y RAG híbrido. Auth, organizaciones y el resto de rutas HTTP no se
+reescriben: el hexágono se aplica **solo al bounded context RAG** (ingesta,
+recuperación, generación y evaluación).
+
+## Hexágono del núcleo RAG
+
+El dominio RAG no depende de FastAPI, SQLAlchemy ni Ollama. El desarrollo sigue
+el orden de Cockburn (de dentro hacia fuera): entidades y reglas → puertos →
+casos de uso → adaptadores de salida → adaptadores de entrada.
+
+```text
+Adaptadores de entrada (FastAPI: /api/v1/chat, documentos, evaluación)
+        |
+        v
+Casos de uso (AnswerQuestion, IngestDocument, EvaluateRetrieval, EvaluateAnswer)
+        |
+        v
+Dominio RAG (Chunk, Query, RRF, expansión léxica) + puertos
+        |
+        +--> pgvector (ChunkRepository)
+        +--> índice BM25 (LexicalIndexPort)
+        +--> Ollama (EmbeddingPort, LlmPort)
+        +--> Cross-Encoder (RerankerPort)
+```
+
+El composition root vive en `gateway/rag/composition.py` (importado desde
+`gateway/main.py`). `RAGService` queda como fachada para no reescribir de golpe
+las rutas HTTP; el contrato `/api/v1` y el frontend no cambian.
 
 No existen proxies de inferencia o retrieval, workers de ingesta, Redis, MQTT ni
 endpoints internos entre servicios.

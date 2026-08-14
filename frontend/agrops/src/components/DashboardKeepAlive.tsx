@@ -2,56 +2,51 @@ import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import ChatPage from "@/pages/ChatPage";
-import RecogidaPage from "@/pages/RecogidaPage";
-import DocumentPage from "@/pages/DocumentationPage";
-import FincasPage from "@/pages/FincasPage";
-import CultivosPage from "@/pages/CultivosPage";
-import AnalyticsPage from "@/pages/AnalyticsPage";
-import LogisticsDashboard from "@/pages/LogisticDashboard";
-import FlotaPage from "@/pages/FlotaPage";
-import ReeferPage from "@/pages/ReeferPage";
-import TransitoPage from "@/pages/TransitoPage";
+import CuadernoCampoPage from "@/pages/CuadernoCampoPage";
+import DatasetsPage from "@/pages/DatasetsPage";
 import OrganizationPage from "@/pages/OrganizationPage";
 import TenantPage from "@/pages/TenantPage";
 import SettingsPage from "@/pages/SettingsPage";
 import KnowledgeGraphPage from "@/pages/KnowledgeGraphPage";
 import EvaluationPage from "@/pages/EvalutionPage";
-import ChromaDebugPage from "@/pages/ChromaDebuPage";
-import FarmDashboard from "@/pages/FarmDashboard";
+import HelpDocsPage from "@/pages/HelpDocsPage";
+import SupportPage from "@/pages/SupportPage";
 
 type DashRoute = {
   path: string;
-  group: "work" | "ops" | "admin" | "labs";
+  group: "work" | "admin" | "labs";
   Component: ComponentType;
 };
 
-/** Todas las páginas del panel de control, agrupadas como en el Sidebar. */
+const OPS_REDIRECTS = new Set([
+  "/dashboard/cultivos",
+  "/dashboard/almacenamiento",
+  "/dashboard/analytics",
+  "/dashboard/logistics",
+  "/dashboard/flota",
+  "/dashboard/reefer",
+  "/dashboard/transito",
+  "/dashboard/fincas",
+  "/dashboard/farm-dashboard",
+  "/dashboard/recogida",
+]);
+
+/** Páginas del panel centradas en documentación y evaluación RAG. */
 export const DASHBOARD_ROUTES: DashRoute[] = [
-  // Trabajo diario
   { path: "/dashboard/chat", group: "work", Component: ChatPage },
-  { path: "/dashboard/recogida", group: "work", Component: RecogidaPage },
-  { path: "/dashboard/documentation", group: "work", Component: DocumentPage },
-  // Operaciones
-  { path: "/dashboard/fincas", group: "ops", Component: FincasPage },
-  { path: "/dashboard/cultivos", group: "ops", Component: CultivosPage },
-  { path: "/dashboard/analytics", group: "ops", Component: AnalyticsPage },
-  { path: "/dashboard/logistics", group: "ops", Component: LogisticsDashboard },
-  { path: "/dashboard/flota", group: "ops", Component: FlotaPage },
-  { path: "/dashboard/reefer", group: "ops", Component: ReeferPage },
-  { path: "/dashboard/transito", group: "ops", Component: TransitoPage },
-  { path: "/dashboard/farm-dashboard", group: "ops", Component: FarmDashboard },
-  // Administración
+  { path: "/dashboard/cuaderno", group: "work", Component: CuadernoCampoPage },
+  { path: "/dashboard/datasets", group: "work", Component: DatasetsPage },
   { path: "/dashboard/organization", group: "admin", Component: OrganizationPage },
   { path: "/dashboard/tenants", group: "admin", Component: TenantPage },
   { path: "/dashboard/settings", group: "admin", Component: SettingsPage },
-  // Laboratorio
+  { path: "/dashboard/help", group: "admin", Component: HelpDocsPage },
+  { path: "/dashboard/support", group: "admin", Component: SupportPage },
   {
     path: "/dashboard/knowledge-graph",
     group: "labs",
     Component: KnowledgeGraphPage,
   },
   { path: "/dashboard/evaluacion", group: "labs", Component: EvaluationPage },
-  { path: "/dashboard/chroma-debug", group: "labs", Component: ChromaDebugPage },
 ];
 
 function normalizePath(pathname: string): string {
@@ -76,7 +71,7 @@ export default function DashboardKeepAlive() {
   );
 
   const [visited, setVisited] = useState<string[]>(() =>
-    known.has(current) ? [current] : ["/dashboard/chat"],
+    known.has(current) ? [current] : ["/dashboard/datasets"],
   );
 
   useEffect(() => {
@@ -84,12 +79,20 @@ export default function DashboardKeepAlive() {
     setVisited((prev) => (prev.includes(current) ? prev : [...prev, current]));
   }, [current, known]);
 
+  if (current === "/dashboard/validacion") {
+    return <Navigate to="/dashboard/evaluacion?tab=validacion" replace />;
+  }
+
+  if (current === "/dashboard/documentation" || OPS_REDIRECTS.has(current)) {
+    return <Navigate to="/dashboard/datasets" replace />;
+  }
+
   if (current === "/dashboard") {
-    return <Navigate to="/dashboard/chat" replace />;
+    return <Navigate to="/dashboard/datasets" replace />;
   }
 
   if (!known.has(current)) {
-    return <Navigate to="/dashboard/chat" replace />;
+    return <Navigate to="/dashboard/datasets" replace />;
   }
 
   return (
@@ -104,7 +107,7 @@ export default function DashboardKeepAlive() {
             aria-hidden={!active}
             className={
               active
-                ? "flex min-h-0 w-full flex-1 flex-col"
+                ? "flex h-full min-h-0 w-full flex-1 flex-col"
                 : "hidden"
             }
           >

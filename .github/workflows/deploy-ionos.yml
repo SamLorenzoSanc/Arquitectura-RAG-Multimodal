@@ -53,7 +53,7 @@ jobs:
           context: ./frontend/agrops
           push: true
           build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_API_URL=/api/v1
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/agrops-frontend:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/agrops-frontend:latest

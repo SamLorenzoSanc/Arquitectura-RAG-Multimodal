@@ -1,0 +1,94 @@
+% !TEX program = pdflatex
+% Proyecto Overleaf / local: TFM Samuel Lorenzo Sánchez
+\documentclass[12pt,a4paper,oneside]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla,es-noshorthands]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\setlength{\headheight}{18pt}
+\addtolength{\topmargin}{-6pt}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue,
+  pdftitle={Impacto de la Arquitectura RAG en las Alucinaciones de los LLMs},
+  pdfauthor={Samuel Lorenzo Sánchez}
+}
+
+\newcommand{\tfmtitle}{Impacto de la Arquitectura RAG en las Alucinaciones de los LLMs}
+\newcommand{\tfmauthor}{Samuel Lorenzo Sánchez}
+\newcommand{\tfmtutor}{Carlos Granados Aguilar}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\tfmauthor}
+\fancyhead[R]{\tfmtitle}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\tfmtitle}
+\author{\tfmauthor}
+\date{Curso 2024--2025}
+
+\begin{document}
+
+% ---------- Portada ----------
+\begin{titlepage}
+\centering
+{\Large Universidad Alfonso X el Sabio\\Business Tech\\[0.5em]
+Máster Universitario en Inteligencia Artificial\par}
+\vspace{2.5cm}
+{\LARGE\bfseries Trabajo de Fin de Máster\par}
+\vspace{1.5cm}
+{\Huge\bfseries \tfmtitle\par}
+\vspace{2cm}
+{\Large Autor: \tfmauthor\par}
+\vspace{0.6cm}
+{\Large Tutor: \tfmtutor\par}
+\vfill
+{\large 2025--2026\par}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\listoffigures
+\listoftables
+\clearpage
+\pagenumbering{arabic}
+
+\input{chapters/00_resumen.tex}
+\clearpage
+
+\input{chapters/01_introduccion.tex}
+\input{chapters/02_objetivos.tex}
+\input{chapters/03_estado_arte.tex}
+\input{chapters/04_metodologia.tex}
+% Orden solicitado por revisión: implementación y despliegue antes de resultados/conclusiones
+\input{chapters/05_implementacion.tex}
+\input{chapters/06_despliegue.tex}
+\input{chapters/07_evaluacion.tex}
+\input{chapters/08_conclusiones.tex}
+
+\appendix
+\input{chapters/A_glosario.tex}
+\input{chapters/B_bibliografia_raw.tex}
+
+\end{document}

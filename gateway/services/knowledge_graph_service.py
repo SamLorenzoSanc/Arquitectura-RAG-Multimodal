@@ -158,7 +158,10 @@ class KnowledgeGraphService:
                 coords = np.random.RandomState(42).rand(len(top_words), 2) * 2 - 1
             else:
                 reducer_w = umap.UMAP(
-                    n_components=2, n_neighbors=min(10, max(2, n - 1)), random_state=42
+                    n_components=2,
+                    n_neighbors=min(10, max(2, n - 1)),
+                    random_state=42,
+                    n_jobs=1,
                 )
                 coords = reducer_w.fit_transform(mat)
 
@@ -266,7 +269,12 @@ class KnowledgeGraphService:
 
             embeddings_list = []
             embedded_indices = []
+            seen_chunks: set[str] = set()
             for idx, (chunk, document, embedding) in enumerate(rows):
+                chunk_key = str(chunk.id)
+                if chunk_key in seen_chunks:
+                    continue
+                seen_chunks.add(chunk_key)
                 text = "\n\n".join(
                     part
                     for part in [chunk.headline, chunk.summary, chunk.content]
@@ -289,7 +297,7 @@ class KnowledgeGraphService:
 
                 if embedding is not None and embedding.vector is not None:
                     embeddings_list.append(list(embedding.vector))
-                    embedded_indices.append(idx)
+                    embedded_indices.append(len(ids) - 1)
 
             embeddings = np.array(embeddings_list) if embeddings_list else np.array([])
 
@@ -305,6 +313,7 @@ class KnowledgeGraphService:
                 min_dist=0.15,
                 metric="cosine",
                 random_state=42,
+                n_jobs=1,
             )
             embedded_coords = reducer.fit_transform(embeddings)
             for local_i, global_i in enumerate(embedded_indices):

@@ -10,7 +10,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ForeignKey, Index, Text
+from sqlalchemy import ForeignKey, Index, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +26,9 @@ class Embedding(Base):
     """
 
     __tablename__ = "embeddings"
+    __table_args__ = (
+        UniqueConstraint("chunk_id", "model", name="ux_embeddings_chunk_model"),
+    )
 
     # Identificador único del registro de embedding (UUIDv4)
     id: Mapped[UUID] = mapped_column(
@@ -39,7 +42,6 @@ class Embedding(Base):
     chunk_id: Mapped[UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("chunks.id", ondelete="CASCADE"),
-        unique=True,
         nullable=False,
     )
 

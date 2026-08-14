@@ -1,0 +1,24 @@
+% -*- coding: utf-8 -*-
+\chapter{Despliegue operativo del prototipo contenedorizado}
+
+
+\section{Despliegue operativo del prototipo funcional contenedorizado}
+El despliegue local y de demostración se realiza con Docker Compose (servicios \texttt{api}, \texttt{frontend}, \texttt{postgres}, \texttt{ollama}, job \texttt{migrate}). Existe pipeline de publicación de imágenes hacia un VPS; la validación en entorno de cliente se documenta como \textbf{prototipo}, no como certificación de producción industrial.
+
+\section{Despliegue Operativo y Arquitectura de Contenedores (Docker)}
+Con el propósito de validar de forma práctica los hallazgos empíricos y demostrar la eficacia de la solución propuesta en la erradicación de alucinaciones factuales, se procedió al diseño, contenedorización y despliegue de la plataforma AgroRAG. Para garantizar la reproductibilidad, modularidad y portabilidad del entorno de pruebas en cualquier infraestructura, la arquitectura completa fue orquestada mediante Docker y Docker Compose.
+
+Este entorno multi-contenedor integra de forma desacoplada los componentes esenciales del sistema, permitiendo su evaluación y prueba interactiva por parte de usuarios externos, técnicos y el panel de expertos:
+
+Base de Datos Relacional (PostgreSQL): Encargada de la persistencia de datos estructurados, gestión de usuarios, almacenamiento de metadatos de los documentos (títulos, fechas, fuentes de la PAC/POSEI, páginas y secciones) y registro de trazabilidad de las auditorías e historial de consultas.
+
+Base de Datos Vectorial (Qdrant / PostgreSQL/pgvector): Optimizada para el almacenamiento y búsqueda eficiente de embeddings densos de alta dimensión, permitiendo la recuperación híbrida y semántica de los fragmentos normativos en tiempos de respuesta de milisegundos.
+
+Servicio de Inferencia y Recuperación (Backend \& LLM Engine): Módulo encargado de ejecutar la ingesta documental, el procesamiento multimodal (OCR/Docling), la ejecución de consultas mediante modelos de lenguaje locales (vía Ollama) y el reordenamiento de contexto mediante Cross-Encoders.
+
+Interfaz Gráfica de Usuario (Dashboard Frontend): Entorno interactivo que permite a los evaluadores realizar consultas en lenguaje natural, visualizar en tiempo real el contexto recuperado, verificar las citas documentales y comprobar de manera directa cómo el anclaje estricto (Strict Grounding) mitiga las alucinaciones en los casos evaluados extrínsecas.
+
+La puesta a disposición de esta plataforma contenedorizada no solo demuestra la viabilidad técnica de la arquitectura RAG en un prototipo funcional contenedorizado, sino que transforma un experimento teórico en una herramienta funcional y auditable por cualquier stakeholder del sector agrícola.
+
+
+

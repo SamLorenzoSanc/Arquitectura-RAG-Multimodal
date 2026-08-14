@@ -33,6 +33,8 @@ def test_numeric_matching_handles_spanish_formats_and_tolerance():
 
 def test_citations_and_abstention_are_deterministic():
     assert citation_accuracy("Véase [manual.pdf:p. 12].", ["manual.pdf"]) == 1.0
+    assert citation_accuracy("La ayuda es 1.200 € por hectárea.", ["posei.pdf"]) == 1.0
+    assert citation_accuracy("Según [inventado.pdf] el POSEI paga 10 €.", ["posei.pdf"]) == 0.0
     assert abstention_score("El contexto no contiene esa información.", True) == 1.0
     assert abstention_score("La dosis es 3 ml.", True) == 0.0
 

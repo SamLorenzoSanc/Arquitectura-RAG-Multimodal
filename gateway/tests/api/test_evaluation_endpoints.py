@@ -1,17 +1,18 @@
 import json
 import pytest
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-GET_TESTS_ROUTE = "/chat/evaluation/tests"
-GET_TEST_ROUTE = "/chat/evaluation/tests/0"
-EVAL_RETRIEVAL_ROUTE = "/chat/evaluation/retrieval/0"
-EVAL_ANSWER_ROUTE = "/chat/evaluation/answer/0"
-UPLOAD_TESTS_ROUTE = "/chat/evaluation/upload-tests"
+from core.test import TestQuestion
+
+GET_TESTS_ROUTE = "/api/v1/chat/evaluation/tests"
+GET_TEST_ROUTE = "/api/v1/chat/evaluation/tests/0"
+EVAL_RETRIEVAL_ROUTE = "/api/v1/chat/evaluation/retrieval/0"
+EVAL_ANSWER_ROUTE = "/api/v1/chat/evaluation/answer/0"
+UPLOAD_TESTS_ROUTE = "/api/v1/chat/evaluation/upload-tests"
 
 
 def make_test_question():
-    return SimpleNamespace(
+    return TestQuestion(
         question="¿Cuál es la capital de España?",
         keywords=["España", "capital"],
         reference_answer="Madrid",
@@ -22,20 +23,25 @@ def make_test_question():
 def test_get_evaluation_tests(authenticated_client):
     sample = [make_test_question()]
 
-    with patch("routes.chat.load_tests", return_value=sample):
+    with patch(
+        "routes.chat.resolve_evaluation_tests", AsyncMock(return_value=sample)
+    ):
         res = authenticated_client.get(GET_TESTS_ROUTE)
 
     assert res.status_code == 200
     body = res.json()
     assert body["total"] == 1
     assert body["tests"][0]["question"] == sample[0].question
+    assert body["tests"][0]["source"] == "file"
 
 
 def test_get_evaluation_test_not_found(authenticated_client):
     sample = [make_test_question()]
 
-    with patch("routes.chat.load_tests", return_value=sample):
-        res = authenticated_client.get("/chat/evaluation/tests/99")
+    with patch(
+        "routes.chat.resolve_evaluation_tests", AsyncMock(return_value=sample)
+    ):
+        res = authenticated_client.get("/api/v1/chat/evaluation/tests/99")
 
     assert res.status_code == 404
 
@@ -52,7 +58,9 @@ async def test_evaluate_retrieval_route(authenticated_client):
 
     async_mock = AsyncMock(return_value=fake_result)
 
-    with patch("routes.chat.load_tests", return_value=sample), patch(
+    with patch(
+        "routes.chat.resolve_evaluation_tests", AsyncMock(return_value=sample)
+    ), patch(
         "routes.chat.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch("routes.chat.evaluate_retrieval_internal", async_mock):
         res = authenticated_client.post(EVAL_RETRIEVAL_ROUTE)
@@ -72,7 +80,9 @@ async def test_evaluate_answer_route(authenticated_client):
 
     async_mock = AsyncMock(return_value=(eval_result, generated_answer, chunks))
 
-    with patch("routes.chat.load_tests", return_value=sample), patch(
+    with patch(
+        "routes.chat.resolve_evaluation_tests", AsyncMock(return_value=sample)
+    ), patch(
         "routes.chat.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch("routes.chat.evaluate_answer_internal", async_mock):
         res = authenticated_client.post(EVAL_ANSWER_ROUTE)
@@ -97,10 +107,32 @@ def test_upload_tests_endpoint(authenticated_client, tmp_path):
     file_path.write_text(content, encoding="utf-8")
 
     destination = tmp_path / "canonical.jsonl"
-    with patch("routes.chat.TEST_FILE", destination), open(file_path, "rb") as fh:
+    with patch("routes.chat.TEST_FILE", destination), patch(
+        "routes.chat.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+    ), open(file_path, "rb") as fh:
         files = {"file": ("tests.json", fh, "application/json")}
         res = authenticated_client.post(UPLOAD_TESTS_ROUTE, files=files)
 
     assert res.status_code == 200
     body = res.json()
     assert body.get("uploaded", 0) >= 1
+
+
+@pytest.mark.asyncio
+async def test_load_unified_tests_rollbacks_after_db_error():
+    from routes.chat import load_unified_tests
+
+    sample = [make_test_question()]
+    db = AsyncMock()
+    db.rollback = AsyncMock()
+    db.commit = AsyncMock()
+
+    with patch("routes.chat.load_tests", return_value=sample), patch(
+        "routes.chat.init_retrieval_dataset_table",
+        AsyncMock(side_effect=RuntimeError("column split does not exist")),
+    ):
+        tests = await load_unified_tests(db, "11111111-1111-1111-1111-111111111111")
+
+    db.rollback.assert_awaited()
+    assert tests[0].question == sample[0].question
+    assert db.execute.await_count == 0

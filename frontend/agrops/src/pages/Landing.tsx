@@ -1,13 +1,11 @@
 import { 
     ArrowRight, 
     Bot, 
-    TrendingUp, 
     ShieldCheck, 
     Building2, 
     Sparkles, 
     ChevronRight, 
     ThermometerSnowflake, 
-    MessageSquare, 
     Info, 
     Leaf 
 } from "lucide-react";
@@ -71,18 +69,18 @@ export default function Landing() {
                     
                     <span className="flex items-center gap-2 rounded-full border border-yellow-300 bg-yellow-100/50 px-4 py-1.5 text-sm font-semibold text-yellow-800 shadow-sm backdrop-blur-sm">
                         <Sparkles size={16} className="text-yellow-600" />
-                        AGROPS & CanariasCold - Innovación Agrícola y Logística
+                        AGROPS — Asistente RAG agrícola
                     </span>
 
                     <h1 className="mt-8 max-w-4xl text-5xl font-extrabold tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
                         Tu ecosistema inteligente para la{' '}
                         <span className="bg-gradient-to-r from-blue-600 to-yellow-500 bg-clip-text text-transparent">
-                            gestión agrícola y cadena de frío
+                            consulta documental con RAG
                         </span>
                     </h1>
 
                     <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 sm:text-xl">
-                        Centraliza documentos con IA, predice mercados con ARIMAX y garantiza la trazabilidad en tiempo real desde Canarias hasta Mercamadrid.
+                        Centraliza normativa PAC/POSEI, recupera evidencia del corpus y genera respuestas citando la fuente.
                     </p>
 
                     <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:gap-6">
@@ -134,21 +132,6 @@ export default function Landing() {
                         text="Sube y consulta normativas, PAC o subvenciones. El sistema RAG indexa PDFs y responde citando la fuente exacta."
                     />
                     <FeatureCard
-                        icon={<ThermometerSnowflake size={28} />}
-                        title="Trazabilidad Multimodal y Frío"
-                        text="Control total de la cadena de frío (Cámara de aire y contenedores reefer) desde fincas en Canarias hasta Mercamadrid."
-                    />
-                    <FeatureCard
-                        icon={<MessageSquare size={28} />}
-                        title="Alertas WhatsApp Business"
-                        text="Notificaciones automáticas en tiempo real directo al móvil del agricultor ante cualquier desviación térmica."
-                    />
-                    <FeatureCard
-                        icon={<TrendingUp size={28} />}
-                        title="Analítica Predictiva"
-                        text="Proyecta demanda y precios de cultivos (Plátano, Aguacate, etc.) usando modelos Prophet y ARIMAX conectados al clima."
-                    />
-                    <FeatureCard
                         icon={<ShieldCheck size={28} />}
                         title="Auditoría RAG Continua"
                         text="Panel de calidad en tiempo real que evalúa exhaustividad (nDCG, MRR) para asegurar que la IA responde sin alucinaciones."
@@ -169,7 +152,7 @@ export default function Landing() {
                             ¿Cómo funciona AgroPS?
                         </h2>
                         <p className="mt-4 text-lg leading-8 text-slate-600">
-                            Un flujo de trabajo diseñado para que ahorres horas de gestión diaria y asegures tus envíos.
+                            Un flujo de trabajo para consultar normativa y evaluar la calidad del RAG.
                         </p>
                     </div>
 
@@ -177,23 +160,23 @@ export default function Landing() {
                         <Step
                             number="1"
                             title="Configura tu Organización"
-                            text="Crea tu espacio, vincula tu cuenta de WhatsApp y registra tus fincas, cooperativas y rutas."
+                            text="Crea el espacio, invita al equipo y elige la base de conocimiento de tu organización."
                             imgSrc="https://images.unsplash.com/photo-1605000797499-95a51c5269ae?q=80&w=800&auto=format&fit=crop"
                             alt="Agricultor usando una tablet en el campo"
                         />
                         <Step
                             number="2"
                             title="Alimenta el Sistema"
-                            text="Sube documentos normativos a ChromaDB y activa la supervisión IoT de contenedores reefer."
+                            text="Sube documentos normativos; el pipeline los fragmenta, embebe e indexa para recuperación híbrida."
                             imgSrc="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?q=80&w=800&auto=format&fit=crop"
                             alt="Gestión de documentos y análisis de datos en ordenador portátil"
                         />
                         <Step
                             number="3"
-                            title="Monitorea y Tranquilidad"
-                            text="Consulta proyecciones de mercado y recibe alertas instantáneas en tu móvil si la cadena de frío sufre variaciones."
+                            title="Consulta y evalúa"
+                            text="Pregunta en lenguaje natural, revisa las citas y mide alucinaciones en el laboratorio de evaluación."
                             imgSrc="https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=800&auto=format&fit=crop"
-                            alt="Gráficos de analítica predictiva en pantalla"
+                            alt="Panel de evaluación RAG"
                         />
                     </div>
                 </div>
@@ -206,10 +189,10 @@ export default function Landing() {
 
                 <div className="relative mx-auto max-w-5xl px-6 text-center">
                     <h2 className="text-4xl font-bold tracking-tight text-white sm:text-5xl">
-                        Centraliza hoy tu gestión agrícola y logística
+                        Centraliza hoy tu documentación agrícola
                     </h2>
                     <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-300">
-                        Deja que la inteligencia artificial y el monitoreo de temperatura en tiempo real se encarguen de lo complejo para que tú puedas centrarte en el campo.
+                        Deja que el asistente RAG recupere evidencia del corpus para que puedas centrarte en el campo.
                     </p>
                     
                     <div className="mt-10 flex items-center justify-center gap-x-6">

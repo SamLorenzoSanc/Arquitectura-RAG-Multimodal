@@ -8,9 +8,6 @@ export interface ChatRequest {
     organization_name?: string;
     model?: string;
     rag_mode?: "hybrid" | "agentic" | "compare";
-    island?: string;
-    crop?: string;
-    crop_id?: string;
 }
 
 export interface AgentTraceStep {
@@ -48,7 +45,7 @@ export interface ChatResponse {
         agentic?: ModeComparisonSide;
         note?: string;
     } | null;
-    farmer_profile?: Record<string, unknown> | null;
+    review_id?: string | null;
 }
 
 
@@ -63,6 +60,7 @@ export interface Message {
         chunk_id?: string;
         snippet?: string;
     }>;
+    pendingReview?: boolean;
 }
 
 export interface ChatContext {

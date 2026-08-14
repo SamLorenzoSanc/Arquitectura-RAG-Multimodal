@@ -1,0 +1,196 @@
+% -*- coding: utf-8 -*-
+\chapter{Marco metodológico}
+
+El presente capítulo expone el diseño metodológico y el procedimiento empírico-analítico formulado para evaluar cuantitativamente la reducción de alucinaciones en modelos de lenguaje de gran tamaño (Large Language Models, LLMs) aplicados a la documentación regulatoria del sector agrario (Política Agraria Común - PAC, programa POSEI y normativa de Sanidad Vegetal). La investigación parte de la necesidad crítica detectada en el ámbito de la gestión pública agrícola: la incapacidad de los LLMs autónomos para responder con precisión y trazabilidad sobre cuerpos normativos densos, heterogéneos y fuertemente tabulares. Para abordar este problema, se ha configurado un diseño experimental cuantitativo, aplicado y transversal, estructurado mediante un flujo de trabajo que abarca la adquisición automatizada de datos (web crawling y layout parsing), el diseño de un pipeline de Generación Aumentada por Recuperación (Retrieval-Augmented Generation, RAG) con fragmentación contextualizada, la construcción de un conjunto de prueba de referencia (Ground Truth) de  consultas técnicas, y una doble metodología de auditoría compuesta por métricas automatizadas de Procesamiento del Lenguaje Natural (PLN) mediante el framework RAGAS y un escrutinio mediante juicio de expertos técnicos.
+
+\section{Orden de desarrollo del núcleo RAG}
+
+El prototipo se implementó como monolito FastAPI, pero el núcleo de recuperación y generación no se construyó mezclando reglas de negocio con SQLAlchemy u Ollama. Se aplicó arquitectura hexagonal únicamente al \emph{bounded context} RAG (ingesta, recuperación, generación y evaluación), dejando autenticación, organizaciones, cuaderno de campo y OpenData fuera de esa reescritura.
+
+El orden de desarrollo sigue a Cockburn (2005): el dominio no depende de frameworks. Primero se definieron las entidades y reglas puras (\texttt{Chunk}, fusión RRF, expansión léxica agrícola) y los puertos de salida (\texttt{ChunkRepository}, \texttt{EmbeddingPort}, \texttt{LlmPort}, \texttt{LexicalIndexPort}, \texttt{RerankerPort}). A continuación se escribieron los casos de uso (\texttt{AnswerQuestion}, \texttt{IngestDocument}, \texttt{EvaluateRetrieval} y \texttt{EvaluateAnswer}) inyectando esas interfaces. Solo después se extrajeron los adaptadores de infraestructura (pgvector, BM25 en disco, cliente OpenAI-compatible de Ollama y Cross-Encoder) y se cablearon en un composition root importado desde el arranque de la API. Las rutas HTTP existentes delegan en la fachada; el contrato \texttt{/api/v1} no cambia.
+
+Esta secuencia permite probar el RAG con puertos falsos (listas en memoria y un LLM stub) sin PostgreSQL ni Ollama, y documenta en código la independencia entre reglas de fusión y detalles de persistencia o inferencia.
+
+\section{Población y muestra}
+En la evaluación de sistemas de recuperación de información e inteligencia artificial, la población no corresponde a sujetos humanos, sino al universo informacional y normativo que constituye la base de conocimiento (knowledge base) de la especialidad.
+
+La población está integrada por la totalidad de las disposiciones legales, circulares técnicas, manuales de procedimiento, catálogos de condicionalidad reforzada y registros oficiales de productos fitosanitarios publicados por la Unión Europea, el Ministerio de Agricultura, Pesca y Alimentación (MAPA) de España, el Fondo Español de Garantía Agraria (FEGA) y la Autoridad Europea de Seguridad Alimentaria (EFSA) para el periodo normativo 2023--2026.
+
+La población está constituida por el conjunto de disposiciones legales, manuales de procedimiento, bases de datos de productos fitosanitarios y directrices de condicionalidad emitidas por la Unión Europea, el Ministerio de Agricultura, Pesca y Alimentación (MAPA) de España, el Fondo Español de Garantía Agraria (FEGA) y la Autoridad Europea de Seguridad Alimentaria (EFSA).
+
+Se ha extraído una muestra representativa mediante raspado web focalizado (targeted web crawling) sobre los portales institucionales de referencia configurados en el sistema (sources.json). La muestra consolidada consta de N = 1760 documentos de alta complejidad estructural, que suman un total estimado de P = 2.845 páginas equivalentes de texto, datos tabulares y diagramas normativos. Criterios de Inclusión: Vigencia Regulatoria: Documentación y marcos aplicables al periodo actual (2023--2026). Alta Densidad Estructural: Presencia obligatoria de listas de materias activas, límites máximos de residuos (LMR), tablas de coeficientes de admisibilidad de pastos (CAP) o regímenes de sanciones. Criticidad de Cumplimiento: Textos cuyo incumplimiento derivaría en sanciones económicas o denegación de subvenciones normativas.
+
+\section{Objetivos de investigación}
+El propósito central de la fase experimental es evaluar cuantitativamente el impacto de la arquitectura RAG multimodal en la reducción de la tasa de alucinación y el incremento de la fidelidad informativa frente a un LLM en modo autónomo (standalone).
+
+De manera específica, la experimentación persigue:
+
+Determinar la variación cuantitativa en la métrica Faithfulness (Fidelidad) al pasar de un LLM autónomo a la arquitectura RAG propuesta (AgroRAG).
+
+Evaluar el impacto de la preservación de maquetación (Docling) y la fragmentación contextual sobre la precisión de recuperación de datos numéricos tabulares.
+
+Medir el grado de concordancia entre la evaluación automatizada (LLM-as-a-judge) y la validación ciega de expertos humanos en normativa agrícola.
+
+\section{Variables intervinientes e instrumentos de evaluación}
+Para llevar a cabo la medición objetiva y reproducible de las variables dependientes, se desarrollaron dos herramientas específicas basadas en el lenguaje Python:
+
+Dashboard de Control y Auditoría (Gradio Framework): Se diseñó un panel de control interactivo mediante la librería Gradio para la ejecución, monitoreo en tiempo real y visualización analítica de los procesos de evaluación. El dashboard automatiza la lectura secuencial del banco de pruebas (tests.jsonl), gestiona las llamadas asíncronas a los modelos y genera métricas agregadas por categoría documental, visualizando las desviaciones mediante gráficos de barras interactivos (gr.BarPlot) y semáforos de calidad basados en umbrales prefijados.
+
+Evaluador Basado en LLM como Juez (LLM-as-a-judge via LiteLLM): La calidad de las respuestas se audita automáticamente mediante la integración de la librería LiteLLM conectada a un servidor local de Ollama ejecutando el modelo llama3. Para eliminar la variabilidad y la falta de estructura en la salida del juez, se forzó la generación de un esquema JSON estructurado validado de forma estricta mediante modelos Pydantic (AnswerEval).
+
+El procedimiento computacional de auditoría se divide en dos módulos independientes: Evaluación del Recuperador (Retrieval) y Evaluación del Generador (Answer Evaluation).
+
+El rendimiento del motor vectorial y la calidad del contexto recuperado  se determinan numéricamente calculando tres métricas clave sobre el conjunto de palabras clave de control (
+
+1. Rango Recíproco Medio (Mean Reciprocal Rank - MRR): Mide la posición (rank) del primer documento recuperado que contiene la palabra clave técnica requerida:
+
+Implementado en el código mediante la función calculate\_mrr().
+
+Ganancia Acumulada Descontada Normalizada (Normalized Discounted Cumulative Gain - nDCG@10): Evalúa la relevancia acumulada binaria de los fragmentos recuperados considerando la penalización logarítmica por posición:
+
+Implementado en el código mediante las funciones calculate\_dcg() y calculate\_ndcg(). Cobertura de Palabras Clave (Keyword Coverage): Determina el porcentaje de términos normativos imprescindibles presentes en el contexto recuperado respecto al total esperado.
+
+Para evaluar la respuesta final producida por el módulo RAG, la función evaluate\_answer() invoca al modelo evaluador enviándole la pregunta del usuario (Q), la respuesta de referencia de un experto (R) y la respuesta generada por el sistema (R). El juez analiza y asigna puntuaciones continuas o discretas (en escala de 1 a 5) bajo las siguientes restricciones declaradas en el modelo AnswerEval:
+
+Precisión (Accuracy, 1-5): Corrección fáctica en comparación con la respuesta de referencia. Cualquier error factual implica una puntuación estricta de 1,0.
+
+Exhaustividad (Completeness, 1-5): Grado en que la respuesta cubre la totalidad de los datos o requisitos expuestos en el Ground Truth.
+
+Pertinencia (Relevance, 1-5): Capacidad de responder directamente a la consulta sin introducir divagaciones o datos redundantes.
+
+\section{Diseño experimental}
+Para auditar cuantitativa y cualitativamente el comportamiento de la arquitectura RAG frente a la muestra documental seleccionada, se procedió a la operacionalización de las variables del estudio y a la selección de instrumentos de evaluación estandarizados en el estado del arte del Procesamiento del Lenguaje Natural (PLN).
+
+\subsection{Variables intervinientes e Instrumentos de Evaluación}
+Para auditar cuantitativa y cualitativamente el comportamiento de la arquitectura RAG frente a la muestra documental seleccionada, se procedió a la operacionalización de las variables del estudio y a la selección de instrumentos de evaluación estandarizados en el estado del arte del Procesamiento del Lenguaje Natural (PLN).
+
+Variables Independientes (Configuración del Sistema)
+
+Son aquellas condiciones técnicas manipuladas para observar su efecto sobre la precisión y la reducción de alucinaciones del modelo:
+
+Estrategia de Fragmentación (Chunking y Layout Analysis): Técnica aplicada para la segmentación del texto fuente. Se contrasta la fragmentación estática mediante ventana deslizante de longitud fija frente al análisis de diseño jerárquico asistido por modelos de visión/parsing (v.g., preservación explícita de estructuras tabulares y maquetación mediante Markdown/HTML).
+
+Modelo de Embedding y Base de Datos Vectorial: Par formado por el algoritmo de representación semántica densa y el motor de almacenamiento vectorial (v.g., búsqueda por vecinos más cercanos indexada con HNSW sobre Qdrant/PostgreSQL/pgvector frente a indexación relacional tradicional).
+
+Variables Dependientes (Métricas de Rendimiento)
+
+Representan las propiedades emergentes del sistema sujetas a medición cuantitativa y cualitativa:
+
+Fidelidad (Faithfulness): Proporción de enunciados atómicos generados en la respuesta que se fundamentan estrictamente en el contexto recuperado, midiendo de forma directa la ausencia de alucinaciones (0,1).
+
+Relevancia de la Respuesta (Answer Relevance): Grado de alineación semántica y pertinencia directa entre la respuesta generada por el LLM y la pregunta formulada por el usuario (0,1 o escala 1--5).
+
+Precisión de la Recuperación (Context Precision): Proporción de fragmentos (chunks) recuperados desde la base de datos vectorial que contienen información directamente relevante para resolver la consulta (0,1).
+
+La medición objetiva de las variables dependientes se apoyó en una estrategia de evaluación híbrida que combina marcos automáticos de PLN con la validación por juicio humano.
+
+La medición objetiva de las variables dependientes se apoyó en una estrategia de evaluación híbrida que combina marcos automáticos de PLN con la validación por juicio humano.
+
+Evaluación Automática mediante Frameworks de PLN (RAGAS / TruLens): Se implementó el framework especializado RAGAS para calcular algorítmicamente las métricas de fidelidad, relevancia y precisión en una escala continua de  a . Este instrumento utiliza un modelo de lenguaje de alta capacidad como juez (LLM-as-a-judge, v.g., GPT-4 o Llama-3-70B) configurado con prompts estandarizados y metodologías de validación cruzada para garantizar la reproducibilidad y objetividad de los cómputos.
+
+\begin{quote}Tabla 4 Frameworks RAG\end{quote}
+Framework
+
+Lenguaje
+
+Popularida
+
+LangChain
+
+Python
+
+Muy Alta
+
+LlamaIndex
+
+Python
+
+Muy Alta
+
+Haystack
+
+Python
+
+Alta
+
+DSPy
+
+Python
+
+Creciente
+
+Juicio de Expertos (Evaluación Humana en Dominio Regulado): Con el objetivo de contrastar la aplicabilidad real del sistema en entornos normativos oficiales, se constituyó un panel de evaluación formado por técnicos gestores e inspectores de la Política Agraria Común (PAC). Este panel auditó una muestra ciega de respuestas generadas por las distintas configuraciones del sistema, evaluándolas mediante una escala Likert de 1 a 5 (donde 1 representa una respuesta completamente deficiente o inviable y 5 una respuesta plenamente precisa, trazable y utilizable en expediente administrativo).
+
+\section{Modelo de análisis de datos}
+La presente investigación adopta un enfoque empírico-analítico de carácter experimental y transversal. El procedimiento metodológico se articula secuencialmente en cuatro fases interconectadas, orientadas a garantizar la reproducibilidad técnica y el rigor estadístico en la evaluación de la arquitectura AgroRAG.
+
+En esta fase inicial, la muestra de N = 20 documentos oficiales en formato PDF se somete a dos flujos diferenciados de procesamiento para comparar el efecto de la maquetación en el rendimiento posterior: Configuración de Extracción Plana (Baseline): Extracción directa de cadenas de texto sin preservación de coordenadas visuales ni etiquetas estructurales, convirtiendo el contenido a texto sin formato (plain text).Configuración Estructurada (AgroRAG): Reconstrucción jerárquica mediante Docling e inferencia visual local, convirtiendo tablas complejas, anexos numéricos y listas a sintaxis Markdown/HTML. Posteriormente, ambos corpus se dividen mediante fragmentación (chunking) contextual e indexación densa en la base de datos vectorial PostgreSQL/pgvector utilizando el modelo de embeddings qwen3-embedding:latest.
+
+Para validar la capacidad de recuperación y generación, se estructuró un conjunto de datos de prueba compuesto por consultas técnicas sintéticas y reales. El banco de pruebas simula las situaciones operativas habituales a las que se enfrenta un inspector o gestor de expedientes PAC/POSEI.El dataset abarca tres niveles de complejidad tipológica: Consultas Factuales Directas (30\%): Búsqueda de definiciones normativas, plazos administrativos y requisitos de admisibilidad. Consultas de Extracción Tabular (40\%): Requerimiento de valores numéricos específicos, coeficientes de admisibilidad de pastos (CAP) o límites máximos de residuos (LMR). Consultas de Razonamiento Cruzado (30\%): Preguntas que exigen relacionar información dispersa entre múltiples anexos o disposiciones reglamentarias normativas.
+
+
+\section{Configuración experimental del prototipo}
+\begin{table}[htbp]
+\centering
+\caption{Configuración exacta verificable del prototipo AgroPS (valores del repositorio; digests de modelos pendientes de congelar en el acta de evaluación).}
+\label{tab:config}
+\begin{tabular}{p{4.2cm}p{9.5cm}}
+\toprule
+\textbf{Componente} & \textbf{Valor} \\
+\midrule
+Generador RAG (servicio) & \texttt{llama3} (\texttt{RAG\_GENERATION\_MODEL}) \\
+Generador chat web & \texttt{llama3.2:latest} (seleccionable) \\
+Generador evaluación & \texttt{llama3.2} \\
+Embedding & \texttt{qwen3-embedding:latest} \\
+Cross-Encoder & \texttt{BAAI/bge-reranker-v2-m3} (\texttt{max\_length=512}, batch 16) \\
+Chunk size / overlap & 1000 / 150 \emph{caracteres} \\
+Dense top-$k$ inicial & 10 (\texttt{retrieval\_k}) \\
+BM25 top-$k$ inicial & 10 (\texttt{bm25\_k}) \\
+Fusión RRF & $k=60$ (hasta 15 candidatos) \\
+Top-$k$ final contexto & 3 (servicio) / 5 (evaluación) \\
+Temperatura & no fijada explícitamente en el cliente Ollama del servicio (predeterminado del servidor) \\
+Almacén vectorial & PostgreSQL 15 + extensión \texttt{vector} (pgvector) \\
+API & FastAPI (lockfile \texttt{gateway/uv.lock}) \\
+Orquestación & Docker Compose (api, frontend, postgres, ollama, migrate) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\section{Dataset de evaluación y categorías}
+El banco versionado en el repositorio (\texttt{gateway/core/tests.jsonl} y equivalentes) contiene \textbf{21 filas y 19 preguntas únicas}, no 150. Dos ítems de la categoría \texttt{relationship} están duplicados.
+
+\begin{table}[htbp]
+\centering
+\caption{Siete categorías del dataset versionado, conteo y ejemplo representativo.}
+\label{tab:categories}
+\begin{tabular}{llp{7.2cm}}
+\toprule
+\textbf{Categoría} & \textbf{N} & \textbf{Ejemplo} \\
+\midrule
+\texttt{direct\_fact} & 6 & Ayuda por hectárea de aguacate bajo POSEI \\
+\texttt{temporal} & 4 & Cambios BCAM 8 en superficies no productivas \\
+\texttt{relationship} & 5 (3 únicas) & Superficie admisible POSEI y recinto declarado \\
+\texttt{spanning} & 3 & Reducción de ayuda sobre 50\,ha de tomate \\
+\texttt{regulatory\_compliance} & 1 & Requisitos PAC para pimiento y frutales \\
+\texttt{regulatory\_fact} & 1 & Condicionalidad de un ecorrégimen PAC \\
+\texttt{traceability} & 1 & Página/anexo jóvenes agricultores \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{Validación de preguntas sintéticas}
+\textbf{Evidencia pendiente.} No se ha localizado en el repositorio el artefacto de 150 preguntas ni un registro que identifique quién validó las preguntas sintéticas, su cualificación, el procedimiento de contraste de las respuestas de referencia ni la proporción revisada. Mientras no se incorpore dicho protocolo, las afirmaciones de ``150 validadas'' no se consideran demostradas. El banco operativo actual es el de 21/19 ítems citado arriba.
+
+
+\section{Origen de las métricas: propias, juez y RAGAS}
+Es obligatorio no mezclar familias de métricas:
+
+\begin{description}
+  \item[Métricas propias (código del gateway)] Recall@1/@$K$, Precision@$K$, MRR, nDCG@$K$, cobertura de keywords, falsos positivos fuera de conocimiento, latencia.
+  \item[LLM-as-a-Judge] \texttt{accuracy}, \texttt{completeness}, \texttt{relevance} (escala 1--5) vía \texttt{RAGService.evaluate\_answer}. No es evaluación humana ni RAGAS.
+  \item[RAGAS + alucinación binaria] Adaptador en \texttt{ragas\_service} y ruta \texttt{POST /api/v1/evaluation/ragas-run} con métricas \texttt{faithfulness}, \texttt{answer\_relevancy}, \texttt{context\_precision}, \texttt{context\_recall}, más \texttt{is\_hallucination}. Si la librería RAGAS no está operativa en el entorno, el endpoint aplica un \emph{fallback heurístico} etiquetado como tal; no debe presentarse como puntuación RAGAS oficial.
+\end{description}
+
+
+

@@ -10,22 +10,40 @@ from fastapi import (
 )
 import unicodedata
 from models.eval import AnswerEval
-from services.rag_service import RetrievalEval
+from services.rag_service import DEFAULT_EMBEDDING_MODEL, RetrievalEval
 from fastapi.responses import StreamingResponse
 from schemas.chat import ChatRequest, ChatResponse, ContextChunk
 from schemas.evaluation import (
-    DatasetEvaluationRequest, DatasetEvaluationResponse, EvaluationHistoryItem,
-    QuestionBankImportRequest, SimulatorSaveRequest, SimulatorSearchRequest,
+    DatasetEvaluationRequest,
+    DatasetEvaluationResponse,
+    EvaluationHistoryItem,
+    ExperimentCompareRequest,
+    ExperimentCompareResponse,
+    ExperimentRunRequest,
+    QuestionBankImportRequest,
+    SimulatorSaveRequest,
+    SimulatorSearchRequest,
 )
 from services import rag as rag_service
 from uuid import uuid4, UUID
 from .auth import get_current_user
 from services.database import get_db
+from services.human_validation import (
+    init_human_validation_tables,
+    queue_chat_review,
+)
+from services.evaluation_dataset import (
+    init_retrieval_dataset_table,
+    init_experiment_runs_table,
+    record_experiment_run,
+    safe_rollback,
+)
+from services.embedding_reindex import EMBEDDING_CATALOG, ensure_multi_embedding_schema
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.tenant import get_user_tenant_id
 from models.user import User
-from core.test import TEST_FILE, TestQuestion, load_tests
+from core.test import TEST_FILE, TestQuestion, load_tests, merge_test_banks
 import pandas as pd
 from models.eval import AnswerEval
 from models.tenant import Tenant
@@ -43,10 +61,10 @@ from services.agentic_rag_service import (
     run_hybrid_answer,
     pack_mode_side,
 )
-from services.farmer_context_service import build_farmer_context
 from services.evaluation_metrics import (
     dataset_fingerprint as compute_dataset_fingerprint,
     ndcg_at_k,
+    normalize_text,
     precision_at_k,
     reciprocal_rank,
 )
@@ -59,38 +77,74 @@ import time
 
 
 async def evaluate_retrieval_internal(
-    test, tenant_id: str, k: int = 10, collections: list[str] | None = None
+    test,
+    tenant_id: str,
+    k: int = 10,
+    collections: list[str] | None = None,
+    distance_metric: str = "cosine",
+    embedding_model: str | None = None,
 ):
     """Evaluate retrieval for a test question using local RAGService pipeline."""
-    evaluator = RAGService()
+    evaluator = RAGService(
+        embedding_model=embedding_model or DEFAULT_EMBEDDING_MODEL,
+    )
 
     context_data = await evaluator.fetch_context(
-        test.question, tenant_id=tenant_id, collections=collections
+        test.question,
+        tenant_id=tenant_id,
+        collections=collections,
+        evaluation_mode=True,
+        distance_metric=distance_metric,
     )
     retrieved_docs = context_data.get("chunks", [])
-
-    mrr_scores = [
-        evaluator.calculate_mrr(keyword, retrieved_docs) for keyword in test.keywords
+    retrieved_ids = [
+        str((getattr(doc, "metadata", {}) or {}).get("chunk_id") or "")
+        for doc in retrieved_docs
     ]
-    ndcg_scores = [
-        evaluator.calculate_ndcg(keyword, retrieved_docs, k)
-        for keyword in test.keywords
-    ]
+    expected_ids = {
+        str(item)
+        for item in (getattr(test, "metadata", {}) or {}).get("expected_chunk_ids", [])
+        if str(item).strip()
+    }
 
-    avg_mrr = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
-    avg_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
-    keywords_found = sum(1 for score in mrr_scores if score > 0)
-    total_keywords = len(test.keywords)
-    coverage = (keywords_found / total_keywords * 100) if total_keywords else 0.0
+    keywords = [str(item).strip() for item in (test.keywords or []) if str(item).strip()]
+    if not keywords and not getattr(test, "out_of_knowledge", False):
+        keywords = [
+            token
+            for token in (test.reference_answer or test.question or "").split()
+            if len(token) > 4
+        ][:6]
 
-    top_k_docs = retrieved_docs[:k]
-    relevant_docs_count = 0
-    for doc in top_k_docs:
-        doc_text = getattr(doc, "page_content", str(doc))
-        if any(keyword.lower() in doc_text.lower() for keyword in test.keywords):
-            relevant_docs_count += 1
+    if expected_ids:
+        avg_mrr = reciprocal_rank(expected_ids, retrieved_ids)
+        avg_ndcg = ndcg_at_k(expected_ids, retrieved_ids, k)
+        keywords_found = sum(1 for chunk_id in retrieved_ids[:k] if chunk_id in expected_ids)
+        total_keywords = len(expected_ids)
+        coverage = (keywords_found / total_keywords * 100) if total_keywords else 0.0
+        accuracy = precision_at_k(expected_ids, retrieved_ids, k) * 100
+    else:
+        mrr_scores = [
+            evaluator.calculate_mrr(keyword, retrieved_docs) for keyword in keywords
+        ]
+        ndcg_scores = [
+            evaluator.calculate_ndcg(keyword, retrieved_docs, k)
+            for keyword in keywords
+        ]
 
-    accuracy = (relevant_docs_count / len(top_k_docs) * 100) if top_k_docs else 0.0
+        avg_mrr = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
+        avg_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
+        keywords_found = sum(1 for score in mrr_scores if score > 0)
+        total_keywords = len(keywords)
+        coverage = (keywords_found / total_keywords * 100) if total_keywords else 0.0
+
+        top_k_docs = retrieved_docs[:k]
+        relevant_docs_count = 0
+        for doc in top_k_docs:
+            doc_text = evaluator._doc_text(doc)
+            if any(normalize_text(keyword) in doc_text for keyword in keywords):
+                relevant_docs_count += 1
+
+        accuracy = (relevant_docs_count / len(top_k_docs) * 100) if top_k_docs else 0.0
 
     return RetrievalEval(
         mrr=avg_mrr,
@@ -99,6 +153,130 @@ async def evaluate_retrieval_internal(
         total_keywords=total_keywords,
         keyword_coverage=coverage,
         accuracy=accuracy,
+    )
+
+
+def _normalize_distance_metric(metric: str | None) -> str:
+    value = (metric or "cosine").strip().lower()
+    aliases = {"l1": "manhattan", "l2": "euclidean"}
+    return aliases.get(value, value)
+
+
+def _iso_ts(value) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return str(value)
+
+
+def _distance_from_parameters(parameters) -> str:
+    if isinstance(parameters, str):
+        try:
+            parameters = json.loads(parameters)
+        except json.JSONDecodeError:
+            parameters = {}
+    if not isinstance(parameters, dict):
+        return "cosine"
+    return _normalize_distance_metric(parameters.get("distance_metric") or "cosine")
+
+
+async def run_question_bank_experiment(
+    tests: list[TestQuestion],
+    tenant_id: str,
+    *,
+    embedding_model: str,
+    distance_metric: str,
+    k: int = 10,
+    collections: list[str] | None = None,
+) -> dict:
+    """Evalúa el banco unificado con un par embedding × distancia."""
+    start = time.time()
+    metric = _normalize_distance_metric(distance_metric)
+    mrr_sum = ndcg_sum = coverage_sum = accuracy_sum = 0.0
+    hits_at_1 = hits_at_k = failures = evaluated = 0
+
+    for test in tests:
+        if getattr(test, "out_of_knowledge", False):
+            continue
+        try:
+            ev = await evaluate_retrieval_internal(
+                test,
+                tenant_id,
+                k=k,
+                collections=collections,
+                distance_metric=metric,
+                embedding_model=embedding_model,
+            )
+            mrr_sum += ev.mrr
+            ndcg_sum += ev.ndcg
+            coverage_sum += ev.keyword_coverage
+            accuracy_sum += ev.accuracy
+            hits_at_1 += 1 if ev.mrr >= 0.999 else 0
+            hits_at_k += 1 if ev.mrr > 0 else 0
+            evaluated += 1
+        except Exception:
+            failures += 1
+
+    n = evaluated or 1
+    return {
+        "dataset_size": len(tests),
+        "evaluated_questions": evaluated,
+        "recall_1": (hits_at_1 / evaluated) if evaluated else 0.0,
+        "recall_k": (hits_at_k / evaluated) if evaluated else 0.0,
+        "mrr": mrr_sum / n if evaluated else 0.0,
+        "ndcg": ndcg_sum / n if evaluated else 0.0,
+        "precision_at_k": (accuracy_sum / n) / 100.0 if evaluated else 0.0,
+        "keyword_coverage": (coverage_sum / n) / 100.0 if evaluated else 0.0,
+        "accuracy": (accuracy_sum / n) / 100.0 if evaluated else 0.0,
+        "failures": failures,
+        "duration_ms": (time.time() - start) * 1000,
+        "parameters": {
+            "embedding_model": embedding_model,
+            "distance_metric": metric,
+            "top_k": k,
+            "collections": collections or [],
+            "evaluation_type": "question_bank",
+        },
+    }
+
+
+def _history_item_from_experiment(row: dict) -> EvaluationHistoryItem:
+    parameters = row.get("parameters") or {}
+    if isinstance(parameters, str):
+        try:
+            parameters = json.loads(parameters)
+        except json.JSONDecodeError:
+            parameters = {}
+    top_k = 10
+    if isinstance(parameters, dict):
+        try:
+            top_k = int(parameters.get("top_k") or 10)
+        except (TypeError, ValueError):
+            top_k = 10
+    return EvaluationHistoryItem(
+        id=int(row["id"]),
+        created_at=_iso_ts(row.get("created_at")),
+        model_name=row.get("generation_model") or "",
+        embedding_model=row.get("embedding_model") or DEFAULT_EMBEDDING_MODEL,
+        distance_metric=_normalize_distance_metric(
+            row.get("distance_metric") or "cosine"
+        ),
+        dataset_size=int(row.get("dataset_size") or 0),
+        top_k=top_k,
+        recall_1=float(row.get("recall_1") or 0.0),
+        recall_k=float(row.get("recall_k") or 0.0),
+        precision_at_k=row.get("precision_at_k"),
+        ndcg=row.get("ndcg"),
+        mrr=float(row.get("mrr") or 0.0),
+        keyword_coverage=row.get("keyword_coverage"),
+        accuracy=row.get("accuracy"),
+        false_positives=0,
+        failures=int(row.get("failures") or 0),
+        duration_ms=float(row.get("duration_ms") or 0.0),
+        status=row.get("status") or "completed",
+        experiment_type=row.get("experiment_type") or "question_bank",
+        parameters=parameters if isinstance(parameters, dict) else {},
     )
 
 
@@ -147,6 +325,74 @@ def calculate_averages(results: list[dict[str, any]]) -> dict[str, float]:
     return {k: v / count for k, v in sums.items() if isinstance(v, (int, float))}
 
 
+def _serialize_test(index: int, test: TestQuestion) -> dict:
+    metadata = test.metadata or {}
+    return {
+        "id": index,
+        "question": test.question,
+        "keywords": test.keywords,
+        "reference_answer": test.reference_answer,
+        "category": test.category,
+        "split": test.split,
+        "out_of_knowledge": test.out_of_knowledge,
+        "source": metadata.get("source", "file"),
+        "annotated": bool(metadata.get("expected_chunk_ids")),
+    }
+
+
+async def load_unified_tests(
+    db: AsyncSession | None = None,
+    tenant_id: str | None = None,
+) -> list[TestQuestion]:
+    """JSONL local + preguntas anotadas en retrieval_dataset."""
+    tests = load_tests()
+    if db is None or not tenant_id:
+        return merge_test_banks(tests, [])
+
+    try:
+        await init_retrieval_dataset_table(db)
+        result = await db.execute(
+            text("""
+                SELECT
+                    question,
+                    keywords,
+                    reference_answer,
+                    category,
+                    split,
+                    flag_out_of_knowledge,
+                    selected_chunk_ids,
+                    expected_chunk_id,
+                    metadata
+                FROM public.retrieval_dataset
+                WHERE tenant_id = :tenant_id
+                ORDER BY id ASC
+            """),
+            {"tenant_id": tenant_id},
+        )
+        rows = [dict(row) for row in result.mappings().all()]
+    except Exception:
+        await safe_rollback(db)
+        return merge_test_banks(tests, [])
+
+    return merge_test_banks(tests, rows)
+
+
+async def resolve_evaluation_tests(
+    current_user: User,
+    db: AsyncSession,
+    organization_id: UUID | None = None,
+) -> list[TestQuestion]:
+    tenant_id = None
+    try:
+        tenant_id = await get_user_tenant_id(
+            current_user.id, db, organization_id=organization_id
+        )
+    except Exception:
+        await safe_rollback(db)
+        tenant_id = None
+    return await load_unified_tests(db, tenant_id)
+
+
 @router.get("/list-all-documents")
 async def list_all_documents(
     db: AsyncSession = Depends(get_db),
@@ -191,6 +437,7 @@ async def import_question_bank(
     skipped = 0
 
     try:
+        await init_retrieval_dataset_table(db)
 
         for item in request.questions:
 
@@ -330,6 +577,8 @@ async def evaluate_dataset(
     # 2. DATASET
     # ============================================================
 
+    await init_retrieval_dataset_table(db)
+
     dataset_result = await db.execute(
         text("""
             SELECT
@@ -430,7 +679,7 @@ async def evaluate_dataset(
     )
     existing_run = existing_run.mappings().first()
 
-    if existing_run is not None:
+    if existing_run is not None and not request.force:
         result_count = await db.scalar(
             text(
                 "SELECT COUNT(*) FROM public.retrieval_evaluation_results WHERE evaluation_run_id = :run_id"
@@ -709,6 +958,7 @@ async def evaluate_dataset(
                     question=question,
                     tenant_id=str(tenant_id),
                     evaluation_mode=True,
+                    distance_metric=request.distance_metric,
                 )
 
             except Exception as exc:
@@ -1137,6 +1387,30 @@ async def evaluate_dataset(
         )
 
         await db.commit()
+        try:
+            await record_experiment_run(
+                db,
+                tenant_id=str(tenant_id),
+                embedding_model=embedding_model,
+                distance_metric=request.distance_metric,
+                generation_model=request.model_name,
+                experiment_type="retrieval_dataset",
+                dataset_size=dataset_size,
+                evaluated_questions=evaluated_questions,
+                recall_1=recall_1,
+                recall_k=recall_k,
+                mrr=mrr,
+                ndcg=ndcg,
+                precision_at_k=precision_at_k,
+                keyword_coverage=None,
+                accuracy=None,
+                failures=failures,
+                duration_ms=duration_ms,
+                parameters=parameters,
+            )
+        except Exception as exp_exc:
+            print(f"Error persistiendo experimento RAG: {exp_exc}")
+            await safe_rollback(db)
         # ========================================================
         # 11. EXPORT CSV / MD AGGREGATES POR CATEGORÍA
         # ========================================================
@@ -1423,6 +1697,42 @@ async def get_evaluation_history(
     tenant_id = await get_user_tenant_id(current_user.id, db)
 
     try:
+        await init_experiment_runs_table(db)
+        result = await db.execute(
+            text("""
+                SELECT
+                    id,
+                    created_at,
+                    generation_model,
+                    embedding_model,
+                    distance_metric,
+                    dataset_size,
+                    recall_1,
+                    recall_k,
+                    precision_at_k,
+                    ndcg,
+                    mrr,
+                    keyword_coverage,
+                    accuracy,
+                    failures,
+                    duration_ms,
+                    status,
+                    experiment_type,
+                    parameters
+                FROM public.rag_experiment_runs
+                WHERE tenant_id = :tenant_id
+                ORDER BY created_at DESC
+                LIMIT 50
+                """),
+            {"tenant_id": tenant_id},
+        )
+        experiment_rows = [dict(row) for row in result.mappings().all()]
+        if experiment_rows:
+            return [_history_item_from_experiment(row) for row in experiment_rows]
+    except Exception:
+        await safe_rollback(db)
+
+    try:
         result = await db.execute(
             text("""
                 SELECT
@@ -1434,6 +1744,8 @@ async def get_evaluation_history(
                     top_k,
                     recall_1,
                     recall_k,
+                    precision_at_k,
+                    ndcg,
                     mrr,
                     false_positives,
                     failures,
@@ -1447,11 +1759,234 @@ async def get_evaluation_history(
                 """),
             {"tenant_id": tenant_id},
         )
-        return [dict(row) for row in result.mappings().all()]
+        items: list[EvaluationHistoryItem] = []
+        for row in result.mappings().all():
+            data = dict(row)
+            items.append(
+                EvaluationHistoryItem(
+                    id=int(data["id"]),
+                    created_at=_iso_ts(data.get("created_at")),
+                    model_name=data.get("model_name") or "",
+                    embedding_model=data.get("embedding_model")
+                    or DEFAULT_EMBEDDING_MODEL,
+                    distance_metric=_distance_from_parameters(data.get("parameters")),
+                    dataset_size=int(data.get("dataset_size") or 0),
+                    top_k=int(data.get("top_k") or 10),
+                    recall_1=float(data.get("recall_1") or 0.0),
+                    recall_k=float(data.get("recall_k") or 0.0),
+                    precision_at_k=data.get("precision_at_k"),
+                    ndcg=data.get("ndcg"),
+                    mrr=float(data.get("mrr") or 0.0),
+                    false_positives=int(data.get("false_positives") or 0),
+                    failures=int(data.get("failures") or 0),
+                    duration_ms=float(data.get("duration_ms") or 0.0),
+                    status=data.get("status") or "completed",
+                    experiment_type="retrieval_dataset",
+                    parameters=(
+                        data.get("parameters")
+                        if isinstance(data.get("parameters"), dict)
+                        else _distance_from_parameters(data.get("parameters"))
+                        and {}
+                    )
+                    if isinstance(data.get("parameters"), dict)
+                    else (
+                        json.loads(data["parameters"])
+                        if isinstance(data.get("parameters"), str)
+                        else {}
+                    ),
+                )
+            )
+        return items
     except Exception:
-        # Tabla/columnas de evaluación aún no migradas en este entorno.
-        await db.rollback()
+        await safe_rollback(db)
         return []
+
+
+@router.get("/evaluation/experiments", response_model=list[EvaluationHistoryItem])
+async def list_evaluation_experiments(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_evaluation_history(current_user, db)
+
+
+@router.get("/evaluation/embedding-models")
+async def list_indexed_embedding_models(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    indexed: list[str] = []
+    try:
+        result = await db.execute(
+            text(
+                """
+                SELECT DISTINCT model
+                FROM public.embeddings
+                WHERE model IS NOT NULL AND btrim(model) <> ''
+                ORDER BY model
+                """
+            )
+        )
+        indexed = [str(row[0]) for row in result.all() if row[0]]
+    except Exception:
+        await safe_rollback(db)
+    default = indexed[0] if indexed else DEFAULT_EMBEDDING_MODEL
+    try:
+        await ensure_multi_embedding_schema(db)
+    except Exception:
+        await safe_rollback(db)
+
+    return {
+        "indexed": indexed,
+        "default": default,
+        "catalog": EMBEDDING_CATALOG,
+        "note": (
+            "Tras reindexar el corpus con varios modelos, cada embedding vive "
+            "en su propio espacio y comparar MRR/nDCG entre ellos es válido. "
+            "Las distancias (coseno, L2, L1) se comparan sobre el mismo modelo."
+        ),
+    }
+
+
+@router.post("/evaluation/experiments", response_model=EvaluationHistoryItem)
+async def create_evaluation_experiment(
+    request: ExperimentRunRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = await get_user_tenant_id(current_user.id, db)
+    tests = await resolve_evaluation_tests(current_user, db)
+    if not tests:
+        raise HTTPException(
+            status_code=400,
+            detail="El banco de preguntas está vacío.",
+        )
+    collections = [str(request.knowledge_base_id)] if request.knowledge_base_id else None
+    metrics = await run_question_bank_experiment(
+        tests,
+        str(tenant_id),
+        embedding_model=request.embedding_model or DEFAULT_EMBEDDING_MODEL,
+        distance_metric=request.distance_metric,
+        k=request.top_k,
+        collections=collections,
+    )
+    row = {
+        "id": 0,
+        "created_at": datetime.now(timezone.utc),
+        "generation_model": None,
+        "embedding_model": request.embedding_model or DEFAULT_EMBEDDING_MODEL,
+        "distance_metric": _normalize_distance_metric(request.distance_metric),
+        "experiment_type": "question_bank",
+        **metrics,
+    }
+    if request.persist:
+        try:
+            saved = await record_experiment_run(
+                db,
+                tenant_id=str(tenant_id),
+                embedding_model=row["embedding_model"],
+                distance_metric=row["distance_metric"],
+                experiment_type="question_bank",
+                dataset_size=metrics["dataset_size"],
+                evaluated_questions=metrics["evaluated_questions"],
+                recall_1=metrics["recall_1"],
+                recall_k=metrics["recall_k"],
+                mrr=metrics["mrr"],
+                ndcg=metrics["ndcg"],
+                precision_at_k=metrics["precision_at_k"],
+                keyword_coverage=metrics["keyword_coverage"],
+                accuracy=metrics["accuracy"],
+                failures=metrics["failures"],
+                duration_ms=metrics["duration_ms"],
+                parameters=metrics["parameters"],
+            )
+            row["id"] = int(saved.get("id") or 0)
+            row["created_at"] = saved.get("created_at") or row["created_at"]
+        except Exception as exc:
+            await safe_rollback(db)
+            raise HTTPException(
+                status_code=500,
+                detail=f"No se pudo guardar la corrida: {exc}",
+            ) from exc
+    return _history_item_from_experiment(row)
+
+
+@router.post(
+    "/evaluation/experiments/compare",
+    response_model=ExperimentCompareResponse,
+)
+async def compare_evaluation_experiments(
+    request: ExperimentCompareRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = await get_user_tenant_id(current_user.id, db)
+    tests = await resolve_evaluation_tests(current_user, db)
+    if not tests:
+        raise HTTPException(
+            status_code=400,
+            detail="El banco de preguntas está vacío.",
+        )
+
+    embeddings = request.embedding_models or [DEFAULT_EMBEDDING_MODEL]
+    distances = request.distance_metrics or ["cosine", "euclidean", "manhattan"]
+    collections = [str(request.knowledge_base_id)] if request.knowledge_base_id else None
+    runs: list[EvaluationHistoryItem] = []
+
+    for embedding_model in embeddings:
+        for distance_metric in distances:
+            metrics = await run_question_bank_experiment(
+                tests,
+                str(tenant_id),
+                embedding_model=embedding_model,
+                distance_metric=distance_metric,
+                k=request.top_k,
+                collections=collections,
+            )
+            row = {
+                "id": 0,
+                "created_at": datetime.now(timezone.utc),
+                "generation_model": None,
+                "embedding_model": embedding_model,
+                "distance_metric": _normalize_distance_metric(distance_metric),
+                "experiment_type": "distance_compare",
+                **metrics,
+            }
+            try:
+                saved = await record_experiment_run(
+                    db,
+                    tenant_id=str(tenant_id),
+                    embedding_model=embedding_model,
+                    distance_metric=_normalize_distance_metric(distance_metric),
+                    experiment_type="distance_compare",
+                    dataset_size=metrics["dataset_size"],
+                    evaluated_questions=metrics["evaluated_questions"],
+                    recall_1=metrics["recall_1"],
+                    recall_k=metrics["recall_k"],
+                    mrr=metrics["mrr"],
+                    ndcg=metrics["ndcg"],
+                    precision_at_k=metrics["precision_at_k"],
+                    keyword_coverage=metrics["keyword_coverage"],
+                    accuracy=metrics["accuracy"],
+                    failures=metrics["failures"],
+                    duration_ms=metrics["duration_ms"],
+                    parameters=metrics["parameters"],
+                )
+                row["id"] = int(saved.get("id") or 0)
+                row["created_at"] = saved.get("created_at") or row["created_at"]
+            except Exception as exc:
+                await safe_rollback(db)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"No se pudo guardar la comparación: {exc}",
+                ) from exc
+            runs.append(_history_item_from_experiment(row))
+
+    best = max(runs, key=lambda item: item.mrr) if runs else None
+    return ExperimentCompareResponse(
+        runs=runs,
+        best_mrr_id=best.id if best else None,
+    )
 
 
 @router.get("/conversations")
@@ -1594,20 +2129,13 @@ async def delete_conversation(
 @router.get("/evaluation/tests")
 async def get_evaluation_tests(
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    organization_id: UUID | None = None,
 ):
-    tests = load_tests()
+    tests = await resolve_evaluation_tests(current_user, db, organization_id)
     return {
         "total": len(tests),
-        "tests": [
-            {
-                "id": idx,
-                "question": t.question,
-                "keywords": t.keywords,
-                "reference_answer": t.reference_answer,
-                "category": t.category,
-            }
-            for idx, t in enumerate(tests)
-        ],
+        "tests": [_serialize_test(idx, test) for idx, test in enumerate(tests)],
     }
 
 
@@ -1615,19 +2143,14 @@ async def get_evaluation_tests(
 async def get_evaluation_test(
     test_id: int,
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    organization_id: UUID | None = None,
 ):
-    tests = load_tests()
+    tests = await resolve_evaluation_tests(current_user, db, organization_id)
     if test_id < 0 or test_id >= len(tests):
         raise HTTPException(status_code=404, detail="Test no encontrado")
 
-    test = tests[test_id]
-    return {
-        "id": test_id,
-        "question": test.question,
-        "keywords": test.keywords,
-        "reference_answer": test.reference_answer,
-        "category": test.category,
-    }
+    return _serialize_test(test_id, tests[test_id])
 
 
 @router.post("/", response_model=ChatResponse)
@@ -1710,14 +2233,6 @@ async def chat(
 
         if conversation_id is None:
             conversation_id = str(uuid4())
-            if not kb_id:
-                kb_id = await db.scalar(
-                    text(
-                        "SELECT id FROM knowledge_bases WHERE tenant_id = :tenant_id LIMIT 1"
-                    ),
-                    {"tenant_id": tenant_id},
-                )
-
             await db.execute(
                 text("""
                 INSERT INTO conversations (id, tenant_id, user_id, knowledge_base_id, title)
@@ -1752,18 +2267,6 @@ async def chat(
         if not request.use_rag:
             rag_mode = "none"
 
-        farmer_ctx = await build_farmer_context(
-            db,
-            user_id=str(current_user.id),
-            crop_id=request.crop_id,
-            organization_id=request.organization_id,
-            fallback_crop=request.crop or "platano_canarias",
-            fallback_island=request.island or "La_Palma",
-        )
-        island = farmer_ctx["island_code"]
-        crop = farmer_ctx["product_id"]
-        farmer_markdown = farmer_ctx["markdown"]
-        farmer_profile = farmer_ctx["profile"]
         org_name = request.organization_name or "AgroTech"
 
         comparison_payload = None
@@ -1785,11 +2288,7 @@ async def chat(
                 collections=[str(kb_id)] if kb_id else None,
                 model=selected_model,
                 history=request.history,
-                island=island,
-                crop=crop,
                 organization_name=org_name,
-                farmer_context=farmer_markdown,
-                farmer_profile=farmer_profile,
             )
             architecture = rag_result.get("architecture")
             agent_trace = rag_result.get("agent_trace")
@@ -1804,8 +2303,6 @@ async def chat(
                 history=request.history,
                 use_reranking=request.use_reranking,
                 use_query_rewrite=request.use_query_rewrite,
-                farmer_context=farmer_markdown,
-                farmer_profile=farmer_profile,
             )
             agentic_result = await agentic.answer(
                 request.question,
@@ -1813,18 +2310,14 @@ async def chat(
                 collections=[str(kb_id)] if kb_id else None,
                 model=selected_model,
                 history=request.history,
-                island=island,
-                crop=crop,
                 organization_name=org_name,
-                farmer_context=farmer_markdown,
-                farmer_profile=farmer_profile,
             )
             comparison_payload = {
                 "hybrid": pack_mode_side(hybrid_result, "hybrid"),
                 "agentic": pack_mode_side(agentic_result, "agentic"),
                 "note": (
                     "Comparación controlada: misma pregunta, mismo modelo/tenant/KB. "
-                    "Hybrid = Dense+BM25+RRF; Agentic = herramientas KB/clima/precios/perfil."
+                    "Hybrid = Dense+BM25+RRF; Agentic = herramienta de búsqueda en KB."
                 ),
             }
             # Respuesta principal (conversación): Hybrid como baseline
@@ -1842,8 +2335,6 @@ async def chat(
                 history=request.history,
                 use_reranking=request.use_reranking,
                 use_query_rewrite=request.use_query_rewrite,
-                farmer_context=farmer_markdown,
-                farmer_profile=farmer_profile,
             )
             architecture = rag_result.get("architecture")
 
@@ -1893,6 +2384,23 @@ async def chat(
         )
         await db.commit()
 
+        review_id = None
+        try:
+            await init_human_validation_tables(db)
+            review_id = await queue_chat_review(
+                db,
+                user_id=str(current_user.id),
+                organization_id=str(request.organization_id)
+                if request.organization_id
+                else None,
+                conversation_id=str(conversation_id) if conversation_id else None,
+                question=request.question,
+                answer=answer,
+                chunks=chunks,
+            )
+        except Exception:
+            review_id = None
+
         # 7. Mapeo a Pydantic
         contextos_validados = []
         for chunk in chunks:
@@ -1923,7 +2431,7 @@ async def chat(
             architecture=architecture,
             agent_trace=agent_trace,
             comparison=comparison_payload,
-            farmer_profile=rag_result.get("farmer_profile") or farmer_profile,
+            review_id=review_id,
         )
 
     except HTTPException:
@@ -1931,7 +2439,18 @@ async def chat(
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+        err = str(e)
+        if "not found" in err.lower() and "model" in err.lower():
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Ollama no tiene el modelo de embeddings o de generación. "
+                    "Descárgalos con: docker compose exec ollama ollama pull "
+                    "qwen3-embedding:latest && docker compose exec ollama "
+                    "ollama pull llama3.2:latest"
+                ),
+            ) from e
+        raise HTTPException(status_code=500, detail=err)
 
 
 @router.post("/evaluation/retrieval/{test_id}")
@@ -1941,8 +2460,12 @@ async def evaluate_retrieval_route(
     db: AsyncSession = Depends(get_db),
     organization_id: UUID | None = None,
     knowledge_base_id: UUID | None = None,
+    distance_metric: str = "cosine",
+    embedding_model: str | None = None,
 ):
-    tests = load_tests()
+    tests = await resolve_evaluation_tests(
+        current_user, db, organization_id
+    )
     if test_id < 0 or test_id >= len(tests):
         raise HTTPException(status_code=404, detail="Test no encontrado")
 
@@ -1952,9 +2475,12 @@ async def evaluate_retrieval_route(
     test = tests[test_id]
     collections = [str(knowledge_base_id)] if knowledge_base_id else None
 
-    # Ejecutar evaluación de recuperación (Retrieval) usando lógica local
     result = await evaluate_retrieval_internal(
-        test, str(tenant_id), collections=collections
+        test,
+        str(tenant_id),
+        collections=collections,
+        distance_metric=_normalize_distance_metric(distance_metric),
+        embedding_model=embedding_model or DEFAULT_EMBEDDING_MODEL,
     )
 
     retrieval_data = result.model_dump() if hasattr(result, "model_dump") else result
@@ -1977,7 +2503,9 @@ async def evaluate_answer_route(
     organization_id: UUID | None = None,
     knowledge_base_id: UUID | None = None,
 ):
-    tests = load_tests()
+    tests = await resolve_evaluation_tests(
+        current_user, db, organization_id
+    )
     if test_id < 0 or test_id >= len(tests):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -2075,7 +2603,78 @@ async def upload_tests(
             status_code=500, detail=f"No se pudo guardar el fichero de tests: {e}"
         )
 
-    return {"status": "ok", "uploaded": len(canonical_rows), "path": tests_path}
+    imported = 0
+    skipped = 0
+    try:
+        await init_retrieval_dataset_table(db)
+        for item in [TestQuestion(**row) for row in canonical_rows]:
+            question = item.question.strip()
+            existing = await db.execute(
+                text("""
+                    SELECT id
+                    FROM public.retrieval_dataset
+                    WHERE tenant_id = :tenant_id
+                      AND lower(btrim(question)) = lower(btrim(:question))
+                    LIMIT 1
+                """),
+                {"tenant_id": tenant_id, "question": question},
+            )
+            if existing.scalar_one_or_none() is not None:
+                skipped += 1
+                continue
+            await db.execute(
+                text("""
+                    INSERT INTO public.retrieval_dataset (
+                        tenant_id,
+                        question,
+                        expected_chunk_id,
+                        selected_chunk_ids,
+                        keywords,
+                        reference_answer,
+                        category,
+                        flag_different_info,
+                        flag_out_of_knowledge,
+                        split,
+                        metadata
+                    )
+                    VALUES (
+                        :tenant_id,
+                        :question,
+                        NULL,
+                        CAST(:selected_chunk_ids AS JSONB),
+                        CAST(:keywords AS JSONB),
+                        :reference_answer,
+                        :category,
+                        FALSE,
+                        :out_of_knowledge,
+                        :split,
+                        CAST(:metadata AS JSONB)
+                    )
+                """),
+                {
+                    "tenant_id": tenant_id,
+                    "question": question,
+                    "selected_chunk_ids": json.dumps([]),
+                    "keywords": json.dumps(item.keywords),
+                    "reference_answer": item.reference_answer,
+                    "category": item.category or "general",
+                    "out_of_knowledge": item.out_of_knowledge,
+                    "split": item.split,
+                    "metadata": json.dumps(item.metadata or {}),
+                },
+            )
+            imported += 1
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    return {
+        "status": "ok",
+        "uploaded": len(canonical_rows),
+        "imported": imported,
+        "skipped": skipped,
+        "path": tests_path,
+    }
 
 
 @router.post("/simulator/save-dataset")
@@ -2102,6 +2701,7 @@ async def save_to_dataset(
         )
 
     try:
+        await init_retrieval_dataset_table(db)
 
         await db.execute(
             text("""
@@ -2179,6 +2779,7 @@ async def simulator_search(
         tenant_id=str(tenant_id),
         collections=[request.knowledge_base_id] if request.knowledge_base_id else None,
         evaluation_mode=request.evaluation_mode,
+        distance_metric=request.distance_metric,
     )
 
     chunks = rag_result.get("chunks", []) or []
@@ -2244,7 +2845,7 @@ async def stream_evaluation(
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = await get_user_tenant_id(current_user.id, db)
-    tests = load_tests()
+    tests = await load_unified_tests(db, tenant_id)
 
     async def event_generator():
         answer_results = []

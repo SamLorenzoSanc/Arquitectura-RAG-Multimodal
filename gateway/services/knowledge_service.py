@@ -57,6 +57,7 @@ async def build_knowledge_graph(
         min_dist=0.1,
         metric="cosine",
         random_state=42,
+        n_jobs=1,
     )
 
     coords = reducer.fit_transform(embeddings)

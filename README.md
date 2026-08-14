@@ -131,7 +131,7 @@ El banco textual versionado contiene 21 filas, 19 preguntas únicas y siete cate
 ```text
 frontend/agrops/       React/Vite
 gateway/               API FastAPI, modelos, parsers, servicios y pruebas
-gateway/services/      RAG, forecast, base de datos y lógica monolítica
+gateway/services/      RAG, evaluación, base de datos y lógica monolítica
 postgres/              inicialización de PostgreSQL/pgvector
 storage/               datos históricos conservados, fuera del runtime
 docs/                  documentación técnica y auditoría de memoria

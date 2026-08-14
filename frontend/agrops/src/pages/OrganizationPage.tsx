@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import api from "@/api";
 import { useOrganization } from "@/context/OrganizationContext";
+import { roleGuide, type RoleGuide } from "@/lib/roles";
 import DepartmentService from "@/services/department.service";
 
 interface Organization {
@@ -33,29 +34,42 @@ interface RoleOption {
     organization_id?: string;
 }
 
-// --- DEFINICIÓN DE ROLES OPERATIVOS Y ACCESO RAG ---
-const ROLE_DEFINITIONS: Record<string, { label: string; context: string }> = {
-    "ORG_ADMIN": { 
-        label: "Administrador de Organización", 
-        context: "Acceso Total RAG" 
-    },
-    "FARM_MANAGER": { 
-        label: "Gestor de Fincas / Producción", 
-        context: "RAG: Fincas, Cultivos e IGP" 
-    },
-    "LOGISTICS_OPERATOR": { 
-        label: "Operador Logístico", 
-        context: "RAG: Flota, Rutas y Contenedores" 
-    },
-    "QUALITY_CONTROLLER": { 
-        label: "Controlador de Calidad", 
-        context: "RAG: Cadena de Frío e Inspección" 
-    },
-    "USER": { 
-        label: "Usuario Estándar", 
-        context: "Consulta básica" 
-    }
-};
+function selectedRoleName(roles: RoleOption[], roleId: string) {
+    return roles.find((role) => role.id === roleId)?.name;
+}
+
+function RolePermissionsCard({ guide }: { guide: RoleGuide }) {
+    return (
+        <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
+            <p className="text-sm font-semibold text-slate-800">{guide.label}</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">{guide.summary}</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Puede</p>
+                    <ul className="mt-1 space-y-1">
+                        {guide.can.map((item) => (
+                            <li key={item} className="text-xs text-slate-600">
+                                · {item}
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+                {guide.cannot.length > 0 && (
+                    <div>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700">No puede</p>
+                        <ul className="mt-1 space-y-1">
+                            {guide.cannot.map((item) => (
+                                <li key={item} className="text-xs text-slate-600">
+                                    · {item}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 // --- SERVICIOS DE API GATEWAY ---
 export const getOrganizations = async () => {
@@ -543,9 +557,12 @@ export default function OrganizationPage() {
             )}
 
             {showMemberModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-                        <h3 className="mb-4 text-xl font-bold text-slate-900">Añadir miembro al departamento</h3>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+                        <h3 className="mb-1 text-xl font-bold text-slate-900">Añadir miembro al departamento</h3>
+                        <p className="mb-4 text-sm text-slate-500">
+                            El rol define qué podrá hacer esta persona en la cooperativa, no solo el nombre del puesto.
+                        </p>
                         <form onSubmit={handleAddMember} className="flex flex-col gap-4">
                             <div>
                                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Departamento activo</label>
@@ -575,7 +592,7 @@ export default function OrganizationPage() {
 
                             <div>
                                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                    Rol Organizacional (Contexto RAG)
+                                    Rol y permisos
                                 </label>
                                 <select
                                     value={selectedRoleId}
@@ -583,27 +600,36 @@ export default function OrganizationPage() {
                                     className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5] font-medium"
                                     required
                                 >
-                                    <option value="">Selecciona el rol y alcance...</option>
+                                    <option value="">Selecciona el rol...</option>
                                     {roles.map((role) => {
-                                        const roleDef = ROLE_DEFINITIONS[role.name] || { 
-                                            label: role.name, 
-                                            context: role.description || "Sin contexto RAG asignado" 
-                                        };
-
+                                        const guide = roleGuide(role.name);
                                         return (
                                             <option key={role.id} value={role.id}>
-                                                {roleDef.label} — [{roleDef.context}]
+                                                {guide.label}
                                             </option>
                                         );
                                     })}
                                 </select>
-                                <p className="mt-1 text-[11px] text-slate-400">
-                                    * El rol seleccionado define los metadatos de filtrado para las consultas del Asistente IA.
-                                </p>
+                                {selectedRoleId ? (
+                                    <RolePermissionsCard
+                                        guide={roleGuide(selectedRoleName(roles, selectedRoleId))}
+                                    />
+                                ) : (
+                                    <p className="mt-2 text-[11px] text-slate-400">
+                                        Elige un rol para ver qué podrá consultar, evaluar o administrar.
+                                    </p>
+                                )}
                             </div>
                             
                             <div className="flex justify-end gap-2 mt-2">
-                                <button type="button" onClick={() => setShowMemberModal(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowMemberModal(false);
+                                        setSelectedRoleId("");
+                                    }}
+                                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                                >
                                     Cancelar
                                 </button>
                                 <button type="submit" disabled={submittingMember} className="rounded-lg bg-[#0055A5] px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">

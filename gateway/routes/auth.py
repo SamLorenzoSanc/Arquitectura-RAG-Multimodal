@@ -12,6 +12,7 @@ from argon2.exceptions import VerifyMismatchError
 import uuid
 from services.database import get_db
 from models.user import User
+from dependencies.security import user_is_admin
 from argon2 import PasswordHasher
 
 load_dotenv()
@@ -36,9 +37,23 @@ def verify_password(password_ingresado: str, password_guardado_en_db: str) -> bo
         return False
 
 
-def create_access_token(user_id, email):
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload = {"sub": str(user_id), "email": email, "exp": expire}
+def create_access_token(
+    user_id,
+    email,
+    expires_minutes: int | None = None,
+    jti: str | None = None,
+    token_use: str = "session",
+):
+    minutes = expires_minutes or ACCESS_TOKEN_EXPIRE_MINUTES
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
+    payload = {
+        "sub": str(user_id),
+        "email": email,
+        "exp": expire,
+        "use": token_use,
+    }
+    if jti:
+        payload["jti"] = jti
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
@@ -72,6 +87,36 @@ async def get_current_user(
     )
     if user is None:
         raise HTTPException(status_code=401, detail="Usuario inexistente o inactivo")
+
+    token_jti = payload.get("jti")
+    if token_jti:
+        try:
+            row = (
+                (
+                    await db.execute(
+                        text("""
+                            SELECT revoked_at FROM user_access_tokens
+                            WHERE jti = :jti AND user_id = :user_id
+                            """),
+                        {"jti": token_jti, "user_id": user.id},
+                    )
+                )
+                .mappings()
+                .first()
+            )
+        except Exception:
+            await db.rollback()
+            raise HTTPException(status_code=401, detail="Token revocado o inválido")
+        if row is None or row.get("revoked_at") is not None:
+            raise HTTPException(status_code=401, detail="Token revocado o inválido")
+        await db.execute(
+            text("""
+                UPDATE user_access_tokens
+                SET last_used_at = NOW()
+                WHERE jti = :jti AND user_id = :user_id
+                """),
+            {"jti": token_jti, "user_id": user.id},
+        )
 
     return user
 
@@ -221,16 +266,14 @@ async def logout(authorization: str = Header(...), db: AsyncSession = Depends(ge
     payload = decode_token(token)
 
     # La BD remota puede no tener aún la tabla del modelo RevokedToken.
-    await db.execute(
-        text("""
+    await db.execute(text("""
             CREATE TABLE IF NOT EXISTS revoked_tokens (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                 token TEXT NOT NULL,
                 expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
                 revoked_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
             )
-            """)
-    )
+            """))
     await db.execute(
         text(
             "INSERT INTO revoked_tokens (token, expires_at) VALUES (:token, :expires)"
@@ -247,5 +290,20 @@ async def logout(authorization: str = Header(...), db: AsyncSession = Depends(ge
 
 
 @router.get("/me")
-async def me(user: User = Depends(get_current_user)):
-    return {"id": str(user.id), "name": user.name, "email": user.email}
+async def me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from routes.account import profile_payload
+
+    try:
+        payload = await profile_payload(db, user)
+    except Exception:
+        payload = {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "has_avatar": False,
+        }
+    payload["is_admin"] = await user_is_admin(db, user.id)
+    return payload

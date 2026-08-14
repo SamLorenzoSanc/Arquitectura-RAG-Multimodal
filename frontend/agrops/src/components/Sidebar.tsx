@@ -7,7 +7,7 @@ import { useShell } from "@/context/ShellContext";
 import { NewOrgModal } from "./NewOrgModal";
 import {
   Building2,
-  MessageSquare,
+  BookOpen,
   Settings,
   ChevronDown,
   Wheat,
@@ -15,21 +15,16 @@ import {
   Plus,
   Network,
   BrainCircuit,
-  Database,
-  TrendingUp,
-  Ship,
-  FileText,
-  Container,
-  Route,
-  Navigation,
+  Layers3,
   X,
+  LifeBuoy,
+  BookMarked,
 } from "lucide-react";
 
-type NavGroupId = "work" | "ops" | "admin" | "labs";
+type NavGroupId = "work" | "admin" | "labs";
 
 const NAV_GROUPS: Record<NavGroupId, string> = {
-  work: "Trabajo diario",
-  ops: "Operaciones",
+  work: "Proyecto",
   admin: "Administración",
   labs: "Laboratorio",
 };
@@ -40,31 +35,24 @@ const NAV_ITEMS: Array<{
   icon: React.ComponentType<{ size?: number; className?: string }>;
   group: NavGroupId;
 }> = [
-  { to: "/dashboard/chat", label: "Chat IA", icon: MessageSquare, group: "work" },
   {
-    to: "/dashboard/recogida",
-    label: "Planificador de rutas",
-    icon: Navigation,
+    to: "/dashboard/cuaderno",
+    label: "Cuaderno de campo",
+    icon: BookOpen,
     group: "work",
   },
   {
-    to: "/dashboard/documentation",
-    label: "Documentación",
-    icon: FileText,
+    to: "/dashboard/datasets",
+    label: "Datasets",
+    icon: Layers3,
     group: "work",
   },
-  { to: "/dashboard/fincas", label: "Fincas y mapas", icon: Tractor, group: "ops" },
-  { to: "/dashboard/cultivos", label: "Cultivos", icon: Wheat, group: "ops" },
-  { to: "/dashboard/analytics", label: "Analítica", icon: TrendingUp, group: "ops" },
-  { to: "/dashboard/logistics", label: "Trazabilidad", icon: Ship, group: "ops" },
-  { to: "/dashboard/flota", label: "Flota", icon: Ship, group: "ops" },
   {
-    to: "/dashboard/reefer",
-    label: "Contenedores reefer",
-    icon: Container,
-    group: "ops",
+    to: "/dashboard/evaluacion",
+    label: "Evaluación",
+    icon: BrainCircuit,
+    group: "work",
   },
-  { to: "/dashboard/transito", label: "Tránsito", icon: Route, group: "ops" },
   {
     to: "/dashboard/organization",
     label: "Organización",
@@ -72,23 +60,10 @@ const NAV_ITEMS: Array<{
     group: "admin",
   },
   { to: "/dashboard/tenants", label: "Inquilinos", icon: Tractor, group: "admin" },
-  { to: "/dashboard/settings", label: "Configuración", icon: Settings, group: "admin" },
   {
     to: "/dashboard/knowledge-graph",
-    label: "Grafo de conocimiento",
+    label: "Grafo de embeddings",
     icon: Network,
-    group: "labs",
-  },
-  {
-    to: "/dashboard/evaluacion",
-    label: "Auditoría RAG",
-    icon: BrainCircuit,
-    group: "labs",
-  },
-  {
-    to: "/dashboard/chroma-debug",
-    label: "Base de datos",
-    icon: Database,
     group: "labs",
   },
 ];
@@ -101,7 +76,7 @@ export default function Sidebar() {
   const [showOrgDropdown, setShowOrgDropdown] = useState(false);
 
   const grouped = useMemo(() => {
-    const order: NavGroupId[] = ["work", "ops", "admin", "labs"];
+    const order: NavGroupId[] = ["work", "admin", "labs"];
     return order
       .map((group) => ({
         group,
@@ -123,7 +98,7 @@ export default function Sidebar() {
               AgroPS
             </h1>
             <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--agro-accent)]">
-              Agricultural Ops
+              Agricultural RAG
             </p>
           </div>
         </div>
@@ -210,7 +185,7 @@ export default function Sidebar() {
 
       <div className="mx-4 my-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
 
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-6">
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
         {grouped.map(({ group, label, items }) => (
           <div key={group}>
             <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -241,6 +216,33 @@ export default function Sidebar() {
           </div>
         ))}
       </nav>
+
+      <div className="border-t border-slate-200 px-3 py-3">
+        {[
+          { to: "/dashboard/help", label: "Docs", icon: BookMarked },
+          { to: "/dashboard/settings", label: "Ajustes", icon: Settings },
+          { to: "/dashboard/support", label: "Soporte", icon: LifeBuoy },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={closeSidebar}
+              className={({ isActive }) =>
+                `group flex items-center gap-3 rounded-xl px-3.5 py-2 text-xs font-medium transition ${
+                  isActive
+                    ? "bg-[color:var(--agro-primary)] text-white shadow-md shadow-blue-900/15"
+                    : "text-slate-600 hover:bg-white hover:text-[color:var(--agro-primary)]"
+                }`
+              }
+            >
+              <Icon size={16} className="shrink-0 opacity-90" />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
+      </div>
 
       <NewOrgModal
         isOpen={isModalOpen}

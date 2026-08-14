@@ -11,7 +11,7 @@ Ambos Compose definen únicamente:
 - `migrate`: job puntual de migraciones.
 
 No se despliegan Redis, Mosquitto, workers ni microservicios de inferencia,
-retrieval, telemetría, notificaciones o forecast.
+retrieval, telemetría o notificaciones.
 
 ## Variables
 
@@ -40,8 +40,16 @@ runtime.
 docker compose config
 docker compose build
 docker compose up -d
-docker compose exec ollama ollama pull llama3
+```
+
+El servicio `ollama-init` descarga `qwen3-embedding:latest` (embeddings) y
+`llama3.2:latest` (generación) la primera vez. Hasta que termine, el chat
+responderá que el modelo no está disponible. Si hace falta repetirlo a mano:
+
+```powershell
+docker compose exec ollama ollama pull llama3.2:latest
 docker compose exec ollama ollama pull qwen3-embedding:latest
+docker compose exec ollama ollama list
 ```
 
 Accesos: frontend `http://localhost`, API/OpenAPI
@@ -50,13 +58,15 @@ Accesos: frontend `http://localhost`, API/OpenAPI
 
 ## Producción
 
-`docker-compose.prod.yaml` consume las imágenes
-`${DOCKERHUB_USER}/agrops-api` y `${DOCKERHUB_USER}/agrops-frontend`; PostgreSQL y
-Ollama usan imágenes oficiales. PostgreSQL y Ollama no publican puertos en el
-host en este Compose.
+`docker-compose.prod.yaml` publica solo el puerto 80. Nginx del frontend sirve
+la SPA y proxifica `/api/` al gateway; PostgreSQL y Ollama no se exponen al host.
+Las imágenes propias son `${DOCKERHUB_USER}/agrops-api` y
+`${DOCKERHUB_USER}/agrops-frontend` (o se construyen en el servidor con `build`).
+
+Guía IONOS: [DEPLOY_IONOS.md](DEPLOY_IONOS.md).
 
 ```bash
-docker compose -f docker-compose.prod.yaml pull
+docker compose -f docker-compose.prod.yaml build
 docker compose -f docker-compose.prod.yaml up -d --remove-orphans
 ```
 

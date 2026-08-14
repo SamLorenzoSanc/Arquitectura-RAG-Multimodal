@@ -1,0 +1,210 @@
+% -*- coding: utf-8 -*-
+\chapter{Marco teórico / Estado del arte}
+
+\section{Arquitectura Transformers y Grandes Modelos del Lenguaje}
+Los grandes modelos de lenguaje (LLMs, por sus siglas en inglés) constituyen una de las principales líneas de avance en el Procesamiento del Lenguaje Natural (PLN) debido a su capacidad para modelar dependencias complejas entre tokens y generar texto coherente en múltiples tareas de comprensión y razonamiento. Su desarrollo contemporáneo se fundamenta en la arquitectura Transformer, introducida por Vaswani et al. (2017), la cual desplazó a los modelos secuenciales previos al proponer un mecanismo de atención capaz de representar relaciones contextuales de forma altamente paralelizables.
+
+\begin{quote}Ilustración 1 Arquitectura Transformers\end{quote}
+A diferencia de las Redes Neuronales Recurrentes (RNN) o las redes de Memoria a Corto y Largo Plazo (LSTM), que procesan la información de manera estrictamente secuencial y sufren de degradación de la señal en secuencias largas (el problema del desvanecimiento del gradiente), el Transformer permite ponderar simultáneamente la interacción entre todos los elementos de una secuencia. Esta arquitectura asume un rol fundacional en este trabajo, ya que constituye el motor inferencial generativo del sistema; sin embargo, comprender sus fundamentos matemáticos es indispensable para identificar por qué, estructuralmente, estos modelos son propensos a la alucinación factual en corpus normativos como la Política Agraria Común (PAC).
+
+\begin{quote}Tabla 1 Comparación de arquitecturas y enfoques NLP\end{quote}
+Arquitectura
+
+Ventaja
+
+Limitación
+
+RNN
+
+Memoria Secuencial
+
+Gradiente
+
+LSTM
+
+Dependencias Largas
+
+Lentitud
+
+Transformers
+
+Paralelismo
+
+Alto Coste
+
+RAG
+
+Conocimiento Actualizado
+
+Recuperación Documentación
+
+\subsection{Fundamentos Matemáticos de los Transformers y Mecanismos de Atención}
+Desde el punto de vista arquitectónico, el núcleo de un Transformer prescinde de la recurrencia y la convolución, basándose íntegramente en el mecanismo de Autoatención de Producto Escalar Escalado (Scaled Dot-Product Attention). La autoatención permite que cada token integre información procedente del resto de la secuencia, generando representaciones contextualizadas que dependen del entorno lingüístico dinámico y no solo de una incrustación léxica estática.
+
+Mecanismo de Autoatef entrada, el modelo proyecta linealmente las representaciones de los tokens en tres matrices distintas: Query (), Key () y Value (). Estas proyecciones se obtienen multiplicando la matriz de entrada  (que contiene los embeddings de los tokens) por matrices de pesos aprendibles ,  y :
+
+La función de atención calcula la similitud entre cada Query y todas las Keys mediante un producto escalar. Para evitar que valores extremadamente grandes empujen la función softmax hacia regiones con gradientes infinitesimales (lo que estancaría el aprendizaje), el producto se escala dividiéndolo por la raíz cuadrada de la dimensión de las keys (). Finalmente, se aplica la función softmax para obtener los pesos de atención, los cuales multiplican a la matriz de valores ():
+
+Esta ecuación explica matemáticamente por qué los LLMs pueden producir respuestas sintácticamente fluidas y semánticamente plausibles: cada palabra generada es una amalgama probabilística altamente contextualizada del texto anterior. Sin embargo, esta misma formulación evidencia su principal carencia normativa: la matriz  se construye basándose en pesos internalizados durante el preentrenamiento. No existe en esta ecuación ningún mecanismo de verificación contra una base de datos externa que garantice la veracidad de la correlación estadística.
+
+Durante la fase de inferencia de un modelo generativo (arquitecturas Decoder-only como la familia LLaMA o GPT, prevalentes en tareas de Q\&A), el modelo opera de forma autorregresiva. Esto implica que la predicción del token en el instante temporal  se condiciona a la probabilidad conjunta de todos los tokens generados hasta el instante :
+
+\begin{quote}Ilustración 2 Ilustración de los embeddings en 2D\end{quote}
+\subsection{Limitaciones Estructurales de los LLMs}
+La aplicación directa de Modelos de Lenguaje de Gran Escala aislados (standalone) para la consulta y gestión de documentación técnica o regulatoria presenta severas inconsistencias funcionales y metodológicas. Aunque los LLMs exhiben una notable capacidad para comprender el lenguaje natural, resumir textos complejos y generar respuestas gramaticalmente fluidas, su arquitectura subyacente impone barreras insuperables cuando se exige rigor jurídico, actualización documental estricta y trazabilidad en el ámbito agrario (por ejemplo, en la regulación de las ayudas de la Política Agraria Común ---PAC--- o el Programa de Opciones Específicas por la Lejanía y la Insularidad ---POSEI---).
+
+\begin{itemize}\item Memoria paramétrica frente a Memoria Paramétrica. La diferencia fundamental entre un sistema de información tradicional y un LLM standalone reside en la naturaleza de su almacenamiento de conocimiento:\end{itemize}
+\begin{itemize}\item Memoria Paramétrica: Todo el conocimiento de un LLM reside de forma distribuida e implícita en los pesos numéricos de sus capas de atención y redes feed-forward, ajustados durante la fase de preentrenamiento masivo. El modelo no "consulta" un documento en tiempo de inferencia; en su lugar, computa una distribución de probabilidad sobre el vocabulario\end{itemize}
+\subsection{Taxonomía del Problema de las Alucinaciones en Dominios Normativos}
+Se define la alucinación en los LLMs como la generación de texto que es fácticamente incorrecto, desalineado del contexto o carente de sustento en la evidencia disponible (Huang et al., 2025; Ji et al., 2023). En el procesamiento de normativas agrícolas como la PAC o el POSEI, las alucinaciones se categorizan estructuralmente en dos tipos:
+
+Alucinaciones Intrínsecas: La salida del modelo contradice explícitamente la información proporcionada en el contexto o en el prompt de entrada. Ocurre cuando el mecanismo de atención pondera erróneamente tokens de contexto contiguos, pero semánticamente antagónicos.
+
+Alucinaciones Extrínsecas: El modelo genera afirmaciones que no pueden ser verificadas ni refutadas a partir del contexto provisto (o cuando se le consulta de forma directa sin contexto). El LLM fabrica datos, artículos de ley inexistentes o requisitos de elegibilidad plausiblemente redactados, pero jurídicamente nulos.
+
+En el marco de la regulación agrícola, una alucinación extrínseca ---como inventar una excepción normativa en el plazo de presentación de solicitudes de pago por ecorregímenes--- conduce a la invalidación del sistema, ya que invalida el criterio de seguridad jurídica y puede derivar en sanciones económicas directas para los solicitantes.
+
+\subsection{Restricciones en la Ventana de Contexto y el Fenómeno Lost in the Middle}
+Un intento ingenuo de resolver la falta de conocimiento paramétrico en un LLM standalone consiste en inyectar el texto normativo completo (cientos de páginas del Boletín Oficial del Estado o reglamentos comunitarios de la UE) dentro de la ventana de contexto (context window) de un modelo con capacidad extendida (ej. 32k, 128k o más tokens). Sin embargo, esta estrategia colapsa por dos razones estructurales:
+
+Complejidad Computacional: El mecanismo de autoatención  escala de forma cuadrática  con respecto a la longitud de la secuencia , elevando exponencialmente la latencia y la demanda de memoria VRAM.
+
+Degradación del Posicionamiento Semántico (Lost in the Middle): Como demostraron Liu et al. (2023), los modelos basados en Transformer muestran una marcada asimetría en la capacidad de recuperación dentro del contexto de entrada. Los modelos son altamente eficaces identificando e integrando información situada al inicio (primacy effect) o al final (recency effect) del prompt, pero sufren un menoscabo drástico en el rendimiento cuando la información clave se halla inmersa en la zona central del texto inyectado. En normativas de gran volumen, los condicionantes técnicos clave suelen estar sepultados en anexos intermedios, quedando efectivamente "invisibilizados" para la atención del modelo.
+
+\subsection{Volatilidad Normativa y Falta de Determinismo y Trazabilidad}
+Finalmente, la gestión de la normativa agraria exige resolver tres factores críticos incompatibles con los LLMs aislados:
+
+Volatilidad y Asincronía Temporal: Las leyes agrícolas están sujetas a modificaciones periódicas (órdenes de modificación de la PAC, resoluciones autonómicas de sequía, ajustes en las fichas del POSEI). Un LLM standalone es estático; su conocimiento termina de forma tajante en su fecha de corte de entrenamiento (knowledge cutoff). La única vía para actualizar la memoria paramétrica de un LLM es mediante el reentrenamiento o el Ajuste Fino (Fine-Tuning), procesos prohibitivos en términos de tiempo, costes computacionales y riesgo de catastrophic forgetting (olvido catastrófico de habilidades previas).
+
+Ausencia de Trazabilidad y Citación Granular: Un LLM aislado opera como una "caja negra" probabilística. Al generar una respuesta sobre un requisito técnico, no es capaz de proporcionar la dirección exacta de la fuente (p. ej., Reglamento (UE) 2021/2115, Artículo 14, apartado 2, página 45). La cita producida por un LLM aislado suele ser una alucinación estilística basada en patrones de citación aprendidos.
+
+Falta de Determinismo: Dado que el proceso de muestreo en la capa de salida (decoding) emplea parámetros como la temperatura () o el muestreo top-, la misma consulta formulada en momentos distintos puede derivar en interpretaciones contradictorias sobre un mismo marco regulatorio.
+
+\section{Arquitectura Retrieval-Augmented Generation (RAG)}
+La arquitectura Retrieval-Augmented Generation (RAG), introducida formalmente por Lewis et al. (2020), nace como un paradigma híbrido que desacopla el almacenamiento del conocimiento de la capacidad de razonamiento del modelo de lenguaje. En lugar de confiar exclusivamente en la memoria paramétrica interna del LLM, RAG integra un componente de recuperación semántica externa (Memoria Paramétrica) que extrae dinámicamente evidencia documental relevante desde una base de conocimiento en tiempo de inferencia, inyectándola directamente en el contexto de entrada del generador.
+
+En el ámbito de la documentación normativa agraria (PAC/POSEI), esta arquitectura no se concibe como un mero sustituto del LLM, sino como un mecanismo de anclaje estricto (Strict Grounding) que condiciona la probabilidad de generación del modelo a la evidencia recuperada, mitigando estructuralmente las alucinaciones extrínsecas y posibilitando la trazabilidad exacta de las respuestas.
+
+\subsection{Descomposición del Pipeline de RAG: Indexación, Recuperación y Generación}
+El funcionamiento de un sistema RAG en entornos regulados se divide operativamente en dos fases principales: Indexación Asíncrona (Ingesta) y Pipeline de Inferencia Síncrona (Recuperación y Generación).
+
+\begin{quote}Ilustración 3 Funcionamiento de la Pipeline de RAG\end{quote}
+En este trabajo, la arquitectura RAG no se interpreta como una solución automática al problema de las alucinaciones, sino como un mecanismo cuya eficacia debe ser evaluada empíricamente. La literatura reciente sobre RAGAS distingue explícitamente entre métricas de recuperación y métricas de generación, como context precision, context recall, faithfulness y answer relevancy, precisamente porque la utilidad de un sistema RAG no puede inferirse solo a partir de la fluidez de la respuesta. Por ello, el presente estudio adopta una visión cuantitativa en la que la recuperación semántica y la generación se analizan por separado y en conjunto.
+
+Fase de Indexación y Preparación Documental:
+
+Parseo y Extracción de Maquetación (Layout Analysis): Los documentos normativos en formato PDF se procesan mediante herramientas avanzadas (e.g., Docling con soporte OCR) que preservan la estructura jerárquica, tablas y elementos visuales, exportándolos a sintaxis Markdown estructurada.
+
+Fragmentación Semántica (Chunking): El texto unificado se segmenta en bloques discretos . Para evitar la rotura de contexto normativo en medio de un artículo o tabla, se aplican estrategias de fragmentación por encabezados o Summary-Augmented Chunking (Reuter et al., 2025).
+
+Incrustación Vectorial (Embedding): Cada fragmento  se pasa por un modelo codificador (Encoder) para proyectarlo en un espacio vectorial denso de dimensión :
+
+Los vectores resultantes, junto con metadatos de gobernanza (tenant\_id, página, sección, checksum), se almacenan en un índice espacial.
+
+\begin{quote}Tabla 2 Modelos Embedding\end{quote}
+Modelo
+
+Dimensión
+
+Ventajas
+
+BGE-M3
+
+1024
+
+Multilingüe
+
+E5
+
+768
+
+Excelente recuperación
+
+Instructor XL
+
+768
+
+Buen rendimiento
+
+Jina Embeddings
+
+1024
+
+Muy rápido
+
+Fase de Inferencia: Recuperación Semántica (Retriever):
+
+Al recibir una consulta  del usuario (ej. "¿Cuáles son los requisitos de elegibilidad para la ayuda al arranque de viñedo en el POSEI?"), el sistema la proyecta al mismo espacio latente:
+
+El recuperador evalúa la similitud entre la consulta y los fragmentos indexados. La métrica habitual en espacios normativos es la similitud coseno:
+
+Búsqueda Híbrida y Re-Ranking: Dado que la búsqueda densa por similitud coseno puede fallar al buscar identificadores alfanuméricos exactos o códigos de ley (ej. "Orden APA/102/2024"), se implementa un esquema de Búsqueda Híbrida que combina la similitud semántica con un algoritmo léxico clásico (). Los top- fragmentos devueltos por ambos métodos se fusionan y reordenan mediante un modelo Cross-Encoder (Re-ranker) para maximizar la precisión del contexto inyectado.
+
+Fase de Generación Condicionada (Generator):
+
+Los  fragmentos con mayor relevancia semántica se ensamblan en un modelo de plantilla de prompt (Prompt Template) junto con la consulta original y una instrucción estricta de sistema (system prompt).
+
+\begin{quote}Tabla 3 Tipos de RAG\end{quote}
+Tipo
+
+Ventajas
+
+Casos de Uso
+
+Naive
+
+Simple
+
+Chatbots
+
+Graph
+
+Relaciones
+
+Jurídico
+
+Agentic Rag
+
+Planificación
+
+Investigación
+
+Modular RAG
+
+Empresas
+
+Producción
+
+\section{Revisión Crítica de la Arquitectura RAG en Dominios Regulados}
+En los últimos años han proliferado estudios sobre arquitecturas Retrieval-Augmented Generation (RAG) para mitigar alucinaciones en LLMs, especialmente en dominios regulados como la medicina y el derecho. Estas investigaciones coinciden en que RAG incorpora conocimiento externo ``no paramétrico'' (por ejemplo, bases de datos vectoriales o textos normativos) al proceso de generación, lo que reduce la tasa de respuestas erróneas o fabricadas. Por ejemplo, en entornos médicos especializados, Wada et al. (2025) demostraron que un modelo local de radiología potenciado con RAG eliminó por completo las alucinaciones en consultas sobre medios de contraste (0 \% frente a 8 \% con el modelo base; p=0.012). De forma similar, He et al. (2025) mostraron que un modelo GPT-4 con RAG alcanzó un 96.4 \% de precisión en evaluaciones preoperatorias (vs. 86.6 \% humano) sin generar alucinaciones. En el ámbito jurídico, Schwarcz et al. (2025) hallaron que una herramienta jurídica basada en RAG mejoraba la calidad del trabajo (claridad y profesionalismo) y ``redujo las alucinaciones a niveles comparables'' al trabajo humano sin IA. Igualmente, Rabnam et al. (2025) desarrollaron el framework LQ-RAG para consultas legales, logrando mejoras significativas en métricas de recuperación (por ejemplo, +13 \% de hit rate y +15 \% de MRR) mediante agentes de auditoría y modelos afinados, aunque sin incorporar aún retroalimentación humana.
+
+En agricultura, Sawant et al. (2026) diseñaron un sistema RAG para asesoría agronómica, procesando documentos de prácticas agrarias mediante chunking semántico y embeddings especializados. Evaluaron varios LLMs (Llama3.1, Mistral, Phi3, Qwen2.5) utilizando métricas de relevancia y recuperación (precisión@K, recall@K, MRR, NDCG) y métricas de calidad semántica (BLEU, ROUGE, BERT, Score, faithfulness). Sus hallazgos indican que modelos como Mistral y Qwen2.5 obtienen mejor desempeño en relevancia y calidad de respuesta en el dominio agrícola. No obstante, casi ninguna investigación previa ha aplicado RAG explícitamente a la documentación normativa agraria (PAC/POSEI), lo que señala una brecha importante.
+
+\section{Alucinaciones en modelos de lenguaje en entornos normativos (definición, causas y estudios relevantes).}
+Los enfoques de Retrieval-Augmented Generation (RAG) combinan la recuperación de información externa con la generación de texto para enriquecer las respuestas de los LLM con evidencias verificables. La bibliografía resalta que RAG pretende mitigar las limitaciones paramétricas de los LLM, mejorando la calidad factual de las respuestas y reduciendo la incidencia de alucinaciones o afirmaciones no fundamentadas. En este contexto, una alucinación se entiende como una salida factualmente incorrecta que el modelo genera de manera plausible pero no está respaldada por la información recuperada. Sin embargo, varios autores advierten que la eficacia de RAG depende críticamente de la precisión de la etapa de recuperación: por ejemplo, Reuter et al. (2025) señalan que RAG sólo reduce las alucinaciones cuando la recuperación documental es fiable, advirtiendo fallos como el Document-Level Retrieval Mismatch donde se seleccionan textos irrelevantes. En suma, RAG no elimina automáticamente las alucinaciones; su beneficio debe verificarse empíricamente caso a caso.
+
+La revisión de trabajos previos muestra diversas arquitecturas RAG especializadas en dominios regulados. Xu et al. (2025) introducen MEGA-RAG, un framework RAG para salud pública con múltiples fuentes de evidencia. Reportaron una reducción de alucinaciones de más del 40\% frente al modelo base y alta exactitud en las respuestas (precisión $\approx$0,79). En el ámbito legal, Rahman et al. (2025) proponen LQ-RAG, que integra agentes de auditoría y modelos finamente ajustados para consultas jurídicas. Su evaluación muestra mejoras relevantes en métricas de recuperación (por ejemplo, +13\% en Hit Rate, +15\% en MRR) y en la relevancia de las respuestas (hasta +23\% vs configuración ingenua). Feng et al. (2026) presentan Hyper-RAG, que emplea modelos de conocimiento basados en hipergrafos. En experimentos multiddominio (medicina, legal, agricultura) vieron un incremento promedio de precisión del 12.3\% sobre el LLM directo y mejoras del \textasciitilde{}6\% respecto a RAG con grafos tradicionales. Además, obtuvieron un +35.5\% de desempeño frente a RAG estándar en evaluación selectiva, confirmando la robustez de su método para consultas complejas. Por otro lado, Reuter et al. (2025) destacan que la fragmentación del texto legal puede obviar contexto global; proponen Summary-Augmented Chunking para enriquecer cada segmento con un resumen sintético, mejorando la recuperación (precisión/recall del contexto) y reduciendo las incoherencias de contexto. En el dominio agrícola normativo, Li et al. (2026) introducen AgriTune-R, un protocolo integral (adaptación LoRA, RAG, verificación experta) para LLM agrarios. Aunque es un marco metodológico sin resultados cuantitativos publicados, enfatiza la trazabilidad y consistencia de fuentes en explicaciones de políticas agrícolas.
+
+Ninguno de estos trabajos afirma que RAG elimine las alucinaciones; todos tratan la reducción de información incorrecta como hipótesis a validar. Los hallazgos disponibles indican mejoras sustanciales en métricas de fidelidad o exactitud, pero dependen del dominio y de la calidad de los componentes de RAG. En muchos casos se carece de métricas estandarizadas y de pruebas con documentos normativos agrícolas concretos. Por ejemplo, el corpus RAGTruth (Zhang et al., 2024) provee un dataset para medir alucinaciones en RAG con anotaciones detalladas, pero no está especializado en la documentación PAC/POSEI. En conclusión, la literatura sugiere que RAG puede aumentar la fidelidad de las respuestas, pero subraya la necesidad de evaluarlo rigurosamente en el contexto normativo agrícola mediante métricas cuantitativas.
+
+\section{Métricas de evaluación en sistemas RAG (definición formal de RAGAS: fidelidad, relevancia de respuesta, precisión y exhaustividad del contexto, tasa de alucinaciones, calidad de citación).}
+La evaluación de arquitecturas RAG requiere métricas que consideren tanto la recuperación documental como la generación de respuestas. El marco RAGAS (Retrieval-Augmented Generation Assessment) propone métricas específicas para sistemas RAG, basadas en la comprobación de la coherencia factual y la relevancia sin necesidad de respuestas de referencia. A continuación, se definen formalmente las métricas empleadas en este estudio, orientadas al dominio normativo agrícola (PAC/POSEI): Fidelidad (Faithfulness), Relevancia de la respuesta (Answer Relevancy), Precisión del contexto (Context Precision), Exhaustividad del contexto (Context Recall), Tasa de alucinaciones (Hallucination Rate) y Calidad de la citación. Cada métrica se calculará en un rango normalizado [0,1] y permitirá comparar cuantitativamente el modelo base (LLM sin RAG) con la arquitectura RAG propuesta.
+
+\begin{itemize}\item Fidelidad (Faithfulness): Mide la consistencia factual de la respuesta generada respecto al contexto recuperado. Se define como la proporción de afirmaciones en la respuesta que pueden inferirse de los fragmentos normativos recuperados. Formalmente, si (A) es la respuesta generada y se extraen de ella (|A|) afirmaciones, de las cuales (|A\_f|) están documentadas en el contexto, entonces.\end{itemize}
+\begin{itemize}\item Relevancia de la respuesta (Answer Relevancy): Evalúa cuán pertinente es la respuesta con respecto a la pregunta formulada. Se calcula generando (N) preguntas inversas () a partir de la respuesta producida, y midiendo la similitud semántica con la pregunta original. Formalmente, usando los vectores de embedding () de cada pregunta generada y (E\_o) de la pregunta original, se define:\end{itemize}
+Donde ) es la similitud coseno. Valores cercanos a 1 indican que la respuesta aborda directamente el contenido de la pregunta normativa original, mientras que valores bajos señalan respuestas incompletas o tangenciales.
+
+\begin{itemize}\item Precisión del contexto (Context Precision): Mide la proporción de fragmentos recuperados que son relevantes para responder la consulta. Sea (el conjunto ordenado de (K) fragmentos recuperados de la normativa (PAC/POSEI). Definimos\end{itemize}
+\begin{itemize}\item Aquí, () es el número de fragmentos relevantes entre los (k) primeros. Entonces la Precisión del Contexto se define como\end{itemize}
+\begin{itemize}\item que se normaliza en [0,1]. Un valor de 1 significa que los fragmentos relevantes ocupan todas las posiciones superiores (es decir, no hay ruido documental antes que los textos útiles).\end{itemize}
+\begin{itemize}\item Exhaustividad del contexto (Context Recall): Evalúa qué fracción de las afirmaciones necesarias para la respuesta (según la respuesta de referencia o ``ground truth'' normativa) aparece en el contexto recuperado. Sea (G) el conjunto de afirmaciones relevantes definidas por la fuente normativa, y () el subconjunto atribuido al contexto recuperado. EntoncesEste valor en [0,1] es 1 si el contexto contiene todas las afirmaciones clave necesarias. La métrica destaca si falta información normativa esencial en la recuperación: una baja exhaustividad suele derivar en respuestas incompletas o tendientes a compensar con alucinaciones.\end{itemize}
+Tasa de alucinaciones (Hallucination Rate): Mide la proporción de respuestas que incluyen contenido no sustentado en la normativa. Definimos la tasa al nivel de respuestas como:
+
+Calidad de citación: Asegura la trazabilidad documental requerida en entornos regulados. Se emplean dos métricas complementarias inspiradas en evaluaciones industriales:
+
+Precisión de cita (Citation Precision): proporción de referencias citadas correctamente entre todas las citas generadas. Formalmente, , donde () es el número de citas con documento, sección y página exactamente coincidentes con la evidencia normativa. Un valor de 1 indica que todas las citas son correctas.
+
+Cobertura de cita (Citation Coverage): proporción de la información de la respuesta de referencia que está soportada por al menos una cita. Esta métrica, aproximando el ``recall'' de las citas, mide en qué grado las citas abarcan la evidencia necesaria.
+
+
+

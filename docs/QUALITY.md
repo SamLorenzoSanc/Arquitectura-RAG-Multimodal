@@ -22,9 +22,8 @@ cd gateway
 uv sync --group dev
 $env:PYTHONPATH = (Get-Location).Path
 uv run pytest -q tests/unit -m unit --confcutdir=tests/unit `
-  --cov=services.geo_polygon `
   --cov=services.evaluation_metrics `
-  --cov=services.farmer_context_service `
+  --cov=services.rag_dataset_service `
   --cov-report=term-missing `
   --cov-report=xml:coverage.xml `
   --cov-report=html:htmlcov `

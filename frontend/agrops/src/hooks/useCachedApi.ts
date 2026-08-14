@@ -3,18 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/api";
 import KnowledgeService from "@/services/knowledge.service";
 import TenantService from "@/services/tenant.service";
+import DocumentService from "@/services/document.service";
 import {
-  createCrops,
-  createTreatment,
-  deleteCrop,
-  deleteTreatment,
-  fetchCrops,
-  fetchDocuments,
-  updateCrop,
-  type CropFinca,
-  type CropTreatment,
-} from "@/services/crops.service";
-import RecogidaService from "@/services/recogida.service";
+  createNotebookEntry,
+  deleteNotebookEntry,
+  fetchNotebookEntries,
+  updateNotebookEntry,
+  type FieldNotebookPayload,
+} from "@/services/notebook.service";
 import { queryKeys } from "@/lib/queryKeys";
 import type { DocumentItem } from "@/types/document";
 
@@ -29,8 +25,9 @@ export function useKnowledgeBases(orgId: string | undefined) {
 export function useDocuments(kbId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.documents(kbId || ""),
-    queryFn: () => fetchDocuments(kbId!),
+    queryFn: () => DocumentService.list(kbId!),
     enabled: Boolean(kbId),
+    placeholderData: (previous) => previous,
   });
 }
 
@@ -43,119 +40,6 @@ export function useInvalidateDocuments() {
       }
       return qc.invalidateQueries({ queryKey: ["documents"] });
     },
-    [qc],
-  );
-}
-
-export function useCrops(includeTreatments = true) {
-  return useQuery({
-    queryKey: [...queryKeys.crops, includeTreatments ? "with-tx" : "basic"],
-    queryFn: () => fetchCrops({ includeTreatments }),
-  });
-}
-
-export function useCreateCrops() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (payload: CropFinca | CropFinca[]) => createCrops(payload),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.crops });
-    },
-  });
-}
-
-export function useUpdateCrop() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Partial<CropFinca> }) =>
-      updateCrop(id, payload),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.crops });
-    },
-  });
-}
-
-export function useDeleteCrop() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => deleteCrop(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.crops });
-    },
-  });
-}
-
-export function useCreateTreatment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      cropId,
-      payload,
-    }: {
-      cropId: string;
-      payload: CropTreatment;
-    }) => createTreatment(cropId, payload),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.crops });
-    },
-  });
-}
-
-export function useDeleteTreatment() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      cropId,
-      treatmentId,
-    }: {
-      cropId: string;
-      treatmentId: string;
-    }) => deleteTreatment(cropId, treatmentId),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.crops });
-    },
-  });
-}
-
-export function useRecogidaMapa() {
-  return useQuery({
-    queryKey: queryKeys.recogidaMapa,
-    queryFn: () => RecogidaService.getMapa(false),
-  });
-}
-
-export function useRefreshRecogidaMapa() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => RecogidaService.getMapa(true),
-    onSuccess: (data) => {
-      qc.setQueryData(queryKeys.recogidaMapa, data);
-    },
-  });
-}
-
-export function useLogisticsBundle() {
-  return useQuery({
-    queryKey: ["logistics", "bundle"] as const,
-    queryFn: async () => {
-      const [shipmentsRes, catalogRes, fleetRes] = await Promise.all([
-        api.get("/logistics/shipments"),
-        api.get("/logistics/catalog/agricultural-options"),
-        api.get("/logistics/fleet"),
-      ]);
-      return {
-        shipments: shipmentsRes.data,
-        catalog: catalogRes.data,
-        fleet: fleetRes.data,
-      };
-    },
-  });
-}
-
-export function useInvalidateLogistics() {
-  const qc = useQueryClient();
-  return useCallback(
-    () => qc.invalidateQueries({ queryKey: ["logistics"] }),
     [qc],
   );
 }
@@ -217,34 +101,62 @@ export function useKnowledgeMap(
   });
 }
 
-/** Prefetch de lecturas del panel (trabajo diario, ops, admin, labs). */
+export function useFieldNotebook(
+  orgId: string | undefined,
+  dateFrom: string,
+  dateTo: string,
+) {
+  return useQuery({
+    queryKey: queryKeys.fieldNotebook(orgId || "none", dateFrom, dateTo),
+    queryFn: () =>
+      fetchNotebookEntries({
+        organizationId: orgId,
+        dateFrom,
+        dateTo,
+      }),
+    enabled: Boolean(dateFrom && dateTo),
+  });
+}
+
+export function useCreateNotebookEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: FieldNotebookPayload) => createNotebookEntry(payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["field-notebook"] });
+    },
+  });
+}
+
+export function useUpdateNotebookEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: Partial<FieldNotebookPayload>;
+    }) => updateNotebookEntry(id, payload),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["field-notebook"] });
+    },
+  });
+}
+
+export function useDeleteNotebookEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteNotebookEntry(id),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["field-notebook"] });
+    },
+  });
+}
 export function usePrefetchDashboard(orgId: string | undefined) {
   const qc = useQueryClient();
   return useCallback(async () => {
     const jobs: Promise<unknown>[] = [
-      qc.prefetchQuery({
-        queryKey: [...queryKeys.crops, "with-tx"],
-        queryFn: () => fetchCrops({ includeTreatments: true }),
-      }),
-      qc.prefetchQuery({
-        queryKey: queryKeys.recogidaMapa,
-        queryFn: () => RecogidaService.getMapa(false),
-      }),
-      qc.prefetchQuery({
-        queryKey: ["logistics", "bundle"] as const,
-        queryFn: async () => {
-          const [shipmentsRes, catalogRes, fleetRes] = await Promise.all([
-            api.get("/logistics/shipments"),
-            api.get("/logistics/catalog/agricultural-options"),
-            api.get("/logistics/fleet"),
-          ]);
-          return {
-            shipments: shipmentsRes.data,
-            catalog: catalogRes.data,
-            fleet: fleetRes.data,
-          };
-        },
-      }),
       qc.prefetchQuery({
         queryKey: queryKeys.chromaDocuments,
         queryFn: async () => {
@@ -298,11 +210,11 @@ export function usePrefetchDashboard(orgId: string | undefined) {
       if (kbId) {
         await qc.prefetchQuery({
           queryKey: queryKeys.documents(kbId),
-          queryFn: () => fetchDocuments(kbId),
+          queryFn: () => DocumentService.list(kbId),
         });
       }
     }
   }, [qc, orgId]);
 }
 
-export type { DocumentItem, CropFinca, CropTreatment };
+export type { DocumentItem };

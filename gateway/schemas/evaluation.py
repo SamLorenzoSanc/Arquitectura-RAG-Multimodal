@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, Any, Literal
 
 
@@ -20,6 +20,14 @@ class SimulatorSearchRequest(BaseModel):
     question: str
     knowledge_base_id: str | None = None
     evaluation_mode: bool = False
+    distance_metric: Literal[
+        "cosine",
+        "euclidean",
+        "manhattan",
+        "inner_product",
+        "l1",
+        "l2",
+    ] = "cosine"
 
 
 class SimulatorFlags(BaseModel):
@@ -30,10 +38,20 @@ class SimulatorFlags(BaseModel):
 class SimulatorSaveRequest(BaseModel):
     question: str
     selected_chunk_ids: list[str] = Field(default_factory=list)
+    selected_chunk_id: str | None = None
     keywords: list[str] = Field(default_factory=list)
     reference_answer: str | None = None
     category: str | None = None
-    flags: SimulatorFlags
+    flags: SimulatorFlags = Field(default_factory=SimulatorFlags)
+
+    @model_validator(mode="after")
+    def merge_selected_chunk(self):
+        if (
+            self.selected_chunk_id
+            and self.selected_chunk_id not in self.selected_chunk_ids
+        ):
+            self.selected_chunk_ids = [*self.selected_chunk_ids, self.selected_chunk_id]
+        return self
 
 
 class EvaluationConfig(BaseModel):
@@ -62,6 +80,7 @@ class DatasetEvaluationRequest(BaseModel):
     reranker_batch_size: int = Field(default=16, ge=1)
     split: Literal["dev", "holdout", "all"] = "dev"
     evaluation_mode: bool = True
+    force: bool = False
     similarity_strategy: str | None = None
     reranking_strategy: str | None = None
     agentic_rag_enabled: bool = False
@@ -71,6 +90,9 @@ class DatasetEvaluationRequest(BaseModel):
         "cosine",
         "euclidean",
         "inner_product",
+        "manhattan",
+        "l1",
+        "l2",
     ] = "cosine"
 
 
@@ -104,6 +126,7 @@ class DatasetEvaluationResponse(BaseModel):
 class AnswerEvaluation(BaseModel):
     feedback: str
     accuracy: float = Field(ge=1, le=5)
+    precision: float = Field(ge=1, le=5, default=3)
     completeness: float = Field(ge=1, le=5)
     relevance: float = Field(ge=1, le=5)
     faithfulness: float = Field(ge=1, le=5)
@@ -116,18 +139,59 @@ class AnswerEvaluation(BaseModel):
 class EvaluationHistoryItem(BaseModel):
     id: int
     created_at: str
-    model_name: str
+    model_name: str = ""
     embedding_model: str
-    dataset_size: int
-    top_k: int
-    recall_1: float
-    recall_k: float
-    mrr: float
-    false_positives: int
-    failures: int
-    duration_ms: float
-    status: str
+    distance_metric: str = "cosine"
+    dataset_size: int = 0
+    top_k: int = 10
+    recall_1: float = 0.0
+    recall_k: float = 0.0
+    precision_at_k: float | None = None
+    ndcg: float | None = None
+    mrr: float = 0.0
+    keyword_coverage: float | None = None
+    accuracy: float | None = None
+    false_positives: int = 0
+    failures: int = 0
+    duration_ms: float = 0.0
+    status: str = "completed"
+    experiment_type: str = "retrieval_dataset"
     parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class ExperimentRunRequest(BaseModel):
+    embedding_model: str = "qwen3-embedding:latest"
+    distance_metric: Literal[
+        "cosine",
+        "euclidean",
+        "manhattan",
+        "inner_product",
+        "l1",
+        "l2",
+    ] = "cosine"
+    top_k: int = Field(default=10, ge=1)
+    knowledge_base_id: str | None = None
+    persist: bool = True
+
+
+class ExperimentCompareRequest(BaseModel):
+    embedding_models: list[str] = Field(
+        default_factory=lambda: ["qwen3-embedding:latest"]
+    )
+    distance_metrics: list[str] = Field(
+        default_factory=lambda: ["cosine", "euclidean", "manhattan"]
+    )
+    top_k: int = Field(default=10, ge=1)
+    knowledge_base_id: str | None = None
+
+
+class ExperimentCompareResponse(BaseModel):
+    runs: list[EvaluationHistoryItem]
+    best_mrr_id: int | None = None
+    note: str = (
+        "Las distancias (coseno, L2, L1) son comparables sobre el mismo embedding. "
+        "Comparar embeddings distintos es válido tras reindexar el corpus con cada modelo."
+    )
 
 
 class EvaluationResultItem(BaseModel):
@@ -146,3 +210,69 @@ class EvaluationResultItem(BaseModel):
     flag_different_info: bool
     flag_out_of_knowledge: bool
     retrieval_latency_ms: Optional[float]
+
+
+RagEvaluationField = Literal[
+    "traceId",
+    "prompt",
+    "context",
+    "response",
+    "timestamp",
+    "expected_response",
+    "expected_context",
+    "metadata",
+    "pipeline",
+    "alternate_response",
+    "code_hash",
+]
+
+
+class MetricThreshold(BaseModel):
+    operator: Literal["gte", "lte"] = "gte"
+    value: float = Field(default=0.5, ge=0, le=1)
+
+
+class EvaluationFilters(BaseModel):
+    split: Literal["dev", "holdout", "all"] = "all"
+    categories: list[str] = Field(default_factory=list)
+    statuses: list[str] = Field(default_factory=lambda: ["ready", "approved"])
+    limit: int = Field(default=100, ge=1, le=500)
+
+
+class EvaluationLabConfigCreate(BaseModel):
+    dataset_id: str
+    name: str = Field(min_length=1, max_length=255)
+    provider: Literal["ollama"] = "ollama"
+    model_name: str = Field(default="llama3.2:latest", min_length=1, max_length=255)
+    metrics: list[str] = Field(min_length=1)
+    mapping: dict[str, RagEvaluationField] = Field(default_factory=dict)
+    thresholds: dict[str, MetricThreshold] = Field(default_factory=dict)
+    filters: EvaluationFilters = Field(default_factory=EvaluationFilters)
+
+    @model_validator(mode="after")
+    def unique_metrics(self):
+        self.metrics = list(dict.fromkeys(self.metrics))
+        return self
+
+
+class EvaluationLabConfigUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    model_name: str | None = Field(default=None, min_length=1, max_length=255)
+    metrics: list[str] | None = Field(default=None, min_length=1)
+    mapping: dict[str, RagEvaluationField] | None = None
+    thresholds: dict[str, MetricThreshold] | None = None
+    filters: EvaluationFilters | None = None
+
+
+class EvaluationLabRunRequest(BaseModel):
+    force: bool = False
+
+
+class EvaluationMetricDefinition(BaseModel):
+    id: str
+    name: str
+    description: str
+    category: Literal["prompt", "context", "response", "text"]
+    required_fields: list[str]
+    default_threshold: MetricThreshold
+    engine: str

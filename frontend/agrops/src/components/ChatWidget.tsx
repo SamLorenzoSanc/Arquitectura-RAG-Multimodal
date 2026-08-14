@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useLocation } from "react-router-dom";
 import {
-  FileText,
   Loader2,
   MessageCircle,
   Send,
@@ -12,32 +11,15 @@ import {
 } from "lucide-react";
 import ChatService from "@/services/chat.service";
 import { useOrganization } from "@/context/OrganizationContext";
-import { useDocuments, useKnowledgeBases } from "@/hooks/useCachedApi";
 import type { Message } from "@/types/chat";
-import type { DocumentItem } from "@/types/document";
-
-function docLabel(doc: DocumentItem) {
-  return (doc.title || doc.filename || "documento")
-    .replace(/\.pdf$/i, "")
-    .replace(/[_-]+/g, " ")
-    .trim();
-}
 
 const FARMER_STARTERS = [
-  "Tengo goteros taponados: ¿cómo los limpio paso a paso y qué recambios llevo?",
-  "¿Cómo podo el plátano y qué herramientas necesito?",
-  "La cámara no mantiene el frío: ¿qué reviso y qué piezas pueden fallar?",
-  "Hay manchas en hoja: ¿cómo identifico la plaga y qué tratamiento aplico?",
-  "¿Cuál es el procedimiento de carga a reefer y qué controles de frío hago?",
+  "Las hojas se están poniendo amarillas: ¿qué puede ser y qué hago?",
+  "El riego no llega igual a todas las plantas: ¿cómo lo reviso?",
+  "Veo manchas o insectos en la hoja: ¿cómo identifico la plaga y cómo la trato?",
+  "¿Cómo deshijo el plátano paso a paso y con qué herramientas?",
+  "Las plantas se marchitan con el calor o el viento: ¿qué hago ahora?",
 ];
-
-function suggestionsFromDocuments(docs: DocumentItem[]): string[] {
-  const fromTitles = docs.slice(0, 2).map(
-    (doc) =>
-      `Según ${docLabel(doc)}, ¿cuál es el procedimiento y qué herramientas o recambios indica?`,
-  );
-  return [...fromTitles, ...FARMER_STARTERS].slice(0, 5);
-}
 
 function relatedFromResponse(
   related?: string[] | null,
@@ -51,7 +33,6 @@ function relatedFromResponse(
 
 export default function ChatWidget() {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const { selectedOrg } = useOrganization();
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState("");
@@ -59,35 +40,21 @@ export default function ChatWidget() {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [relatedQuestions, setRelatedQuestions] = useState<string[]>([]);
-  const [knowledgeBaseId, setKnowledgeBaseId] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: kbs } = useKnowledgeBases(selectedOrg?.id);
-  const { data: documents } = useDocuments(knowledgeBaseId || undefined);
-
   const hideOnFullChat = pathname.startsWith("/dashboard/chat");
-
-  useEffect(() => {
-    if (kbs?.length && !knowledgeBaseId) {
-      setKnowledgeBaseId(kbs[0].id);
-    }
-  }, [kbs, knowledgeBaseId]);
 
   useEffect(() => {
     setMessages([]);
     setConversationId(null);
     setRelatedQuestions([]);
-    setKnowledgeBaseId("");
   }, [selectedOrg?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading, open]);
 
-  const starterQuestions = useMemo(
-    () => suggestionsFromDocuments(documents ?? []),
-    [documents],
-  );
+  const starterQuestions = FARMER_STARTERS;
 
   const visibleRelated =
     relatedQuestions.length > 0 ? relatedQuestions : starterQuestions;
@@ -116,7 +83,6 @@ export default function ChatWidget() {
           role: msg.role,
           content: msg.content,
         })),
-        knowledge_base_id: knowledgeBaseId || undefined,
         organization_id: selectedOrg.id,
         organization_name: selectedOrg.name,
         use_rag: true,
@@ -136,6 +102,7 @@ export default function ChatWidget() {
             source: chunk.metadata?.source || chunk.metadata?.title,
             snippet: chunk.page_content?.slice(0, 160),
           })),
+          pendingReview: Boolean(response.review_id),
         },
       ]);
       setRelatedQuestions(
@@ -177,15 +144,9 @@ export default function ChatWidget() {
               </p>
               <p className="mt-0.5 truncate text-[11px] text-white/80">
                 {selectedOrg
-                  ? `Problemas de campo · ${selectedOrg.name}`
+                  ? `Toda la documentación y datasets · ${selectedOrg.name}`
                   : "Selecciona una organización"}
               </p>
-              {(documents?.length ?? 0) > 0 && (
-                <p className="mt-1 flex items-center gap-1 text-[10px] text-white/75">
-                  <FileText size={11} />
-                  {documents!.length} documento{documents!.length === 1 ? "" : "s"}
-                </p>
-              )}
             </div>
             <div className="flex shrink-0 gap-1">
               <button
@@ -214,25 +175,13 @@ export default function ChatWidget() {
             {messages.length === 0 && (
               <div className="rounded-xl border border-slate-200 bg-white p-3">
                 <p className="text-xs font-semibold text-slate-800">
-                  Describe el problema de tu finca
+                  Cuéntame qué te está pasando en la finca
                 </p>
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                  Te devolveré el procedimiento paso a paso, datos técnicos y las
-                  herramientas o recambios necesarios. Usa una sugerencia o escribe
-                  lo que te está pasando.
+                  Consulta normativa, manuales, datasets y el resto del corpus
+                  de la organización. El asistente busca en todas las bases de
+                  conocimiento.
                 </p>
-                {(documents?.length ?? 0) === 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOpen(false);
-                      navigate("/dashboard/documentation");
-                    }}
-                    className="mt-3 text-[11px] font-semibold text-blue-700 hover:underline"
-                  >
-                    Ir a Documentación para subir archivos
-                  </button>
-                )}
               </div>
             )}
 
@@ -246,6 +195,11 @@ export default function ChatWidget() {
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
+                {msg.role === "assistant" && msg.pendingReview && (
+                  <p className="mt-2 text-[10px] font-semibold text-amber-700">
+                    En cola de validación humana
+                  </p>
+                )}
                 {msg.role === "assistant" && msg.sources && msg.sources.length > 0 && (
                   <p className="mt-2 border-t border-slate-100 pt-1.5 text-[10px] text-slate-500">
                     Fuentes:{" "}
@@ -297,7 +251,7 @@ export default function ChatWidget() {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={
                 selectedOrg
-                  ? "Describe el problema (riego, plaga, frío, maquinaria…)"
+                  ? "Ej. hojas amarillas, riego irregular, manchas en hoja…"
                   : "Selecciona una organización"
               }
               disabled={isLoading || !selectedOrg}

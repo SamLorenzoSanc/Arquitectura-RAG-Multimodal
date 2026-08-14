@@ -7,6 +7,7 @@ import {
 } from "react";
 import { jwtDecode } from "jwt-decode";
 import { login as loginService } from "@/services/auth.service";
+import AccountService from "@/services/account.service";
 import api from "@/api";
 
 interface JwtPayload {
@@ -20,6 +21,12 @@ export interface User {
   name: string;
   email: string;
   exp: number;
+  isAdmin: boolean;
+  jobTitle?: string | null;
+  phone?: string | null;
+  island?: string | null;
+  hasAvatar?: boolean;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextType {
@@ -28,6 +35,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (patch: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -38,11 +46,26 @@ async function loadCurrentUser(token: string): Promise<User> {
     headers: { Authorization: `Bearer ${token}` },
   });
 
+  let avatarUrl: string | null = null;
+  if (data.has_avatar) {
+    try {
+      avatarUrl = await AccountService.avatarObjectUrl();
+    } catch {
+      avatarUrl = null;
+    }
+  }
+
   return {
     id: decoded.sub,
     exp: decoded.exp,
     email: data.email,
     name: data.name,
+    isAdmin: Boolean(data.is_admin),
+    jobTitle: data.job_title,
+    phone: data.phone,
+    island: data.island,
+    hasAvatar: Boolean(data.has_avatar),
+    avatarUrl,
   };
 }
 
@@ -95,8 +118,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   function logout() {
     localStorage.removeItem("token");
     sessionStorage.removeItem("token");
+    setUser((current) => {
+      if (current?.avatarUrl) URL.revokeObjectURL(current.avatarUrl);
+      return null;
+    });
     setToken(null);
-    setUser(null);
+  }
+
+  function updateUser(patch: Partial<User>) {
+    setUser((current) => {
+      if (!current) return current;
+      if (
+        patch.avatarUrl &&
+        current.avatarUrl &&
+        patch.avatarUrl !== current.avatarUrl
+      ) {
+        URL.revokeObjectURL(current.avatarUrl);
+      }
+      return { ...current, ...patch };
+    });
   }
 
   return (
@@ -106,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         login,
         logout,
+        updateUser,
         isAuthenticated: !!token,
       }}
     >

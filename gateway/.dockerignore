@@ -21,8 +21,10 @@ htmlcov/
 .env.*
 !.env.example
 
-# Datos / artefactos locales (runtime, no imagen)
-storage/
+# Datos / artefactos locales (runtime, no imagen).
+# El paquete Python storage/*.py debe entrar en la imagen.
+uploads/
+storage/**/*.pdf
 chroma_db/
 out/
 *.sqlite

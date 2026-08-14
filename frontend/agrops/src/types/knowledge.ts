@@ -15,6 +15,7 @@ export interface KnowledgeNode {
     y: number;
     weight?: number;
     group?: string;
+    has_embedding?: boolean;
 }
 
 

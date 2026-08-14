@@ -1,0 +1,18 @@
+campo,Nombre,Descripción,Tipo,Codificación (si procede),Observaciones
+denominacion,Denominación,Denominación de la Sociedad Agraria de Transformación.,Texto,,
+nif,NIF,"Número de identificación fiscal de la Sociedad Agraria de Transformación.
+Tener en cuenta que el código ""_U"" se usa para indicar que se trata de un dato desconocido.",Texto,,
+objeto_social_principal_id,Código del objeto social principal,Código del objetos social principal represetado por un ítem de la clasificación CL_CNAE_93_REV_1 (v1.0) publicada por el Instituto Canario de Estadística (ISTAC). ,Codificado,CL_CNAE_93_REV_1,
+objeto_social_principal_nombre,Nombre del objeto social principal,Nombre del objeto social principal que corresponde al nombre de los códigos de la CNAE 93 Rev.1,Texto,,
+ambito_id,Código del ámbito geográfico,Código que identifica el ámbito geográfico asociado a cada Sociedad Agraria de Transformación. Se han usado los códigos de la clasificación CL_GRANULARIDADES_GEOGRAFICAS (v2.1) publicada por el  Instituto Canario de Estadística (ISTAC).,Codificado,CL_GRANULARIDADES_GEOGRAFICAS,
+ambito_nombre,Nombre del ámbito geográfico,Nombre del ámbito geográfico asociado a cada Sociedad Agraria de Transformación.,Texto,,
+clase_responsabilidad,Clase de responsabilidad,Se distingue entre responsabilidad limitada e ilimitada.,Texto,,
+duracion,Duración,Se distingue entre duración limitada e ilimitada.,Texto,,
+numero_socios,Número de socios,Corresponde al número de socios que pertenecen a cada Sociedad Agraria de Transformación.,Texto,,
+situacion,Situación,"Una Sociedad Agraria de Transformación puede estar activa, cancelada, en baja provisional o en liquidación.",Texto,,
+direccion,Dirección,Dirección de las Sociedades Agrarias de Transformación.,Texto,,
+direccion_codigo_postal,Dirección:código postal,Código postal.,Texto,,
+direccion_municipio_id,Dirección: código del municipio,Código del municipio represetado por un ítem de la clasificación territorial CL_AREA_ES (v3.0) publicada por el Instituto Canario de Estadística (ISTAC).,Codificado,CL_AREA_ES,
+direccion_municipio_nombre,Dirección: nombre del municipio,Nombre del municipio.,Texto,,
+direccion_provincia_id,Dirección: código de la provincia,Código de la provincia represetado por un ítem de la clasificación territorial CL_AREA_ES (v3.0) publicada por el Instituto Canario de Estadística (ISTAC).,Codificado,CL_AREA_ES,
+direccion_provincia_nombre,Dirección: nombre de la provincia,Nombre de la provincia.,Texto,,

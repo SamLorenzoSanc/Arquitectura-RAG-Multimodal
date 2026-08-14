@@ -14,6 +14,8 @@ import { usePrefetchDashboard } from "@/hooks/useCachedApi";
 function DashboardShell() {
   const { pathname } = useLocation();
   const isChat = pathname.startsWith("/dashboard/chat");
+  const isGraph = pathname.startsWith("/dashboard/knowledge-graph");
+  const immersive = isChat || isGraph;
   const { selectedOrg } = useOrganization();
   const prefetch = usePrefetchDashboard(selectedOrg?.id);
 
@@ -27,22 +29,26 @@ function DashboardShell() {
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header />
         <main
-          className={`min-w-0 flex-1 min-h-0 px-3 py-3 sm:px-5 sm:py-4 lg:px-6 ${
-            isChat ? "flex flex-col overflow-hidden" : "overflow-y-auto"
+          className={`min-w-0 flex-1 min-h-0 ${
+            immersive
+              ? `flex flex-col overflow-hidden ${isGraph ? "p-0" : "px-3 py-3 sm:px-5 sm:py-4"}`
+              : "overflow-y-auto px-3 py-3 sm:px-5 sm:py-4 lg:px-6"
           }`}
         >
           <div
-            className={`mx-auto flex w-full max-w-[1400px] ${
-              isChat
-                ? "min-h-0 flex-1 flex-col overflow-hidden"
-                : "min-h-0 flex-1 flex-col"
+            className={`flex w-full ${
+              isGraph
+                ? "h-full min-h-0 max-w-none flex-1 flex-col overflow-hidden"
+                : immersive
+                  ? "mx-auto min-h-0 max-w-[1400px] flex-1 flex-col overflow-hidden"
+                  : "mx-auto min-h-0 max-w-[1400px] flex-1 flex-col"
             }`}
           >
             <DashboardKeepAlive />
           </div>
         </main>
       </div>
-      <ChatWidget />
+      {!isGraph && <ChatWidget />}
     </div>
   );
 }

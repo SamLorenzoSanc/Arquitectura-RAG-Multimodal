@@ -5,7 +5,6 @@ from . import (
     department,
     document,
     embedded_chunk,
-    forecast,
     health,
     knowledge_base,
     metrics,

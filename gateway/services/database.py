@@ -14,14 +14,32 @@ DATABASE_URL = os.getenv(
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
 
-# 1. Motor async
+# Motor async (API). pool_pre_ping + recycle evitan conexiones huérfanas tras
+# reinicios de Postgres / Docker Desktop en Windows.
 engine = create_async_engine(
-    DATABASE_URL, pool_pre_ping=True, pool_size=10, max_overflow=20
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=300,
+    pool_timeout=30,
+    connect_args={
+        "timeout": 10,
+        "command_timeout": 60,
+        "server_settings": {"application_name": "agrops-api"},
+    },
 )
 
-sync_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+# Motor sync solo si hace falta (p. ej. scripts). asyncpg no sirve aquí.
+_SYNC_URL = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://", 1)
+sync_engine = create_engine(
+    _SYNC_URL,
+    pool_pre_ping=True,
+    pool_recycle=300,
+    pool_size=2,
+    max_overflow=5,
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=sync_engine)
-
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -31,7 +49,6 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
-# 3. Dependencia para las rutas
 async def get_db():
     """Cede una AsyncSession por petición y la cierra al terminar."""
     async with AsyncSessionLocal() as db:

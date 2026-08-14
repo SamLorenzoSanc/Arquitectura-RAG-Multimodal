@@ -63,10 +63,6 @@ class ChatRequest(BaseModel):
     use_rag: bool = True
     # Comparación controlada Hybrid vs Agentic
     rag_mode: Literal["hybrid", "agentic", "compare"] = "hybrid"
-    island: Optional[str] = "La_Palma"
-    crop: Optional[str] = "platano_canarias"
-    # Parcela estructurada del agricultor (prioridad sobre crop/island)
-    crop_id: Optional[str] = None
 
 
 class ModeComparisonSide(BaseModel):
@@ -92,7 +88,7 @@ class ChatResponse(BaseModel):
     architecture: str | None = None
     agent_trace: list[dict] | None = None
     comparison: dict[str, Any] | None = None
-    farmer_profile: dict[str, Any] | None = None
+    review_id: str | None = None
 
 
 class Result(BaseModel):

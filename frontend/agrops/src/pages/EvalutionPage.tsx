@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "@/api";
 import { useOrganization } from "@/context/OrganizationContext";
 import {
   useEvaluationTests,
   useKnowledgeBases,
 } from "@/hooks/useCachedApi";
+import AnnotatePanel from "@/components/evaluation/AnnotatePanel";
+import BankPanel from "@/components/evaluation/BankPanel";
+import ExperimentHistory from "@/components/evaluation/ExperimentHistory";
+import ConfigurableEvaluationLab from "@/components/evaluation/ConfigurableEvaluationLab";
+import { categoryLabel } from "@/components/evaluation/labels";
+import ValidacionHumanaPage from "@/pages/ValidacionHumanaPage";
 import { 
   BarChart, 
   Bar, 
@@ -18,12 +25,22 @@ import {
   ResponsiveContainer 
 } from "recharts";
 
+type EvalTab = "anotar" | "banco" | "metricas" | "validacion";
+
+const EVAL_TABS: { id: EvalTab; label: string }[] = [
+  { id: "anotar", label: "Anotar" },
+  { id: "banco", label: "Banco" },
+  { id: "metricas", label: "Métricas" },
+  { id: "validacion", label: "Validación humana" },
+];
+
 type TestItem = {
   id: number;
   question: string;
   keywords: string[];
   reference_answer: string;
   category: string;
+  source?: string;
 };
 
 type RetrievalResult = {
@@ -92,7 +109,7 @@ function getAnswerMetric(item: AnswerResult | undefined | null, metric: string):
 
   const metricAliases: Record<string, string[]> = {
     accuracy: ["accuracy", "punteria", "accuracy_score", "score"],
-    precision: ["precision", "sin_paja", "precision_score"],
+    precision: ["precision", "sin_paja", "precision_score", "faithfulness"],
     completeness: ["completeness", "exhaustividad", "completeness_score"],
     relevance: ["relevance", "utilidad", "relevance_score"],
     faithfulness: ["faithfulness", "fidelidad"],
@@ -122,14 +139,19 @@ function getFeedbackText(item: AnswerResult | undefined | null): string {
   return item.evaluation?.feedback || item.feedback || "";
 }
 
-/** Escala 1-5 → %; 0-1 → %; >5 se trata como % ya. */
+/**
+ * Convierte una métrica a porcentaje.
+ * 0–1 (MRR, nDCG, citas) se multiplica por 100; 1–5 (juez Likert) se escala;
+ * valores >5 se interpretan ya como porcentaje.
+ */
 function getSafePercentage(value: number): number {
+  if (value === 0) return 0;
   if (!value || isNaN(value)) return 0;
   let scaled: number;
-  if (value > 0 && value <= 5) {
-    scaled = (value / 5) * 100;
-  } else if (value <= 1) {
+  if (value > 0 && value <= 1) {
     scaled = value * 100;
+  } else if (value <= 5) {
+    scaled = (value / 5) * 100;
   } else {
     scaled = value;
   }
@@ -144,6 +166,15 @@ function getUnitPercentage(value: number): number {
 
 export default function AuditPage() {
   const { selectedOrg } = useOrganization();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const tab: EvalTab = EVAL_TABS.some((item) => item.id === tabParam)
+    ? (tabParam as EvalTab)
+    : "metricas";
+  const setTab = (next: EvalTab) => {
+    setSearchParams(next === "metricas" ? {} : { tab: next }, { replace: true });
+  };
+
   const [retrieval, setRetrieval] = useState<RetrievalResult[]>([]);
   const [answers, setAnswers] = useState<AnswerResult[]>([]);
   const [running, setRunning] = useState(false);
@@ -151,6 +182,42 @@ export default function AuditPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchFilter, setSearchFilter] = useState("");
   const [selectedKbId, setSelectedKbId] = useState("");
+  const [distanceMetric, setDistanceMetric] = useState<
+    "cosine" | "euclidean" | "manhattan"
+  >("cosine");
+  const [embeddingModel, setEmbeddingModel] = useState("qwen3-embedding:latest");
+  const [indexedModels, setIndexedModels] = useState<string[]>([
+    "qwen3-embedding:latest",
+  ]);
+  const [experiments, setExperiments] = useState<
+    Array<{
+      id: number;
+      created_at: string;
+      embedding_model: string;
+      distance_metric: string;
+      dataset_size: number;
+      recall_1: number;
+      recall_k: number;
+      mrr: number;
+      ndcg?: number | null;
+      precision_at_k?: number | null;
+      keyword_coverage?: number | null;
+      accuracy?: number | null;
+      failures: number;
+      duration_ms: number;
+      experiment_type?: string;
+    }>
+  >([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [bestMrrId, setBestMrrId] = useState<number | null>(null);
+  const [datasetEval, setDatasetEval] = useState<{
+    recall_1: number;
+    recall_k: number;
+    mrr: number;
+    ndcg?: number;
+    false_positives: number;
+    failures: number;
+  } | null>(null);
 
   const {
     data: cachedTests,
@@ -170,8 +237,10 @@ export default function AuditPage() {
     const params: Record<string, string> = {};
     if (selectedOrg?.id) params.organization_id = selectedOrg.id;
     if (selectedKbId) params.knowledge_base_id = selectedKbId;
+    params.distance_metric = distanceMetric;
+    params.embedding_model = embeddingModel;
     return params;
-  }, [selectedOrg?.id, selectedKbId]);
+  }, [selectedOrg?.id, selectedKbId, distanceMetric, embeddingModel]);
 
   useEffect(() => {
     if (testsError) {
@@ -182,6 +251,120 @@ export default function AuditPage() {
   useEffect(() => {
     setSelectedKbId((prev) => prev || knowledgeBases[0]?.id || "");
   }, [knowledgeBases]);
+
+  const loadHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const [historyRes, modelsRes] = await Promise.all([
+        api.get("/chat/evaluation/experiments"),
+        api.get("/chat/evaluation/embedding-models"),
+      ]);
+      setExperiments(historyRes.data ?? []);
+      const indexed = modelsRes.data?.indexed ?? [];
+      if (indexed.length) {
+        setIndexedModels(indexed);
+        setEmbeddingModel((prev) =>
+          indexed.includes(prev) ? prev : indexed[0],
+        );
+      }
+    } catch {
+      /* el historial puede no existir aún en Render */
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "metricas") {
+      void loadHistory();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  const saveExperiment = async () => {
+    setRunning(true);
+    setRunningStep("Guardando corrida embedding × distancia…");
+    setError(null);
+    try {
+      const response = await api.post("/chat/evaluation/experiments", {
+        embedding_model: embeddingModel,
+        distance_metric: distanceMetric,
+        top_k: 10,
+        knowledge_base_id: selectedKbId || null,
+      });
+      setBestMrrId(response.data?.id ?? null);
+      await loadHistory();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(
+        typeof detail === "string"
+          ? detail
+          : "No se pudo guardar la corrida experimental.",
+      );
+    } finally {
+      setRunning(false);
+      setRunningStep(null);
+    }
+  };
+
+  const compareDistances = async () => {
+    setRunning(true);
+    setRunningStep("Comparando coseno, L2 y L1 sobre el mismo embedding…");
+    setError(null);
+    try {
+      const response = await api.post("/chat/evaluation/experiments/compare", {
+        embedding_models: [embeddingModel],
+        distance_metrics: ["cosine", "euclidean", "manhattan"],
+        top_k: 10,
+        knowledge_base_id: selectedKbId || null,
+      });
+      setBestMrrId(response.data?.best_mrr_id ?? null);
+      await loadHistory();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(
+        typeof detail === "string"
+          ? detail
+          : "No se pudo comparar distancias.",
+      );
+    } finally {
+      setRunning(false);
+      setRunningStep(null);
+    }
+  };
+
+  const compareEmbeddings = async () => {
+    const models = indexedModels.length >= 2 ? indexedModels : [embeddingModel];
+    if (models.length < 2) {
+      setError(
+        "Reindexa el corpus con al menos dos embeddings en Documentación para comparar cuál mejora al otro.",
+      );
+      return;
+    }
+    setRunning(true);
+    setRunningStep("Comparando embeddings sobre la misma distancia…");
+    setError(null);
+    try {
+      const response = await api.post("/chat/evaluation/experiments/compare", {
+        embedding_models: models,
+        distance_metrics: [distanceMetric],
+        top_k: 10,
+        knowledge_base_id: selectedKbId || null,
+      });
+      setBestMrrId(response.data?.best_mrr_id ?? null);
+      await loadHistory();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(
+        typeof detail === "string"
+          ? detail
+          : "No se pudo comparar embeddings.",
+      );
+    } finally {
+      setRunning(false);
+      setRunningStep(null);
+    }
+  };
 
   const loadTests = async () => {
     setError(null);
@@ -293,6 +476,39 @@ export default function AuditPage() {
     }
   };
 
+  const runDatasetEval = async () => {
+    setRunning(true);
+    setRunningStep("Evaluando dataset anotado (Recall/MRR sobre chunks)...");
+    setError(null);
+    try {
+      const response = await api.post("/chat/simulator/evaluate-dataset", {
+        model_name: "llama3.2:latest",
+        embedding_model: embeddingModel,
+        distance_metric: distanceMetric,
+        top_k: 5,
+        retrieval_k: 10,
+        bm25_k: 10,
+        rrf_k: 60,
+        candidate_k: 15,
+        split: "all",
+        evaluation_mode: true,
+        force: true,
+      });
+      setDatasetEval(response.data);
+      await loadHistory();
+    } catch (err: any) {
+      const detail = err.response?.data?.detail;
+      setError(
+        typeof detail === "string"
+          ? detail
+          : "No hay preguntas anotadas en retrieval_dataset o falló la evaluación.",
+      );
+    } finally {
+      setRunning(false);
+      setRunningStep(null);
+    }
+  };
+
   const averages = useMemo(() => {
     const avg = (arr: number[]) =>
       arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
@@ -319,6 +535,7 @@ export default function AuditPage() {
       (t) =>
         t.question?.toLowerCase().includes(term) ||
         t.category?.toLowerCase().includes(term) ||
+        categoryLabel(t.category).toLowerCase().includes(term) ||
         t.id.toString().includes(term)
     );
   }, [tests, searchFilter]);
@@ -378,7 +595,7 @@ export default function AuditPage() {
     });
   }, [tests, retrieval, answers]);
 
-  if (loadingTests) {
+  if (loadingTests && tab === "metricas" && tests.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="animate-pulse font-semibold text-emerald-600">
@@ -391,20 +608,59 @@ export default function AuditPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Cabecera */}
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-600">
+            Panel de Calidad RAG
+          </p>
+          <h1 className="text-3xl font-extrabold text-slate-900">
+            Evaluación RAG
+          </h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Al subir un documento se extraen preguntas de muestra; la validación
+            humana las aprueba o corrige; solo las aceptadas entran en el banco
+            de métricas.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-1">
+          {EVAL_TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTab(item.id)}
+              className={`rounded-t-xl px-4 py-2 text-sm font-semibold ${
+                tab === item.id
+                  ? "bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200"
+                  : "text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {tab === "anotar" && <AnnotatePanel />}
+        {tab === "banco" && <BankPanel />}
+        {tab === "validacion" && <ValidacionHumanaPage embedded />}
+
+        {tab === "metricas" && (
+          <>
+        <ConfigurableEvaluationLab
+          organizationId={selectedOrg?.id ?? ""}
+          initialDatasetId={searchParams.get("dataset") ?? undefined}
+        />
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.25em] text-emerald-600">
-              Panel de Calidad RAG
-            </p>
-            <h1 className="text-3xl font-extrabold text-slate-900">
-              Evaluación del Asistente ({tests.length} pruebas)
-            </h1>
+            <h2 className="text-xl font-extrabold text-slate-900">
+              Métricas del banco ({tests.length} pruebas)
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
               Scope: {selectedOrg?.name ?? "sin organización"}
               {selectedKbId
                 ? ` · KB ${knowledgeBases.find((k) => k.id === selectedKbId)?.name ?? selectedKbId}`
                 : ""}
+              {" · "}
+              embedding {embeddingModel} · distancia {distanceMetric}
             </p>
             {runningStep && (
               <p className="mt-1 animate-pulse text-xs font-semibold text-emerald-700">
@@ -414,6 +670,33 @@ export default function AuditPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={embeddingModel}
+              onChange={(e) => setEmbeddingModel(e.target.value)}
+              disabled={running}
+              title="Modelo de embeddings indexado en el corpus"
+            >
+              {indexedModels.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
+            <select
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+              value={distanceMetric}
+              onChange={(e) =>
+                setDistanceMetric(
+                  e.target.value as "cosine" | "euclidean" | "manhattan",
+                )
+              }
+              disabled={running}
+            >
+              <option value="cosine">Coseno</option>
+              <option value="euclidean">Euclídea (L2)</option>
+              <option value="manhattan">Manhattan (L1)</option>
+            </select>
             <select
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
               value={selectedKbId}
@@ -455,6 +738,34 @@ export default function AuditPage() {
             >
               Ejecutar Auditoría Completa
             </button>
+            <button
+              onClick={() => void saveExperiment()}
+              disabled={!tests.length || running}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50"
+            >
+              Guardar corrida
+            </button>
+            <button
+              onClick={() => void compareDistances()}
+              disabled={!tests.length || running}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50"
+            >
+              Comparar 3 distancias
+            </button>
+            <button
+              onClick={() => void compareEmbeddings()}
+              disabled={!tests.length || running}
+              className="rounded-xl bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800 disabled:opacity-50"
+            >
+              Comparar embeddings
+            </button>
+            <button
+              onClick={() => void runDatasetEval()}
+              disabled={running}
+              className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 disabled:opacity-50"
+            >
+              Evaluar anotaciones
+            </button>
           </div>
         </div>
 
@@ -464,6 +775,55 @@ export default function AuditPage() {
           </div>
         )}
 
+        {tests.length === 0 && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            El banco está vacío. Sube un JSON en la pestaña Banco o anota
+            chunks en Anotar. Las tarjetas permanecerán en «Pendiente» hasta
+            pulsar «Ejecutar Auditoría Completa».
+          </div>
+        )}
+
+        {datasetEval && (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <MiniStat
+              label="Recall@1"
+              value={`${Math.round((datasetEval.recall_1 || 0) * 100)}%`}
+              percentage={Math.round((datasetEval.recall_1 || 0) * 100)}
+            />
+            <MiniStat
+              label="Recall@K"
+              value={`${Math.round((datasetEval.recall_k || 0) * 100)}%`}
+              percentage={Math.round((datasetEval.recall_k || 0) * 100)}
+            />
+            <MiniStat
+              label="MRR anotado"
+              value={`${Math.round((datasetEval.mrr || 0) * 100)}%`}
+              percentage={Math.round((datasetEval.mrr || 0) * 100)}
+            />
+            <MiniStat
+              label="nDCG anotado"
+              value={`${Math.round((datasetEval.ndcg || 0) * 100)}%`}
+              percentage={Math.round((datasetEval.ndcg || 0) * 100)}
+            />
+            <MiniStat
+              label="Falsos positivos"
+              value={String(datasetEval.false_positives)}
+              percentage={datasetEval.false_positives ? 40 : 100}
+            />
+            <MiniStat
+              label="Fallos"
+              value={String(datasetEval.failures)}
+              percentage={datasetEval.failures ? 40 : 100}
+            />
+          </div>
+        )}
+
+        <ExperimentHistory
+          runs={experiments}
+          bestMrrId={bestMrrId}
+          loading={loadingHistory}
+        />
+
         {/* METRICAS PRINCIPALES (TARJETAS KPI) */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <ClientMetricCard
@@ -471,48 +831,58 @@ export default function AuditPage() {
             technicalName="MRR"
             description="¿El documento correcto apareció de primero?"
             value={averages.mrr}
+            asUnit
+            pending={retrieval.length === 0}
           />
           <ClientMetricCard
             title="Calidad de Búsqueda"
             technicalName="nDCG"
             description="¿Qué tan bien ordenados estaban los resultados?"
             value={averages.ndcg}
+            asUnit
+            pending={retrieval.length === 0}
           />
           <ClientMetricCard
             title="Puntería de Respuesta"
             technicalName="Accuracy"
             description="¿Respondió correctamente según la información oficial?"
             value={averages.accuracy}
+            pending={answers.length === 0}
           />
           <ClientMetricCard
             title="Directo / Sin Paja"
             technicalName="Precision"
             description="¿Respondió sin inventar o meter texto innecesario?"
             value={averages.precision}
+            pending={answers.length === 0}
           />
           <ClientMetricCard
             title="Exhaustividad"
             technicalName="Completeness"
             description="¿Respondió la duda completa sin omitir datos?"
             value={averages.completeness}
+            pending={answers.length === 0}
           />
           <ClientMetricCard
             title="Útil y Enfocado"
             technicalName="Relevance"
             description="¿La respuesta realmente solucionó lo consultado?"
             value={averages.relevance}
+            pending={answers.length === 0}
           />
           <ClientMetricCard
             title="Fidelidad"
             technicalName="Faithfulness"
             description="¿La respuesta se ciñe al contexto recuperado (anti-alucinación)?"
             value={averages.faithfulness}
+            pending={answers.length === 0}
           />
           <ClientMetricCard
             title="Anclaje"
             technicalName="Groundedness"
             description="¿Cada afirmación está respaldada por el contexto?"
             value={averages.groundedness}
+            pending={answers.length === 0}
           />
           <ClientMetricCard
             title="Citas"
@@ -520,6 +890,7 @@ export default function AuditPage() {
             description="¿Las referencias citadas existen en las fuentes?"
             value={averages.citation_accuracy}
             asUnit
+            pending={answers.length === 0}
           />
           <ClientMetricCard
             title="Abstención"
@@ -527,6 +898,7 @@ export default function AuditPage() {
             description="¿Se abstuvo correctamente cuando no había conocimiento?"
             value={averages.abstention}
             asUnit
+            pending={answers.length === 0}
           />
         </div>
 
@@ -646,7 +1018,7 @@ export default function AuditPage() {
                   >
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <span className="rounded-md bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-800">
-                        {test.category}
+                        {categoryLabel(test.category)}
                       </span>
                       <span className="text-xs font-semibold text-slate-400">
                         Prueba #{test.id}
@@ -692,8 +1064,8 @@ export default function AuditPage() {
               <div className="max-h-[600px] space-y-3 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-200">
                 {filteredRetrieval.map((item, idx) => {
                   const testId = item.test_id ?? item.id ?? idx + 1;
-                  const mrrVal = getSafePercentage(getRetrievalMetric(item, "mrr"));
-                  const ndcgVal = getSafePercentage(getRetrievalMetric(item, "ndcg"));
+                  const mrrVal = getUnitPercentage(getRetrievalMetric(item, "mrr"));
+                  const ndcgVal = getUnitPercentage(getRetrievalMetric(item, "ndcg"));
                   const covVal = getSafePercentage(getRetrievalMetric(item, "keyword_coverage"));
                   const accVal = getSafePercentage(getRetrievalMetric(item, "accuracy"));
                   
@@ -704,7 +1076,7 @@ export default function AuditPage() {
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                          {item.category}
+                          {categoryLabel(item.category)}
                         </span>
                         <span className="text-xs font-semibold text-slate-400">
                           Prueba #{testId}
@@ -756,7 +1128,7 @@ export default function AuditPage() {
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-800">
-                          {item.category}
+                          {categoryLabel(item.category)}
                         </span>
                         <span className="text-xs font-semibold text-slate-400">
                           Prueba #{testId}
@@ -799,6 +1171,8 @@ export default function AuditPage() {
           </Panel>
 
         </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -810,16 +1184,25 @@ function ClientMetricCard({
   description,
   value,
   asUnit = false,
+  pending = false,
 }: {
   title: string;
   technicalName: string;
   description: string;
   value: number;
   asUnit?: boolean;
+  pending?: boolean;
 }) {
   const percentage = asUnit ? getUnitPercentage(value) : getSafePercentage(value);
 
   const getStatus = (val: number) => {
+    if (pending)
+      return {
+        bg: "bg-slate-50",
+        border: "border-slate-200",
+        text: "text-slate-500",
+        badge: "Pendiente",
+      };
     if (val === 0)
       return {
         bg: "bg-rose-50",
@@ -865,7 +1248,9 @@ function ClientMetricCard({
 
       <div className="mt-4">
         <div className="flex items-baseline gap-2">
-          <p className={`text-3xl font-black ${status.text}`}>{percentage}%</p>
+          <p className={`text-3xl font-black ${status.text}`}>
+            {pending ? "—" : `${percentage}%`}
+          </p>
         </div>
         <span
           className={`mt-1 inline-block rounded-full border bg-white/80 px-2 py-0.5 text-[10px] font-bold ${status.border} ${status.text}`}

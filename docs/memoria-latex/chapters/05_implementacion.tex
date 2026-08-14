@@ -1,0 +1,39 @@
+% -*- coding: utf-8 -*-
+\chapter{Arquitectura e implementación}
+
+
+\section{Implementación del prototipo AgroPS}
+El sistema se consolidó como monolito contenedorizado (frontend React/Vite, API FastAPI, PostgreSQL/pgvector, Ollama), retirando el despliegue fragmentado en microservicios de inferencia/recuperación/ingesta como runtime obligatorio.
+
+\subsection{Componentes del hexágono RAG}
+El núcleo RAG se organiza en anillos concéntricos. El dominio (\texttt{gateway/rag/domain}) contiene entidades y reglas sin entrada/salida: fragmento recuperado, consulta, fusión RRF y expansión léxica. Los casos de uso (\texttt{gateway/rag/application}) orquestan \texttt{AnswerQuestion} (híbrido y chat sin recuperación), \texttt{IngestDocument} y la evaluación de retrieval y respuesta. Los adaptadores de salida hablan con PostgreSQL/pgvector, el índice BM25, Ollama y el Cross-Encoder. FastAPI permanece como adaptador de entrada: chat, documentos y evaluación delegan en los casos de uso a través de una fachada, sin duplicar routers.
+
+\begin{figure}[htbp]
+\centering
+\begin{verbatim}
+  FastAPI  /api/v1  (chat, documentos, evaluacion)
+                    |
+            Casos de uso RAG
+                    |
+     Dominio + puertos (sin I/O)
+        /     |      |      \
+ pgvector   BM25   Ollama  Cross-Encoder
+\end{verbatim}
+\caption{Hexágono del núcleo RAG: los adaptadores de entrada invocan casos de uso; el dominio solo conoce puertos; la infraestructura queda en adaptadores de salida.}
+\label{fig:rag-hexagon}
+\end{figure}
+
+El resto del monolito (JWT, tenants, organizaciones) no forma parte de este hexágono. El pipeline híbrido sigue siendo denso + BM25 + RRF, con reranking opcional y generación local vía Ollama. La evaluación combina métricas propias, LLM-as-a-Judge y el adaptador RAGAS (\texttt{is\_hallucination}).
+
+\section{Implementación / Resultados}
+\begin{quote}Ilustración 5 Plataforma de Gestión de Documentación\end{quote}
+\begin{quote}Ilustración 6 Gestión de la Organización\end{quote}
+\begin{quote}Ilustración 7 Componente Chat\end{quote}
+\begin{quote}Ilustración 8 Documento Interno para Testear la Pipeline de Ingesta\end{quote}
+\begin{quote}Ilustración 9 Información representada en Grafo\end{quote}
+
+\section{Alcance multimodal del prototipo}
+El corpus histórico deriva de documentos (incl. OCR) y de activos de imagen o vídeo del dominio agrícola. No obstante, \textbf{retrieval, generación y evaluación operan sobre texto y embeddings ya persistidos}. No se demuestra en esta memoria un razonamiento visual end-to-end ni una métrica multimodal independiente. Por ello se emplea el término \emph{multimodal} en sentido de corpus y producto, matizado respecto a la evaluación (textual).
+
+
+

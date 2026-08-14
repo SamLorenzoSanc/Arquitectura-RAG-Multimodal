@@ -17,7 +17,6 @@ import { useOrganization } from "@/context/OrganizationContext";
 import AvatarPanel from "@/components/AvatarPanel";
 import type { DocumentItem } from "@/types/document";
 import {
-  useCrops,
   useDocuments,
   useKnowledgeBases,
 } from "@/hooks/useCachedApi";
@@ -37,19 +36,6 @@ const OLLAMA_MODELS = [
   { id: "llama3:latest", name: "Llama 3 (Equilibrado)" },
   { id: "phi3:latest", name: "Phi-3 (Eficiente)" },
   { id: "llama3.2-vision:latest", name: "Llama 3.2 Vision (Multimodal)" },
-];
-
-const CROPS = [
-  { id: "platano_canarias", name: "Plátano" },
-  { id: "aguacate_hass", name: "Aguacate" },
-  { id: "papa_bonita", name: "Papa" },
-  { id: "tomate_canario", name: "Tomate" },
-];
-
-const ISLANDS = [
-  { id: "La_Palma", name: "La Palma" },
-  { id: "Tenerife_Norte", name: "Tenerife Norte" },
-  { id: "Gran_Canaria_Sur", name: "Gran Canaria Sur" },
 ];
 
 type RagMode = "hybrid" | "agentic" | "compare";
@@ -104,10 +90,6 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState<any[]>([]);
   const [useRag, setUseRag] = useState(true);
   const [ragMode, setRagMode] = useState<RagMode>("compare");
-  const [crop, setCrop] = useState("platano_canarias");
-  const [island, setIsland] = useState("La_Palma");
-  const [selectedCropId, setSelectedCropId] = useState<string>("");
-  const { data: farmerCrops } = useCrops(true);
   const [comparison, setComparison] = useState<{
     hybrid?: ModeComparisonSide;
     agentic?: ModeComparisonSide;
@@ -234,11 +216,8 @@ export default function ChatPage() {
   useEffect(() => {
     if (kbsCached) {
       setKbs(kbsCached);
-      if (!knowledgeBaseId && kbsCached.length > 0) {
-        setKnowledgeBaseId(kbsCached[0].id);
-      }
     }
-  }, [kbsCached, knowledgeBaseId]);
+  }, [kbsCached]);
 
   useEffect(() => {
     setDocuments(documentsCached ?? []);
@@ -251,14 +230,6 @@ export default function ChatPage() {
       setDocuments([]);
     }
   }, [selectedOrg?.id]);
-
-  useEffect(() => {
-    if (!farmerCrops?.length) return;
-    if (!selectedCropId || !farmerCrops.some((c) => c.id === selectedCropId)) {
-      const first = farmerCrops[0];
-      setSelectedCropId(first.id || "");
-    }
-  }, [farmerCrops, selectedCropId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -347,9 +318,6 @@ export default function ChatPage() {
         organization_name: selectedOrg?.name,
         use_rag: useRag,
         rag_mode: useRag ? ragMode : "hybrid",
-        island,
-        crop,
-        crop_id: selectedCropId || undefined,
         model: selectedModel,
       })
         .then((response) => {
@@ -479,6 +447,7 @@ export default function ChatPage() {
                   "El asistente no devolvió ninguna respuesta.",
             timestamp: new Date(),
             sources: [],
+            pendingReview: Boolean(response.review_id),
           };
 
           const rd = response.retrieval_details;
@@ -613,46 +582,6 @@ export default function ChatPage() {
               ))}
             </div>
 
-            <select
-              value={selectedCropId}
-              onChange={(e) => setSelectedCropId(e.target.value)}
-              className="max-w-[220px] rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-900"
-              title="Parcela operativa del agricultor"
-            >
-              {(farmerCrops || []).length === 0 && (
-                <option value="">Sin parcelas — usa cultivo/isla</option>
-              )}
-              {(farmerCrops || []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre} · {c.cultivo}
-                </option>
-              ))}
-            </select>
-            <select
-              value={crop}
-              onChange={(e) => setCrop(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
-              title="Cultivo fallback (si no hay parcela)"
-            >
-              {CROPS.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={island}
-              onChange={(e) => setIsland(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700"
-              title="Zona fallback"
-            >
-              {ISLANDS.map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name}
-                </option>
-              ))}
-            </select>
-
             {/* Selector de Modelos Ollama */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shrink-0 shadow-xs">
               <Cpu size={15} className="text-amber-600 shrink-0" />
@@ -764,17 +693,10 @@ export default function ChatPage() {
                     Asistente de campo · {selectedOrg.name}
                   </h2>
                   <p className="text-sm text-gray-500 leading-relaxed">
-                    Describe el problema de tu finca. Recibirás diagnóstico,
-                    procedimiento paso a paso, datos técnicos y las herramientas
-                    o recambios necesarios. Parcela{" "}
-                    {(farmerCrops || []).find((c) => c.id === selectedCropId)
-                      ?.nombre ||
-                      CROPS.find((c) => c.id === crop)?.name}{" "}
-                    ·{" "}
-                    {(farmerCrops || []).find((c) => c.id === selectedCropId)
-                      ?.isla ||
-                      ISLANDS.find((i) => i.id === island)?.name}
-                    .
+                    Pregunta sobre normativa, manuales, datasets o el corpus
+                    documental de la organización. El asistente busca en todas
+                    las bases de conocimiento y datasets y responde citando
+                    fuentes.
                   </p>
                 </div>
               </div>
@@ -799,6 +721,11 @@ export default function ChatPage() {
                           <p className="whitespace-pre-wrap text-sm leading-relaxed break-words">
                             {message.content}
                           </p>
+                          {message.role === "assistant" && message.pendingReview && (
+                            <p className="mt-2 text-[11px] font-semibold text-amber-700">
+                              En cola de validación humana
+                            </p>
+                          )}
                           <p
                             className={`mt-3 text-[11px] ${
                               message.role === "user"
@@ -1020,7 +947,7 @@ export default function ChatPage() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Describe el problema (riego, plaga, frío, maquinaria…)"
+              placeholder="Ej. hojas amarillas, riego irregular, manchas en hoja…"
               disabled={isLoading}
               className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-amber-500 focus:bg-white transition-all shadow-xs pr-12"
             />
