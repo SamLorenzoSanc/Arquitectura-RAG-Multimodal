@@ -33,6 +33,10 @@ AGRO_SYNONYMS: dict[str, str] = {
     "viento": "viento alisio deshoje daño tutores",
     "clorosis": "clorosis amarilleo carencia hierro nitrogeno",
     "maleza": "maleza hierba adventicia desbroce",
+    "vademecum": "vademecum vademécum fitosanitario materia activa uso autorizado",
+    "vademécum": "vademecum vademécum fitosanitario materia activa uso autorizado",
+    "fitosanitario": "fitosanitario plaguicida herbicida fungicida insecticida",
+    "bcam": "bcam condicionalidad buenas practicas agricolas pac",
 }
 
 

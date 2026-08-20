@@ -29,7 +29,7 @@ El presente trabajo se sitúa en el ámbito de la asistencia documental para el 
 
 La evaluación de los modelos de lenguaje ha abierto nuevas posibilidades para automatizar este tipo de consultas, pero también ha puesto de manifiesto una limitación estructural: el conocimiento de estos modelos no se actualiza de forma continua y no siempre está alineado con documentos internos o normativos específicos. Los estudios recientes sobre alucinaciones muestran que este problema no es anecdótico, sino una barrera central para el uso fiable de los LLMs en dominios donde la precisión factual es crítica. (Huang, 2023)
 
-Añadir, que la arquitectura RAG surge precisamente para abordar esta limitación. En lugar de depender únicamente del conocimiento paramétrico del modelo, el sistema recupera información de una base documental externa y la incorpora al proceso de generación. Esta separación entre generación y conocimiento permite mejorar la trazabilidad, actualizar el contenido sin reentrenar el modelo y limitar la respuesta a evidencia recuperada. La litera reciente también destaca que RAG, combinado con estrategias de razonamiento y recuperación bien diseñadas, es una de las líneas consolidadas para mitigar las alucinaciones en aplicaciones reales. (Li, 2025)
+Añadir, que la arquitectura RAG surge precisamente para abordar esta limitación. En lugar de depender únicamente del conocimiento paramétrico del modelo, el sistema recupera información de una base documental externa y la incorpora al proceso de generación. Esta separación entre generación y conocimiento permite mejorar la trazabilidad, actualizar el contenido sin reentrenar el modelo y limitar la respuesta a evidencia recuperada. La literatura reciente también destaca que RAG, combinado con estrategias de razonamiento y recuperación bien diseñadas, es una de las líneas consolidadas para mitigar las alucinaciones en aplicaciones reales. (Li, 2025)
 
 \section{Presentación del proyecto y del problema}
 El problema que aborda este trabajo consiste en que un modelo de lenguaje, utilizado de forma aislada, puede generar respuestas lingüísticamente correctas, pero no necesariamente verificables cuando se le consulta sobre documentación agrícola y normativa. Esta situación puede derivar en errores de interpretación, respuestas incompletas o afirmaciones que no se corresponden con el contenido real de los documentos. En un contexto regulado este comportamiento reduce la utilidad práctica del sistema y limita su adopción.
@@ -46,21 +46,15 @@ Además, la incorporación de RAG aporta una ventaja clave frente a un LLM sin r
 Desde el punto de vista técnico, el proyecto también tiene utilidad como caso de estudio sobre diseño y evaluación de sistemas RAG. Permite observar cómo influye la fragmentación del texto, la recuperación vectorial, el reranking y la formulación de consultas en la calidad de las respuestas. De este modo, el trabajo no se limita a implementar una solución funcional, sino que examina qué componentes mejoran realmente el comportamiento del sistema.
 
 \section{Estructura del trabajo}
-El resto del trabajo se organiza en capítulos que siguen una secuencia lógica de presentación, diseña, implementación y evaluación. El capitulo 2 recoge los objetivos generales y específicos que guían la investigación. El capitulo 3 desarrolla el marco teórico y el estado del arte, centrado en los LLMs, la arquitectura RAG, la recuperación semántica y la problemática de las alucinaciones en entornos regulados. El capitulo 4 presenta el marco metodológico, donde se define el corpus documental, el diseño experimental y las variables de evaluación.
-
-A continuación, el Capítulo 5 expone la implementación de la solución, incluyendo la arquitectura del sistema, el proceso de ingesta documental la indexación vectorial, la recuperación de contexto y el mecanismo de citación. Después, el capítulo 6 presenta los resultados obtenidos y su análisis comparativo. Finalmente, el capítulo 7 recoge las conclusiones, las limitaciones del trabajo y las posibles líneas futuras de desarrollo.
-
-
-\section{Estructura del trabajo}
 La memoria se organiza del siguiente modo:
 \begin{enumerate}
   \item Introducción, problema, contexto y utilidad.
-  \item Objetivos general y específicos.
+  \item Objetivos general y específicos, y planificación Scrum.
   \item Marco teórico / estado del arte.
   \item Marco metodológico (dataset, variables, diseño experimental).
-  \item Arquitectura e implementación del prototipo.
+  \item Arquitectura e implementación del MVP (autenticación, documentos y chat agéntico).
   \item Despliegue operativo del prototipo funcional contenedorizado.
-  \item Evaluación, resultados y discusión (con limitaciones de evidencia).
+  \item Evaluación, resultados y discusión (desacoplada de la interfaz).
   \item Conclusiones, limitaciones y prospectiva.
 \end{enumerate}
 

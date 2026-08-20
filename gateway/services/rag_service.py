@@ -16,8 +16,10 @@ from rag.adapters.mapping import bundle_to_dict, from_result, to_results
 from rag.adapters.outbound.ollama import (
     OLLAMA_API_KEY,
     OLLAMA_BASE_URL,
+    RAG_CHAT_MAX_TOKENS,
     RAG_KEEP_ALIVE,
     RAG_MAX_TOKENS,
+    RAG_NUM_CTX,
     RAG_TEMPERATURE,
 )
 from rag.application.answer import build_prompt as _build_prompt
@@ -41,23 +43,60 @@ load_dotenv(override=True)
 WAIT_POLICY = wait_exponential(multiplier=1, min=10, max=240)
 
 HNSW_INDEX_DIMENSIONS = int(os.getenv("HNSW_INDEX_DIMENSIONS", "2000"))
-DEFAULT_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "qwen3-embedding:latest")
+DEFAULT_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "nomic-embed-text")
 DEFAULT_CHAT_MODEL = os.getenv("RAG_GENERATION_MODEL", "llama3.2:latest")
 RAG_USE_RERANKER = os.getenv("RAG_USE_RERANKER", "false").lower() in {
     "1",
     "true",
     "yes",
 }
-RAG_USE_QUERY_REWRITE = os.getenv("RAG_USE_QUERY_REWRITE", "false").lower() in {
+RAG_USE_QUERY_REWRITE = os.getenv("RAG_USE_QUERY_REWRITE", "true").lower() in {
     "1",
     "true",
     "yes",
 }
 
 
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+DEFAULT_RETRIEVAL_K = _env_int("RAG_RETRIEVAL_K", 12)
+DEFAULT_BM25_K = _env_int("RAG_BM25_K", 12)
+DEFAULT_CANDIDATE_K = _env_int("RAG_CANDIDATE_K", 20)
+DEFAULT_FINAL_K = _env_int("RAG_FINAL_K", 8)
+DEFAULT_RRF_K = _env_int("RAG_RRF_K", 60)
+EVAL_TOP_K = _env_int("RAG_EVAL_TOP_K", 3)
+
+
+def rag_runtime_config() -> dict[str, Any]:
+    """Contrato visible: chat y evaluación deben mostrar estos valores."""
+    return {
+        "generation_model": DEFAULT_CHAT_MODEL,
+        "embedding_model": DEFAULT_EMBEDDING_MODEL,
+        "temperature": RAG_TEMPERATURE,
+        "chunk_size_chars": _env_int("RAG_CHUNK_SIZE", 1400),
+        "chunk_overlap_chars": _env_int("RAG_CHUNK_OVERLAP", 120),
+        "retrieval_k": DEFAULT_RETRIEVAL_K,
+        "bm25_k": DEFAULT_BM25_K,
+        "rrf_k": DEFAULT_RRF_K,
+        "final_k": DEFAULT_FINAL_K,
+        "eval_top_k": EVAL_TOP_K,
+        "use_reranker": RAG_USE_RERANKER,
+        "use_query_rewrite": RAG_USE_QUERY_REWRITE,
+        "note": "Híbrido denso+BM25+RRF. El chat usa final_k; la evaluación IR usa eval_top_k=3.",
+    }
+
+
 class DatasetEvaluationRequest(BaseModel):
     model_name: str = "llama3.2"
-    embedding_model: str = "qwen3-embedding:latest"
+    embedding_model: str = "nomic-embed-text"
     top_k: int = 5
     retrieval_k: int = 10
     bm25_k: int = 10
@@ -129,11 +168,11 @@ class RAGService:
         self,
         model: str = DEFAULT_CHAT_MODEL,
         embedding_model: str = DEFAULT_EMBEDDING_MODEL,
-        retrieval_k: int = 10,
-        bm25_k: int = 10,
+        retrieval_k: int = DEFAULT_RETRIEVAL_K,
+        bm25_k: int = DEFAULT_BM25_K,
         rrf_k: int = 60,
-        candidate_k: int = 15,
-        final_k: int = 3,
+        candidate_k: int = DEFAULT_CANDIDATE_K,
+        final_k: int = DEFAULT_FINAL_K,
         reranker_model: str = DEFAULT_RERANKER,
         reranker_batch_size: int = 16,
         bm25_index_dir: str | None = None,
@@ -227,6 +266,7 @@ class RAGService:
         use_reranking: bool | None = None,
         use_query_rewrite: bool | None = None,
         distance_metric: str = "cosine",
+        retrieval_strategy: str = "hybrid",
     ):
         do_rerank = RAG_USE_RERANKER if use_reranking is None else bool(use_reranking)
         allow_rewrite = (
@@ -240,6 +280,7 @@ class RAGService:
                 tenant_id=tenant_id,
                 collections=collections,
                 distance_metric=distance_metric,
+                retrieval_strategy=retrieval_strategy,
                 use_reranking=do_rerank,
                 use_query_rewrite=allow_rewrite,
                 evaluation_mode=evaluation_mode,
@@ -262,9 +303,15 @@ class RAGService:
             question, [from_result(c) for c in chunks], max_questions or 5
         )
 
-    async def simple_chat(self, question: str, history: list | None = None):
+    async def simple_chat(
+        self, question: str, history: list | None = None, temperature: float | None = None
+    ):
         result = await self._container.answer.execute(
-            question, history=history, use_rag=False, model=self.model
+            question,
+            history=history,
+            use_rag=False,
+            model=self.model,
+            temperature=temperature,
         )
         return {
             "answer": result["answer"],
@@ -282,12 +329,17 @@ class RAGService:
         model: str | None = None,
         use_reranking: bool | None = None,
         use_query_rewrite: bool | None = None,
+        retrieval_strategy: str | None = None,
+        temperature: float | None = None,
     ):
         do_rerank = RAG_USE_RERANKER if use_reranking is None else bool(use_reranking)
         allow_rewrite = (
             RAG_USE_QUERY_REWRITE
             if use_query_rewrite is None
             else bool(use_query_rewrite)
+        )
+        strategy = retrieval_strategy or (
+            "hybrid_expansion_rrf_rerank" if do_rerank else "hybrid_expansion_rrf"
         )
         result = await self._container.answer.execute(
             question,
@@ -297,6 +349,8 @@ class RAGService:
             model=model,
             use_reranking=do_rerank,
             use_query_rewrite=allow_rewrite,
+            retrieval_strategy=strategy,
+            temperature=temperature,
         )
         return self._public_answer(result)
 
@@ -346,14 +400,25 @@ class RAGService:
             test, tenant_id, collections, k
         )
 
-    async def _create_completion(self, model: str, messages: list[dict]):
+    async def _create_completion(
+        self,
+        model: str,
+        messages: list[dict],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ):
+        temp = RAG_TEMPERATURE if temperature is None else float(temperature)
+        tokens = RAG_MAX_TOKENS if max_tokens is None else int(max_tokens)
         return await asyncio.to_thread(
             self.client.chat.completions.create,
             model=model,
             messages=messages,
-            temperature=RAG_TEMPERATURE,
-            max_tokens=RAG_MAX_TOKENS,
-            extra_body={"keep_alive": RAG_KEEP_ALIVE},
+            temperature=temp,
+            max_tokens=tokens,
+            extra_body={
+                "keep_alive": RAG_KEEP_ALIVE,
+                "options": {"num_ctx": RAG_NUM_CTX, "num_predict": tokens},
+            },
         )
 
     async def _create_parse_completion(
@@ -373,6 +438,7 @@ class RAGService:
         retrieved_docs: list,
         reference_answer: str | None = None,
         out_of_knowledge: bool = False,
+        keywords: list[str] | None = None,
     ):
         return await self._container.evaluate_answer.execute(
             question,
@@ -380,6 +446,7 @@ class RAGService:
             retrieved_docs,
             reference_answer,
             out_of_knowledge,
+            keywords,
         )
 
     def get_embeddings(self):

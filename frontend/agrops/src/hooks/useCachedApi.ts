@@ -4,6 +4,7 @@ import api from "@/api";
 import KnowledgeService from "@/services/knowledge.service";
 import TenantService from "@/services/tenant.service";
 import DocumentService from "@/services/document.service";
+import { getOrganizationDepartments } from "@/services/organization.service";
 import {
   createNotebookEntry,
   deleteNotebookEntry,
@@ -13,11 +14,22 @@ import {
 } from "@/services/notebook.service";
 import { queryKeys } from "@/lib/queryKeys";
 import type { DocumentItem } from "@/types/document";
+import { useOrganization } from "@/context/OrganizationContext";
 
-export function useKnowledgeBases(orgId: string | undefined) {
+export function useKnowledgeBases(
+  orgId?: string | undefined,
+  departmentId?: string,
+) {
   return useQuery({
-    queryKey: queryKeys.knowledgeBases(orgId || ""),
-    queryFn: () => KnowledgeService.list(orgId!),
+    queryKey: queryKeys.knowledgeBases(orgId || "default", departmentId),
+    queryFn: () => KnowledgeService.list(orgId, departmentId),
+  });
+}
+
+export function useDepartments(orgId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.orgDepartments(orgId || ""),
+    queryFn: () => getOrganizationDepartments(orgId!),
     enabled: Boolean(orgId),
   });
 }
@@ -62,14 +74,18 @@ export function useChromaDocuments() {
 }
 
 export function useEvaluationTests() {
+  const { selectedOrg } = useOrganization();
+  const orgId = selectedOrg?.id;
   return useQuery({
-    queryKey: queryKeys.evaluationTests,
+    queryKey: [...queryKeys.evaluationTests, orgId ?? "none"],
     queryFn: async () => {
       const { data } = await api.get<{ tests: unknown[] }>(
         "/chat/evaluation/tests",
+        { params: orgId ? { organization_id: orgId } : undefined },
       );
       return data.tests ?? [];
     },
+    enabled: Boolean(orgId),
   });
 }
 
@@ -165,10 +181,11 @@ export function usePrefetchDashboard(orgId: string | undefined) {
         },
       }),
       qc.prefetchQuery({
-        queryKey: queryKeys.evaluationTests,
+        queryKey: [...queryKeys.evaluationTests, orgId ?? "none"],
         queryFn: async () => {
           const { data } = await api.get<{ tests: unknown[] }>(
             "/chat/evaluation/tests",
+            { params: orgId ? { organization_id: orgId } : undefined },
           );
           return data.tests ?? [];
         },

@@ -2,11 +2,11 @@ import sys
 import os
 import math
 import json
+import re
 import urllib.request
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-# Manejo de la importación para evitar ImportError si se ejecuta directamente
 try:
     from .test import TestQuestion, load_tests
 except ImportError:
@@ -18,156 +18,218 @@ from advanced_implementation.answer import answer_question, fetch_context
 
 load_dotenv(override=True)
 
-MODEL = "llama3"  # Nombre directo del modelo en Ollama
-OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-db_name = "preprocessed_db"
+MODEL = os.getenv("RAG_GENERATION_MODEL", "llama3.2")
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", os.getenv("OLLAMA_URL", "http://localhost:11434"))
 
 
-class RetrievalEval(BaseModel):
-    """Evaluation metrics for retrieval performance."""
-
-    mrr: float = Field(description="Rango recíproco medio: media de todas las palabras clave")
-    ndcg: float = Field(description="Ganancia acumulada descontada normalizada (relevancia binaria)")
-    keywords_found: int = Field(description="Número total de palabras clave que hay que buscar")
-    total_keywords: int = Field(description="Número total de palabras clave que hay que buscar")
-    keyword_coverage: float = Field(description="Porcentaje de palabras clave encontradas")
+def _normalize(value: str) -> str:
+    return " ".join((value or "").casefold().split())
 
 
-class AnswerEval(BaseModel):
-    """LLM-as-a-judge evaluation of answer quality."""
+def _doc_text(doc) -> str:
+    return getattr(doc, "page_content", None) or str(doc)
+
+
+def _answer_units(answer: str) -> list[str]:
+    parts = re.split(r"(?<=[.!?])\s+|\n+", (answer or "").strip())
+    return [part.strip() for part in parts if part.strip()] or ([answer] if answer else [])
+
+
+class SharedIREval(BaseModel):
+    """Métricas de recuperación compartidas por contexto y por respuesta."""
+
+    mrr: float = Field(default=0.0, description="Rango recíproco medio de las palabras clave")
+    ndcg: float = Field(default=0.0, description="nDCG binario de las palabras clave")
+    keywords_found: int = Field(default=0, description="Palabras clave encontradas")
+    total_keywords: int = Field(default=0, description="Palabras clave esperadas")
+    keyword_coverage: float = Field(
+        default=0.0, description="Porcentaje de palabras clave encontradas"
+    )
+
+
+class RetrievalEval(SharedIREval):
+    """Contexto recuperado: mismas IR que la respuesta, más notas 1-5 comparables."""
+
+    accuracy: float = Field(description="Precisión@k (0-100) de fragmentos con palabras clave")
+    completeness: float = Field(description="Cobertura de palabras clave, en escala 1-5")
+    relevance: float = Field(description="Calidad del ranking (nDCG), en escala 1-5")
+
+
+class JudgeScores(BaseModel):
+    feedback: str
+    accuracy: float = Field(ge=1, le=5)
+    completeness: float = Field(ge=1, le=5)
+    relevance: float = Field(ge=1, le=5)
+    faithfulness: float = Field(ge=1, le=5, default=3)
+
+
+class AnswerEval(SharedIREval):
+    """Las mismas métricas IR que el retrieval, más el juez LLM 1-5."""
 
     feedback: str = Field(
-        description="Comentarios concisos sobre la calidad de la respuesta, comparándola con la respuesta de referencia y evaluándola en función del contexto obtenido"
+        description="Comentarios concisos comparando respuesta, referencia y contexto recuperado"
     )
     accuracy: float = Field(
-        description="¿En qué medida es correcta la respuesta desde el punto de vista fáctico en comparación con la respuesta de referencia? De 1 (incorrecta; cualquier respuesta incorrecta debe puntuar con un 1) a 5 (ideal: totalmente correcta). Una respuesta aceptable obtendría una puntuación de 3."
+        description="Corrección fáctica frente a la referencia. 1 incorrecta, 5 perfecta"
     )
-    completeness: float = Field(
-        description="¿En qué medida aborda la respuesta todos los aspectos de la pregunta? De 1 (muy deficiente: falta información clave) a 5 (ideal: se proporciona toda la información de la respuesta de referencia de forma completa). Responde 5 solo si se incluye TODA la información de la respuesta de referencia."
-    )
-    relevance: float = Field(
-        description="¿En qué medida es relevante la respuesta a la pregunta concreta que se ha formulado? De 1 (muy poco relevante —fuera de tema—) a 5 (ideal —responde directamente a la pregunta y no aporta información adicional—). Responde con un 5 solo si la respuesta es totalmente relevante para la pregunta y no aporta información adicional."
-    )
+    completeness: float = Field(description="¿Cubre toda la información de la referencia? 1-5")
+    relevance: float = Field(description="¿Responde a la pregunta sin relleno? 1-5")
+    faithfulness: float = Field(default=3, description="¿Está anclada en el contexto recuperado? 1-5")
+
+
+def _to_five(unit: float) -> float:
+    return round(1.0 + 4.0 * max(0.0, min(1.0, unit)), 2)
 
 
 def calculate_mrr(keyword: str, retrieved_docs: list) -> float:
-    """Calculate reciprocal rank for a single keyword (case-insensitive)."""
-    keyword_lower = keyword.lower()
+    needle = _normalize(keyword)
+    if not needle:
+        return 0.0
     for rank, doc in enumerate(retrieved_docs, start=1):
-        if keyword_lower in doc.page_content.lower():
+        if needle in _normalize(_doc_text(doc)):
             return 1.0 / rank
     return 0.0
 
 
 def calculate_dcg(relevances: list[int], k: int) -> float:
-    """Calculate Discounted Cumulative Gain."""
     dcg = 0.0
     for i in range(min(k, len(relevances))):
-        dcg += relevances[i] / math.log2(i + 2)  # i+2 because rank starts at 1
+        dcg += relevances[i] / math.log2(i + 2)
     return dcg
 
 
 def calculate_ndcg(keyword: str, retrieved_docs: list, k: int = 10) -> float:
-    """Calculate nDCG for a single keyword (binary relevance, case-insensitive)."""
-    keyword_lower = keyword.lower()
-
-    # Binary relevance: 1 if keyword found, 0 otherwise
+    needle = _normalize(keyword)
     relevances = [
-        1 if keyword_lower in doc.page_content.lower() else 0 for doc in retrieved_docs[:k]
+        1 if needle and needle in _normalize(_doc_text(doc)) else 0
+        for doc in retrieved_docs[:k]
     ]
-
-    # DCG
     dcg = calculate_dcg(relevances, k)
-
-    # Ideal DCG (best case: keyword in first position)
-    ideal_relevances = sorted(relevances, reverse=True)
-    idcg = calculate_dcg(ideal_relevances, k)
-
+    idcg = calculate_dcg(sorted(relevances, reverse=True), k)
     return dcg / idcg if idcg > 0 else 0.0
 
 
-def evaluate_retrieval(test: TestQuestion, k: int = 10) -> RetrievalEval:
-    """
-    Evaluate retrieval performance for a test question.
-    """
-    retrieved_docs = fetch_context(test.question)
+def ir_metrics(keywords: list[str], docs: list, k: int = 10) -> dict:
+    needles = [item for item in keywords if _normalize(item)]
+    ranked = docs[:k]
+    if not needles:
+        return {
+            "mrr": 0.0,
+            "ndcg": 0.0,
+            "keywords_found": 0,
+            "total_keywords": 0,
+            "keyword_coverage": 0.0,
+            "accuracy": 0.0,
+        }
+    mrr_scores = [calculate_mrr(item, ranked) for item in needles]
+    ndcg_scores = [calculate_ndcg(item, ranked, k) for item in needles]
+    found = sum(1 for score in mrr_scores if score > 0)
+    relevant = 0
+    for doc in ranked:
+        blob = _normalize(_doc_text(doc))
+        if any(_normalize(item) in blob for item in needles):
+            relevant += 1
+    return {
+        "mrr": sum(mrr_scores) / len(mrr_scores),
+        "ndcg": sum(ndcg_scores) / len(ndcg_scores),
+        "keywords_found": found,
+        "total_keywords": len(needles),
+        "keyword_coverage": found / len(needles) * 100.0,
+        "accuracy": (relevant / len(ranked) * 100.0) if ranked else 0.0,
+    }
 
-    mrr_scores = [calculate_mrr(keyword, retrieved_docs) for keyword in test.keywords]
-    avg_mrr = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
 
-    ndcg_scores = [calculate_ndcg(keyword, retrieved_docs, k) for keyword in test.keywords]
-    avg_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
+class _TextDoc:
+    def __init__(self, page_content: str):
+        self.page_content = page_content
 
-    keywords_found = sum(1 for score in mrr_scores if score > 0)
-    total_keywords = len(test.keywords)
-    keyword_coverage = (keywords_found / total_keywords * 100) if total_keywords > 0 else 0.0
 
+def evaluate_retrieval(test: TestQuestion, k: int = 10, retrieved_docs: list | None = None) -> RetrievalEval:
+    docs = retrieved_docs if retrieved_docs is not None else fetch_context(test.question)
+    metrics = ir_metrics(test.keywords, docs, k)
+    coverage_unit = metrics["keyword_coverage"] / 100.0
     return RetrievalEval(
-        mrr=avg_mrr,
-        ndcg=avg_ndcg,
-        keywords_found=keywords_found,
-        total_keywords=total_keywords,
-        keyword_coverage=keyword_coverage,
+        **metrics,
+        completeness=_to_five(coverage_unit),
+        relevance=_to_five(metrics["ndcg"]),
     )
 
 
-def evaluate_answer(test: TestQuestion) -> tuple[AnswerEval, str, list]:
-    """
-    Evaluate answer quality using LLM-as-a-judge calling Ollama directly via HTTP/REST.
-    """
-    generated_answer, retrieved_docs = answer_question(test.question)
+def evaluate_answer(test: TestQuestion) -> tuple[AnswerEval, str, list, RetrievalEval]:
+    """Una sola recuperación: evalúa contexto y respuesta con las mismas métricas IR."""
+    generated_answer, docs = answer_question(test.question)
+    retrieval = evaluate_retrieval(test, retrieved_docs=docs)
+    context = "\n\n".join(_doc_text(doc) for doc in docs)
+    ir = ir_metrics(test.keywords, [_TextDoc(unit) for unit in _answer_units(generated_answer)])
 
     judge_messages = [
         {
             "role": "system",
-            "content": "Eres un evaluador experto encargado de valorar la calidad de las respuestas. Evalúa la respuesta generada comparándola con la respuesta de referencia. Solo otorga una puntuación de 5/5 a las respuestas perfectas.",
+            "content": (
+                "Eres un evaluador experto. Valora la respuesta con la misma vara que el retrieval: "
+                "cobertura de palabras clave, ranking de lo importante y fidelidad al contexto. "
+                "Solo otorga 5/5 a respuestas perfectas y ancladas en el contexto."
+            ),
         },
         {
             "role": "user",
             "content": f"""Pregunta:
-            {test.question}
+{test.question}
 
-            Respuesta generada:
-            {generated_answer}
+Respuesta generada:
+{generated_answer}
 
-            Respuesta de referencia:
-            {test.reference_answer}
+Respuesta de referencia:
+{test.reference_answer}
 
-            Por favor, evalúa la respuesta generada en tres aspectos:
-            1. Precisión: ¿En qué medida es correcta desde el punto de vista fáctico en comparación con la respuesta de referencia? Solo otorga una puntuación de 5/5 a las respuestas perfectas.
-            2. Exhaustividad: ¿En qué medida aborda de forma exhaustiva todos los aspectos de la pregunta, cubriendo toda la información de la respuesta de referencia?
-            3. Pertinencia: ¿En qué medida responde directamente a la pregunta específica formulada, sin aportar información adicional?
+Contexto recuperado:
+{context or "Sin contexto"}
 
-            Proporciona comentarios detallados y puntuaciones del 1 (muy deficiente) al 5 (ideal) para cada aspecto. Si la respuesta es incorrecta, la puntuación de precisión debe ser 1.""",
+Palabras clave esperadas: {", ".join(test.keywords)}
+
+Evalúa en tres aspectos (1 muy deficiente, 5 ideal):
+1. Precisión (quality_accuracy): corrección fáctica frente a la referencia. Si es incorrecta, 1.
+2. Exhaustividad (completeness): ¿incluye TODA la información de la referencia?
+3. Pertinencia (relevance): ¿responde a la pregunta sin relleno?
+4. Fidelidad (faithfulness): ¿está anclada en el contexto recuperado?
+
+No inventes mrr ni ndcg. Devuelve feedback y las notas 1-5.""",
         },
     ]
 
-    # Petición HTTP nativa a la API de Ollama
     payload = {
         "model": MODEL,
         "messages": judge_messages,
-        "format": AnswerEval.model_json_schema(),  # Estructurado vía Pydantic Schema
-        "stream": False
+        "format": JudgeScores.model_json_schema(),
+        "stream": False,
     }
-
     req = urllib.request.Request(
         f"{OLLAMA_API_BASE}/api/chat",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
-        method="POST"
+        method="POST",
     )
-
     with urllib.request.urlopen(req) as response:
         res_data = json.loads(response.read().decode("utf-8"))
         json_content = res_data["message"]["content"]
 
-    answer_eval = AnswerEval.model_validate_json(json_content)
-
-    return answer_eval, generated_answer, retrieved_docs
+    judged = JudgeScores.model_validate_json(json_content)
+    answer_eval = AnswerEval(
+        feedback=judged.feedback,
+        accuracy=judged.accuracy,
+        completeness=judged.completeness,
+        relevance=judged.relevance,
+        faithfulness=judged.faithfulness,
+        mrr=ir["mrr"],
+        ndcg=ir["ndcg"],
+        keywords_found=ir["keywords_found"],
+        total_keywords=ir["total_keywords"],
+        keyword_coverage=ir["keyword_coverage"],
+    )
+    return answer_eval, generated_answer, docs, retrieval
 
 
 def evaluate_all_retrieval():
-    """Evaluate all retrieval tests."""
     tests = load_tests()
     total_tests = len(tests)
     for index, test in enumerate(tests):
@@ -177,7 +239,6 @@ def evaluate_all_retrieval():
 
 
 def evaluate_all_answers():
-    """Evaluate all answers to tests using batched async execution."""
     tests = load_tests()
     total_tests = len(tests)
     for index, test in enumerate(tests):
@@ -187,15 +248,12 @@ def evaluate_all_answers():
 
 
 def run_cli_evaluation(test_number: int):
-    """Run evaluation for a specific test (async helper for CLI)."""
     tests = load_tests()
-
     if test_number < 0 or test_number >= len(tests):
         print(f"Error: test_row_number must be between 0 and {len(tests) - 1}")
         sys.exit(1)
 
     test = tests[test_number]
-
     print(f"\n{'=' * 80}")
     print(f"Test #{test_number}")
     print(f"{'=' * 80}")
@@ -204,46 +262,46 @@ def run_cli_evaluation(test_number: int):
     print(f"Category: {test.category}")
     print(f"Reference Answer: {test.reference_answer}")
 
-    # Retrieval Evaluation
+    answer_result, generated_answer, retrieved_docs, retrieval_result = evaluate_answer(test)
+
     print(f"\n{'=' * 80}")
-    print("Retrieval Evaluation")
+    print("Retrieval y respuesta (mismas métricas IR)")
     print(f"{'=' * 80}")
-
-    retrieval_result = evaluate_retrieval(test)
-
-    print(f"MRR: {retrieval_result.mrr:.4f}")
-    print(f"nDCG: {retrieval_result.ndcg:.4f}")
-    print(f"Keywords Found: {retrieval_result.keywords_found}/{retrieval_result.total_keywords}")
-    print(f"Keyword Coverage: {retrieval_result.keyword_coverage:.1f}%")
-
-    # Answer Evaluation
-    print(f"\n{'=' * 80}")
-    print("Answer Evaluation")
-    print(f"{'=' * 80}")
-
-    answer_result, generated_answer, retrieved_docs = evaluate_answer(test)
-
+    print("Contexto:")
+    print(f"  MRR: {retrieval_result.mrr:.4f}  nDCG: {retrieval_result.ndcg:.4f}")
+    print(
+        f"  Cobertura: {retrieval_result.keywords_found}/{retrieval_result.total_keywords} "
+        f"({retrieval_result.keyword_coverage:.1f}%)  Precisión@k: {retrieval_result.accuracy:.1f}%"
+    )
+    print(
+        f"  Notas 1-5  exhaustividad {retrieval_result.completeness:.2f}  "
+        f"pertinencia {retrieval_result.relevance:.2f}"
+    )
+    print("Respuesta:")
+    print(f"  MRR: {answer_result.mrr:.4f}  nDCG: {answer_result.ndcg:.4f}")
+    print(
+        f"  Cobertura: {answer_result.keywords_found}/{answer_result.total_keywords} "
+        f"({answer_result.keyword_coverage:.1f}%)"
+    )
     print(f"\nGenerated Answer:\n{generated_answer}")
     print(f"\nFeedback:\n{answer_result.feedback}")
-    print("\nScores:")
+    print("\nScores 1-5:")
     print(f"  Accuracy: {answer_result.accuracy:.2f}/5")
     print(f"  Completeness: {answer_result.completeness:.2f}/5")
     print(f"  Relevance: {answer_result.relevance:.2f}/5")
+    print(f"  Faithfulness: {answer_result.faithfulness:.2f}/5")
     print(f"\n{'=' * 80}\n")
 
 
 def main():
-    """CLI to evaluate a specific test by row number."""
     if len(sys.argv) != 2:
         print("Usage: python eval.py <test_row_number>")
         sys.exit(1)
-
     try:
         test_number = int(sys.argv[1])
     except ValueError:
         print("Error: test_row_number must be an integer")
         sys.exit(1)
-
     run_cli_evaluation(test_number)
 
 

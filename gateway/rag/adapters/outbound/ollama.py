@@ -8,9 +8,11 @@ from openai import OpenAI
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
-RAG_MAX_TOKENS = int(os.getenv("RAG_MAX_TOKENS", "640"))
+RAG_MAX_TOKENS = int(os.getenv("RAG_MAX_TOKENS", "1536"))
+RAG_CHAT_MAX_TOKENS = int(os.getenv("RAG_CHAT_MAX_TOKENS", "512"))
+RAG_NUM_CTX = int(os.getenv("RAG_NUM_CTX", "4096"))
 RAG_TEMPERATURE = float(os.getenv("RAG_TEMPERATURE", "0"))
-RAG_KEEP_ALIVE = os.getenv("RAG_KEEP_ALIVE", "30m")
+RAG_KEEP_ALIVE = os.getenv("RAG_KEEP_ALIVE", "24h")
 
 
 class OllamaLlmAdapter:
@@ -27,14 +29,23 @@ class OllamaLlmAdapter:
         self.max_tokens = max_tokens
         self.keep_alive = keep_alive
 
-    async def complete(self, model: str, messages: list[dict[str, str]]) -> str:
+    async def complete(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+    ) -> str:
+        temp = self.temperature if temperature is None else float(temperature)
         response = await asyncio.to_thread(
             self.client.chat.completions.create,
             model=model,
             messages=messages,
-            temperature=self.temperature,
+            temperature=temp,
             max_tokens=self.max_tokens,
-            extra_body={"keep_alive": self.keep_alive},
+            extra_body={
+                "keep_alive": self.keep_alive,
+                "options": {"num_ctx": RAG_NUM_CTX, "num_predict": self.max_tokens},
+            },
         )
         return response.choices[0].message.content or ""
 

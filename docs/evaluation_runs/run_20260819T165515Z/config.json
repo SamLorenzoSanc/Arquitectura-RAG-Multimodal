@@ -1,0 +1,39 @@
+{
+  "run_id": "run_20260819T165515Z",
+  "retriever": "local_hybrid_asesor_canarias",
+  "note": "Misma receta que el chat (denso+BM25+RRF, reranker off) sobre knowledge-base/asesor-canarias. No es Graph RAG ni visión. RAGAS no se ejecuta en esta corrida.",
+  "ragas": "not_run",
+  "generation_model": "llama3.2:latest",
+  "embedding_model": "nomic-embed-text",
+  "chunk_size_chars": 1400,
+  "chunk_overlap_chars": 120,
+  "dense_k": 10,
+  "bm25_k": 10,
+  "rrf_k": 60,
+  "final_k": 8,
+  "reranker": false,
+  "temperature": "ollama_default_not_sent",
+  "n_gold": 35,
+  "ollama": {
+    "ok": true,
+    "models": [
+      {
+        "name": "nomic-embed-text:latest",
+        "digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+        "size": 274302450
+      },
+      {
+        "name": "llama3.2:latest",
+        "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+        "size": 2019393189
+      },
+      {
+        "name": "qwen3-embedding:latest",
+        "digest": "64b933495768fbd3b87c20583d379728a07471e0c66733a9df87cd1901b3c44b",
+        "size": 4676805193
+      }
+    ]
+  },
+  "started_utc": "2026-08-19T16:55:15.794104+00:00",
+  "finished_utc": "2026-08-19T17:00:31.799431+00:00"
+}

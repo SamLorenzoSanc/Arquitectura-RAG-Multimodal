@@ -35,6 +35,7 @@ _ADD_COLUMNS_SQL = (
     "ALTER TABLE public.retrieval_dataset ADD COLUMN IF NOT EXISTS split TEXT NOT NULL DEFAULT 'dev'",
     "ALTER TABLE public.retrieval_dataset ADD COLUMN IF NOT EXISTS metadata JSONB NOT NULL DEFAULT '{}'::jsonb",
     "ALTER TABLE public.retrieval_dataset ADD COLUMN IF NOT EXISTS expected_chunk_id TEXT",
+    "ALTER TABLE public.retrieval_dataset ALTER COLUMN expected_chunk_id DROP NOT NULL",
 )
 
 
@@ -50,7 +51,11 @@ async def safe_rollback(db: AsyncSession | None) -> None:
 async def init_retrieval_dataset_table(db: AsyncSession) -> None:
     await db.execute(text(CREATE_RETRIEVAL_DATASET_SQL))
     for statement in _ADD_COLUMNS_SQL:
-        await db.execute(text(statement))
+        try:
+            await db.execute(text(statement))
+        except Exception:
+            await safe_rollback(db)
+            await db.execute(text(CREATE_RETRIEVAL_DATASET_SQL))
     await db.execute(
         text(
             """
@@ -204,6 +209,7 @@ async def insert_extracted_questions_into_bank(
     tenant_id: str,
     questions: list[dict],
     document_id: str | None = None,
+    validated: bool = False,
 ) -> int:
     """Copia preguntas extraídas del PDF al banco de evaluación (sin duplicar)."""
     await init_retrieval_dataset_table(db)
@@ -228,7 +234,11 @@ async def insert_extracted_questions_into_bank(
         keywords = item.get("keywords") or []
         if not isinstance(keywords, list):
             keywords = []
-        metadata = {"source": "hitl", "document_id": document_id}
+        metadata = {
+            "source": "hitl",
+            "document_id": document_id,
+            "validated": bool(item.get("validated", validated)),
+        }
         await db.execute(
             text(
                 """
@@ -237,7 +247,7 @@ async def insert_extracted_questions_into_bank(
                     keywords, reference_answer, category, flag_different_info,
                     flag_out_of_knowledge, split, metadata
                 ) VALUES (
-                    :tenant_id, :question, NULL, '[]'::jsonb,
+                    :tenant_id, :question, '', '[]'::jsonb,
                     CAST(:keywords AS JSONB), :reference_answer, :category,
                     FALSE, :out_of_knowledge, 'dev', CAST(:metadata AS JSONB)
                 )
@@ -257,3 +267,70 @@ async def insert_extracted_questions_into_bank(
         imported += 1
     await db.commit()
     return imported
+
+
+async def mark_hitl_question_in_bank(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    question: str,
+    reference_answer: str | None = None,
+    category: str | None = None,
+    keywords: list | None = None,
+    validated: bool = True,
+) -> None:
+    await init_retrieval_dataset_table(db)
+    clean_keywords = [
+        str(item).strip()
+        for item in (keywords or [])
+        if str(item).strip()
+    ]
+    await db.execute(
+        text(
+            """
+            UPDATE public.retrieval_dataset
+            SET reference_answer = COALESCE(:reference_answer, reference_answer),
+                category = COALESCE(:category, category),
+                keywords = CASE
+                    WHEN CAST(:has_keywords AS boolean)
+                    THEN CAST(:keywords AS jsonb)
+                    ELSE keywords
+                END,
+                metadata = COALESCE(metadata, '{}'::jsonb)
+                    || CAST(:metadata AS jsonb)
+            WHERE tenant_id = :tenant_id
+              AND lower(btrim(question)) = lower(btrim(:question))
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "question": question,
+            "reference_answer": (reference_answer or "").strip() or None,
+            "category": category,
+            "has_keywords": bool(clean_keywords),
+            "keywords": json.dumps(clean_keywords, ensure_ascii=False),
+            "metadata": json.dumps({"validated": validated, "source": "hitl"}),
+        },
+    )
+    await db.commit()
+
+
+async def remove_hitl_question_from_bank(
+    db: AsyncSession,
+    *,
+    tenant_id: str,
+    question: str,
+) -> None:
+    await init_retrieval_dataset_table(db)
+    await db.execute(
+        text(
+            """
+            DELETE FROM public.retrieval_dataset
+            WHERE tenant_id = :tenant_id
+              AND lower(btrim(question)) = lower(btrim(:question))
+              AND COALESCE(metadata->>'source', '') = 'hitl'
+            """
+        ),
+        {"tenant_id": tenant_id, "question": question},
+    )
+    await db.commit()

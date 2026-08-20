@@ -11,6 +11,10 @@ import {
   X,
 } from "lucide-react";
 
+import {
+  DatasetChunkTable,
+  chunkTitleOf,
+} from "@/components/datasets/DatasetChunkCards";
 import DatasetService from "@/services/dataset.service";
 import DocumentService from "@/services/document.service";
 import {
@@ -25,6 +29,7 @@ import {
 } from "@/types/dataset";
 import type { KnowledgeBaseSummary } from "@/services/knowledge.service";
 import type { Department } from "@/services/department.service";
+import { useTranslation } from "@/i18n/I18nProvider";
 
 type Props = {
   open: boolean;
@@ -37,28 +42,28 @@ type Props = {
   onCreated: (dataset: RagDataset) => void;
 };
 
-const SOURCE_META: Record<
+const SOURCE_META_KEYS: Record<
   DatasetSource,
-  { title: string; description: string; icon: typeof UploadCloud }
+  { titleKey: string; descriptionKey: string; icon: typeof UploadCloud }
 > = {
   file: {
-    title: "Subir documento",
-    description: "PDF, DOCX, PPT, vídeo, CSV, JSON o Excel para el RAG del departamento.",
+    titleKey: "datasets.wizardFileTitle",
+    descriptionKey: "datasets.wizardFileDesc",
     icon: FileText,
   },
   logs: {
-    title: "Importar logs",
-    description: "Traza de inferencias en JSONL, CSV, JSON o .log.",
+    titleKey: "datasets.wizardLogsTitle",
+    descriptionKey: "datasets.wizardLogsDesc",
     icon: ScrollText,
   },
   synthetic: {
-    title: "Datos sintéticos",
-    description: "Genera casos para la cola de validación humana.",
+    titleKey: "datasets.wizardSyntheticTitle",
+    descriptionKey: "datasets.wizardSyntheticDesc",
     icon: Sparkles,
   },
   demo: {
-    title: "Datasets demo",
-    description: "Carga un conjunto de ejemplo agrícola (POSEI, riego, sanidad).",
+    titleKey: "datasets.wizardDemoTitle",
+    descriptionKey: "datasets.wizardDemoDesc",
     icon: PlayCircle,
   },
 };
@@ -76,16 +81,12 @@ const SUGGESTIONS: Record<string, RagField> = {
   summary: "expected_response",
 };
 
-function messageFromError(error: unknown) {
+function messageFromError(error: unknown, fallback: string) {
   const candidate = error as {
     response?: { data?: { detail?: string } };
     message?: string;
   };
-  return (
-    candidate.response?.data?.detail ||
-    candidate.message ||
-    "No se pudo completar la operación."
-  );
+  return candidate.response?.data?.detail || candidate.message || fallback;
 }
 
 function suggestedMapping(columns: string[]): DatasetMapping {
@@ -112,6 +113,19 @@ function displayValue(value: unknown) {
   return String(value);
 }
 
+function previewChunkItems(preview: DatasetPreview) {
+  return (preview.chunks ?? preview.rows).map((chunk, index) => {
+    const item = chunk as Record<string, unknown>;
+    return {
+      chunk_index:
+        typeof item.chunk_index === "number" ? item.chunk_index : index,
+      title: chunkTitleOf(item, preview.filename),
+      headline: item.headline,
+      summary: item.summary,
+    };
+  });
+}
+
 export default function DatasetWizard({
   open,
   source,
@@ -122,6 +136,7 @@ export default function DatasetWizard({
   onClose,
   onCreated,
 }: Props) {
+  const { t } = useTranslation();
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [knowledgeBaseId, setKnowledgeBaseId] = useState("");
@@ -138,8 +153,16 @@ export default function DatasetWizard({
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const meta = SOURCE_META[source];
+  const meta = SOURCE_META_KEYS[source];
   const Icon = meta.icon;
+
+  const stepLabels = [
+    t("datasets.wizardStepOrigin"),
+    preview?.kind === "chunks"
+      ? t("datasets.wizardStepFragments")
+      : t("datasets.wizardStepColumns"),
+    t("datasets.wizardStepPreview"),
+  ] as const;
 
   const reset = () => {
     setStep(1);
@@ -175,11 +198,11 @@ export default function DatasetWizard({
 
   const loadPreview = async () => {
     if (!name.trim() || !knowledgeBaseId) {
-      setError("Indica un nombre y una base de conocimiento.");
+      setError(t("datasets.wizardNameKbRequired"));
       return;
     }
     if (departmentIds.length === 0) {
-      setError("Asigna el dataset al menos a un departamento.");
+      setError(t("datasets.wizardDeptRequired"));
       return;
     }
     setBusy(true);
@@ -187,11 +210,11 @@ export default function DatasetWizard({
     try {
       let data: DatasetPreview;
       if (source === "file" || source === "logs") {
-        if (!file) throw new Error("Selecciona un archivo.");
+        if (!file) throw new Error(t("datasets.wizardSelectFileError"));
         data = await DatasetService.previewFile(file, organizationId);
       } else if (source === "demo") {
         const item = demoItems.find((demo) => demo.id === catalogId);
-        if (!item) throw new Error("Elige un dataset demo.");
+        if (!item) throw new Error(t("datasets.wizardSelectDemoError"));
         if (!name.trim()) setName(item.name);
         data = {
           columns: ["prompt", "expected_response"],
@@ -236,7 +259,7 @@ export default function DatasetWizard({
       );
       setStep(2);
     } catch (err) {
-      setError(messageFromError(err));
+      setError(messageFromError(err, t("evalExtended.operationFailed")));
     } finally {
       setBusy(false);
     }
@@ -263,7 +286,7 @@ export default function DatasetWizard({
             expected_response: "summary",
           };
     if (!effectiveMapping.prompt) {
-      setError("Asigna al menos una columna al campo prompt.");
+      setError(t("datasets.wizardPromptRequired"));
       setStep(2);
       return;
     }
@@ -309,7 +332,7 @@ export default function DatasetWizard({
       onCreated(created);
       onClose();
     } catch (err) {
-      setError(messageFromError(err));
+      setError(messageFromError(err, t("evalExtended.operationFailed")));
     } finally {
       setBusy(false);
     }
@@ -330,16 +353,16 @@ export default function DatasetWizard({
             </span>
             <div>
               <h2 id="dataset-wizard-title" className="font-bold text-slate-900">
-                {meta.title}
+                {t(meta.titleKey)}
               </h2>
-              <p className="text-xs text-slate-500">{meta.description}</p>
+              <p className="text-xs text-slate-500">{t(meta.descriptionKey)}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             <X size={20} />
           </button>
@@ -347,7 +370,7 @@ export default function DatasetWizard({
 
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="mx-auto flex max-w-xl items-center">
-            {(["Origen y acceso", preview?.kind === "chunks" ? "Fragmentos" : "Columnas", "Vista previa"] as const).map((label, index) => {
+            {stepLabels.map((label, index) => {
               const number = index + 1;
               return (
                 <div key={label} className="flex flex-1 items-center last:flex-none">
@@ -383,22 +406,22 @@ export default function DatasetWizard({
             <div className="mx-auto max-w-3xl space-y-6">
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold text-slate-700">
-                  Nombre del dataset
+                  {t("datasets.wizardNameLabel")}
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
-                    placeholder="Ej. FAQ cultivos 2026"
+                    placeholder={t("datasets.wizardNamePlaceholder")}
                     className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-400"
                   />
                 </label>
                 <label className="text-sm font-semibold text-slate-700">
-                  Base de conocimiento
+                  {t("datasets.wizardKbLabel")}
                   <select
                     value={knowledgeBaseId}
                     onChange={(event) => setKnowledgeBaseId(event.target.value)}
                     className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 font-normal outline-none focus:border-blue-400"
                   >
-                    <option value="">Selecciona una KB</option>
+                    <option value="">{t("datasets.wizardSelectKb")}</option>
                     {knowledgeBases.map((kb) => (
                       <option key={kb.id} value={kb.id}>
                         {kb.name}
@@ -410,10 +433,10 @@ export default function DatasetWizard({
 
               <fieldset>
                 <legend className="text-sm font-semibold text-slate-700">
-                  Departamentos con acceso
+                  {t("datasets.wizardDeptAccess")}
                 </legend>
                 <p className="mt-1 text-xs text-slate-500">
-                  Cada departamento ve solo sus datasets. Elige al menos uno.
+                  {t("datasets.wizardDeptHint")}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {departments.map((department) => {
@@ -441,7 +464,7 @@ export default function DatasetWizard({
                     );
                   })}
                   {departments.length === 0 && (
-                    <span className="text-xs text-slate-400">No hay departamentos.</span>
+                    <span className="text-xs text-slate-400">{t("datasets.noDepartments")}</span>
                   )}
                 </div>
               </fieldset>
@@ -466,12 +489,12 @@ export default function DatasetWizard({
                   >
                     <UploadCloud size={28} className="text-[#0038A8]" />
                     <span className="mt-3 text-sm font-bold text-slate-800">
-                      {file?.name ?? "Selecciona o arrastra un archivo"}
+                      {file?.name ?? t("datasets.wizardSelectFile")}
                     </span>
                     <span className="mt-1 text-xs text-slate-500">
                       {source === "logs"
-                        ? "CSV, JSON, JSONL o .log de inferencias"
-                        : "CSV, JSON, Excel, PDF, DOCX, PowerPoint, vídeo, TXT o Markdown"}
+                        ? t("datasets.wizardLogsFormats")
+                        : t("datasets.wizardFileFormats")}
                     </span>
                   </button>
                 </div>
@@ -502,14 +525,14 @@ export default function DatasetWizard({
                           {item.description}
                         </span>
                         <span className="mt-2 block text-[11px] font-semibold text-slate-400">
-                          {item.row_count} ejemplos
+                          {t("datasets.wizardExamples", { count: item.row_count })}
                         </span>
                       </button>
                     );
                   })}
                   {demoItems.length === 0 && (
                     <p className="text-xs text-slate-500 sm:col-span-3">
-                      No hay datasets demo disponibles.
+                      {t("datasets.wizardNoDemo")}
                     </p>
                   )}
                 </div>
@@ -519,7 +542,7 @@ export default function DatasetWizard({
                 <div className="space-y-4 rounded-xl border border-purple-100 bg-purple-50/40 p-5">
                   <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
                     <label className="text-xs font-bold text-slate-600">
-                      Número de filas
+                      {t("datasets.wizardRowCount")}
                       <input
                         type="number"
                         min={1}
@@ -534,27 +557,27 @@ export default function DatasetWizard({
                       />
                     </label>
                     <label className="text-xs font-bold text-slate-600">
-                      Pregunta adicional (opcional)
+                      {t("datasets.wizardExtraQuestion")}
                       <input
                         value={syntheticTopic}
                         onChange={(event) => setSyntheticTopic(event.target.value)}
-                        placeholder="¿Qué requisitos debe cumplir el cultivo?"
+                        placeholder={t("datasets.wizardExtraQuestionPlaceholder")}
                         className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 font-normal"
                       />
                     </label>
                   </div>
                   <label className="block text-xs font-bold text-slate-600">
-                    Instrucciones opcionales
+                    {t("datasets.wizardOptionalInstructions")}
                     <textarea
                       value={syntheticInstructions}
                       onChange={(event) => setSyntheticInstructions(event.target.value)}
                       rows={4}
-                      placeholder="Incluye preguntas difíciles y respuestas de referencia..."
+                      placeholder={t("datasets.wizardOptionalInstructionsPlaceholder")}
                       className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-3 font-normal"
                     />
                   </label>
                   <p className="text-xs text-purple-700">
-                    Las filas se enviarán a Validación humana antes de incorporarse al banco.
+                    {t("datasets.wizardSyntheticHint")}
                   </p>
                 </div>
               )}
@@ -564,70 +587,36 @@ export default function DatasetWizard({
           {step === 2 && preview && preview.kind === "chunks" && (
             <div className="space-y-5">
               <div>
-                <h3 className="font-bold text-slate-900">Fragmentos detectados</h3>
+                <h3 className="font-bold text-slate-900">{t("datasets.wizardChunksDetected")}</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  {preview.chunks?.length ?? preview.rows.length} chunks extraídos del{" "}
-                  {preview.format || "documento"}. Los parseadores no cambian; aquí se
-                  previsualizan headline, resumen y fragmento.
+                  {t("datasets.wizardChunksDetectedHint", {
+                    count: preview.chunks?.length ?? preview.rows.length,
+                    format: preview.format || t("evalExtended.ragDocsDefaultDocType"),
+                  })}
                 </p>
               </div>
-              <div className="space-y-3">
-                {(preview.chunks ?? preview.rows).slice(0, 12).map((chunk, index) => {
-                  const item = chunk as {
-                    chunk_index?: number;
-                    headline?: unknown;
-                    summary?: unknown;
-                    fragment?: unknown;
-                    characters?: number;
-                  };
-                  return (
-                    <article
-                      key={item.chunk_index ?? index}
-                      className="rounded-xl border border-slate-200 bg-slate-50/60 p-4"
-                    >
-                      <div className="mb-2 flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-[#0038A8] px-2 py-0.5 text-[10px] font-bold text-white">
-                          chunk {item.chunk_index ?? index}
-                        </span>
-                        <span className="text-[11px] font-semibold text-slate-500">
-                          {item.characters ?? String(item.fragment ?? "").length} caracteres
-                        </span>
-                      </div>
-                      <h4 className="text-sm font-semibold text-slate-900">
-                        {displayValue(item.headline)}
-                      </h4>
-                      <p className="mt-2 whitespace-pre-wrap text-xs leading-5 text-slate-600">
-                        {displayValue(item.fragment).slice(0, 700)}
-                        {displayValue(item.fragment).length > 700 ? "…" : ""}
-                      </p>
-                    </article>
-                  );
-                })}
-              </div>
-              <p className="text-[11px] text-slate-400">
-                Mapeo RAG automático: headline → prompt · fragmento → context · resumen →
-                expected_response
-              </p>
+              <DatasetChunkTable items={previewChunkItems(preview).slice(0, 12)} />
             </div>
           )}
 
           {step === 2 && preview && preview.kind !== "chunks" && (
             <div>
               <div className="mb-4">
-                <h3 className="font-bold text-slate-900">Columnas detectadas</h3>
+                <h3 className="font-bold text-slate-900">{t("datasets.wizardColumnsDetected")}</h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Se han extraído las {preview.columns.length} columnas del archivo. Relaciona
-                  cada una con un campo RAG; las no asignadas se conservan en metadatos.
+                  {t("datasets.wizardColumnsDetectedHint", {
+                    count: preview.columns.length,
+                  })}
                 </p>
               </div>
               <div className="overflow-hidden rounded-xl border border-slate-200">
                 <table className="w-full">
                   <thead className="bg-slate-50 text-left text-[11px] uppercase tracking-wide text-slate-500">
                     <tr>
-                      <th className="px-4 py-3">Columna de origen</th>
-                      <th className="px-4 py-3">Tipo</th>
-                      <th className="px-4 py-3">Ejemplo</th>
-                      <th className="px-4 py-3">Campo RAG</th>
+                      <th className="px-4 py-3">{t("datasets.wizardColSource")}</th>
+                      <th className="px-4 py-3">{t("datasets.wizardColType")}</th>
+                      <th className="px-4 py-3">{t("datasets.wizardColExample")}</th>
+                      <th className="px-4 py-3">{t("datasets.wizardColRagField")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -643,7 +632,7 @@ export default function DatasetWizard({
                             </span>
                             {suggestion && (
                               <span className="ml-2 rounded bg-blue-50 px-2 py-0.5 text-[10px] text-blue-700">
-                                sugerido → {suggestion}
+                                {t("datasets.wizardSuggested", { field: suggestion })}
                               </span>
                             )}
                           </td>
@@ -663,7 +652,7 @@ export default function DatasetWizard({
                               }
                               className="h-9 min-w-48 rounded-lg border border-slate-200 bg-white px-3 text-xs"
                             >
-                              <option value="">No importar</option>
+                              <option value="">{t("datasets.wizardNoImport")}</option>
                               {RAG_FIELDS.map((field) => (
                                 <option
                                   key={field}
@@ -692,56 +681,65 @@ export default function DatasetWizard({
                 <div>
                   <h3 className="font-bold text-slate-900">
                     {preview.kind === "chunks"
-                      ? "Vista previa de fragmentos"
-                      : "Vista previa de columnas"}
+                      ? t("datasets.wizardPreviewChunks")
+                      : t("datasets.wizardPreviewColumns")}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {preview.total_rows ?? preview.rows.length}{" "}
-                    {preview.kind === "chunks" ? "fragmentos" : "filas"} ·{" "}
-                    {preview.columns.length} columnas
-                    {preview.kind !== "chunks"
-                      ? ` · ${Object.keys(mapping).length} campos RAG`
-                      : ""}
+                    {preview.kind === "chunks"
+                      ? t("datasets.wizardPreviewFragments", {
+                          count: preview.total_rows ?? preview.rows.length,
+                        }) + t("datasets.wizardPreviewChunksMeta")
+                      : t("datasets.wizardPreviewRows", {
+                          count: preview.total_rows ?? preview.rows.length,
+                        }) +
+                        t("datasets.wizardPreviewColumnsMeta", {
+                          cols: preview.columns.length,
+                          fields: Object.keys(mapping).length,
+                        })}
                   </p>
                 </div>
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                   {source === "synthetic"
-                    ? "Destino: Validación humana"
-                    : "Listo para crear"}
+                    ? t("datasets.wizardDestHuman")
+                    : t("datasets.wizardReady")}
                 </span>
               </div>
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
-                <table className="min-w-full text-left">
-                  <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
-                    <tr>
-                      {preview.columns.map((field) => (
-                        <th key={field} className="whitespace-nowrap px-4 py-3">
-                          {field}
-                          {sourceFor(mapping, field) && (
-                            <span className="ml-1 font-semibold text-[#0038A8]">
-                              → {sourceFor(mapping, field)}
-                            </span>
-                          )}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
-                    {mappedPreview.map((row, index) => (
-                      <tr key={index}>
+              {preview.kind === "chunks" ? (
+                <DatasetChunkTable items={previewChunkItems(preview).slice(0, 12)} />
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="min-w-full text-left">
+                    <thead className="bg-slate-50 text-[10px] uppercase text-slate-500">
+                      <tr>
                         {preview.columns.map((field) => (
-                          <td
-                            key={field}
-                            className="max-w-xs truncate whitespace-nowrap px-4 py-3"
-                          >
-                            {displayValue(row[field])}
-                          </td>
+                          <th key={field} className="whitespace-nowrap px-4 py-3">
+                            {field}
+                            {sourceFor(mapping, field) && (
+                              <span className="ml-1 font-semibold text-[#0038A8]">
+                                → {sourceFor(mapping, field)}
+                              </span>
+                            )}
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs text-slate-600">
+                      {mappedPreview.map((row, index) => (
+                        <tr key={index}>
+                          {preview.columns.map((field) => (
+                            <td
+                              key={field}
+                              className="max-w-xs truncate whitespace-nowrap px-4 py-3"
+                            >
+                              {displayValue(row[field])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -754,7 +752,7 @@ export default function DatasetWizard({
             className="flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-white disabled:opacity-50"
           >
             {step > 1 && <ArrowLeft size={16} />}
-            {step === 1 ? "Cancelar" : "Atrás"}
+            {step === 1 ? t("common.cancel") : t("evalExtended.back")}
           </button>
           {step === 1 ? (
             <button
@@ -763,7 +761,7 @@ export default function DatasetWizard({
               disabled={busy}
               className="flex items-center gap-2 rounded-lg bg-[#0038A8] px-5 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-50"
             >
-              {busy ? "Obteniendo esquema…" : "Continuar"}
+              {busy ? t("datasets.wizardFetchingSchema") : t("evalExtended.continue")}
               {!busy && <ArrowRight size={16} />}
             </button>
           ) : step === 2 ? (
@@ -771,7 +769,7 @@ export default function DatasetWizard({
               type="button"
               onClick={() => {
                 if (preview?.kind !== "chunks" && !mapping.prompt) {
-                  setError("Asigna al menos una columna al campo prompt.");
+                  setError(t("datasets.wizardPromptRequired"));
                   return;
                 }
                 setError("");
@@ -779,7 +777,9 @@ export default function DatasetWizard({
               }}
               className="flex items-center gap-2 rounded-lg bg-[#0038A8] px-5 py-2.5 text-sm font-bold text-white"
             >
-              {preview?.kind === "chunks" ? "Revisar fragmentos" : "Revisar datos"}{" "}
+              {preview?.kind === "chunks"
+                ? t("datasets.wizardReviewFragments")
+                : t("datasets.wizardReviewData")}{" "}
               <ArrowRight size={16} />
             </button>
           ) : (
@@ -789,7 +789,7 @@ export default function DatasetWizard({
               disabled={busy}
               className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50"
             >
-              {busy ? "Creando dataset…" : "Finalizar y crear"}
+              {busy ? t("datasets.wizardCreating") : t("datasets.wizardFinish")}
               {!busy && <Check size={16} />}
             </button>
           )}

@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from typing import Any
 
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1")
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "ollama")
@@ -109,34 +112,9 @@ def categorize_question(question: str, fallback: str = "direct_fact") -> str:
 
 
 def _extract_pdf_text(content: bytes, *, max_pages: int = 12, max_chars: int = MAX_CHARS) -> str:
-    try:
-        from io import BytesIO
-        from pypdf import PdfReader
+    from services.pdf_extract import extract_pdf_text
 
-        reader = PdfReader(BytesIO(content))
-        pages = [(page.extract_text() or "") for page in reader.pages[:max_pages]]
-        text = "\n".join(pages).strip()
-        if text:
-            return text[:max_chars]
-    except Exception:
-        pass
-    try:
-        import pypdfium2 as pdfium
-
-        pdf = pdfium.PdfDocument(content)
-        parts: list[str] = []
-        for index in range(min(len(pdf), max_pages)):
-            page = pdf[index]
-            textpage = page.get_textpage()
-            parts.append(textpage.get_text_bounded() or "")
-        text = "\n".join(parts).strip()
-        if text:
-            return text[:max_chars]
-    except Exception:
-        pass
-    printable = re.findall(rb"[\x20-\x7E\n]{6,}", content)
-    decoded = "\n".join(p.decode("latin-1", errors="ignore") for p in printable)
-    return decoded[:max_chars]
+    return extract_pdf_text(content, max_pages=max_pages, max_chars=max_chars)
 
 
 def extract_text(filename: str, content: bytes, mime_type: str | None = None) -> str:
@@ -149,6 +127,11 @@ def extract_text(filename: str, content: bytes, mime_type: str | None = None) ->
 
     if name.endswith(".pdf") or "pdf" in mime:
         return _extract_pdf_text(content, max_pages=12, max_chars=MAX_CHARS)
+
+    from services.video_extract import is_video_file, transcribe_video_text
+
+    if is_video_file(filename, mime_type):
+        return transcribe_video_text(content, filename, max_chars=MAX_CHARS)
 
     return content.decode("utf-8", errors="ignore")[:MAX_CHARS]
 
@@ -310,7 +293,7 @@ Documento:
         if parsed:
             return parsed
     except Exception:
-        pass
+        logger.exception("Fallo al extraer preguntas con el LLM")
     return heuristic_questions(snippet, filename)
 
 

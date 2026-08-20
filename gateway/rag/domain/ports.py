@@ -13,7 +13,10 @@ class EmbeddingPort(Protocol):
 @runtime_checkable
 class LlmPort(Protocol):
     async def complete(
-        self, model: str, messages: list[dict[str, str]]
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
     ) -> str: ...
 
     async def parse(

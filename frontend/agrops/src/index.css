@@ -3,12 +3,16 @@
 
 :root {
   --agro-primary: #0038a8;
-  --agro-accent: #c9a227;
+  --agro-primary-hover: #002d86;
+  --agro-accent: #ffd100;
+  --agro-accent-ink: #8a6d00;
   --agro-danger: #d91424;
-  --agro-canvas: #f3f6fb;
+  --agro-canvas: #f7f8fb;
   --agro-surface: #ffffff;
-  --agro-border: #d9e2f1;
-  --agro-ink: #0f172a;
+  --agro-border: #e6eaf2;
+  --agro-ink: #111827;
+  --agro-muted: #6b7280;
+  --agro-pill: #e8eef8;
   color-scheme: light;
 }
 
@@ -23,6 +27,7 @@ body {
   color: var(--agro-ink);
   background: var(--agro-canvas);
   font-family:
+    Inter,
     "Segoe UI",
     ui-sans-serif,
     system-ui,
@@ -35,8 +40,29 @@ body {
   box-sizing: border-box;
 }
 
-/* Scrollbars suaves en paneles densos */
 .overflow-y-auto {
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
+}
+
+.agro-flag-bar {
+  display: flex;
+  height: 4px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.agro-flag-bar > span:nth-child(1) {
+  flex: 1;
+  background: #ffffff;
+}
+
+.agro-flag-bar > span:nth-child(2) {
+  flex: 1;
+  background: #0038a8;
+}
+
+.agro-flag-bar > span:nth-child(3) {
+  flex: 1;
+  background: #ffd100;
 }

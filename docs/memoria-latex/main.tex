@@ -19,6 +19,8 @@
 \usepackage{fancyhdr}
 \usepackage{titlesec}
 \usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,calc,fit,decorations.pathreplacing}
 \usepackage{enumitem}
 \setlength{\headheight}{18pt}
 \addtolength{\topmargin}{-6pt}
@@ -38,8 +40,8 @@
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\tfmauthor}
-\fancyhead[R]{\tfmtitle}
+\fancyhead[L]{\small\tfmauthor}
+\fancyhead[R]{\small\nouppercase{\tfmtitle}}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 

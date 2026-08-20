@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from services.human_validation import save_document_questions
+from services.human_validation import coerce_keywords, save_document_questions
 from services.question_extraction import (
     EVAL_CATEGORIES,
     _parse_llm_questions,
@@ -14,6 +14,12 @@ from services.question_extraction import (
 )
 
 pytestmark = pytest.mark.api
+
+
+def test_coerce_keywords_keeps_explicit_and_derives_from_answer():
+    assert coerce_keywords(["POSEI", "Medida II"]) == ["POSEI", "Medida II"]
+    derived = coerce_keywords([], "¿Presupuesto?", "243,96 millones de euros")
+    assert "243,96" in derived
 
 
 def test_heuristic_questions_from_text():
@@ -86,7 +92,9 @@ def test_list_reviews(authenticated_client, override_db):
     ]
     override_db.execute = AsyncMock(return_value=result)
     override_db.commit = AsyncMock()
-    with patch("routes.human_validation.init_human_validation_tables", new=AsyncMock()):
+    with patch(
+        "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+    ):
         response = authenticated_client.get("/api/v1/human-validation/reviews")
     assert response.status_code == 200
     assert response.json()["data"][0]["question"] == "¿Riego?"
@@ -97,7 +105,9 @@ def test_list_reviews_defaults_to_document_questions(authenticated_client, overr
     result.mappings.return_value.all.return_value = []
     override_db.execute = AsyncMock(return_value=result)
     override_db.commit = AsyncMock()
-    with patch("routes.human_validation.init_human_validation_tables", new=AsyncMock()):
+    with patch(
+        "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+    ):
         response = authenticated_client.get("/api/v1/human-validation/reviews")
     assert response.status_code == 200
     params = override_db.execute.await_args.args[1]
@@ -111,16 +121,27 @@ def test_decide_review(authenticated_client, override_db):
     select.mappings.return_value.first.return_value = {
         "document_id": None,
         "question": "¿Riego?",
+        "answer": "Goteo",
+        "source": "chat",
     }
     override_db.execute = AsyncMock(side_effect=[update, select])
     override_db.commit = AsyncMock()
-    with patch("routes.human_validation.init_human_validation_tables", new=AsyncMock()):
+    with (
+        patch(
+            "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+        ),
+        patch(
+            "evaluation.application.hitl.promote_review_to_evaluation_bank",
+            new=AsyncMock(),
+        ) as promote,
+    ):
         response = authenticated_client.post(
             "/api/v1/human-validation/reviews/r1",
             json={"status": "approved", "reviewer_notes": "Correcto"},
         )
     assert response.status_code == 200
     assert response.json()["decision"] == "approved"
+    promote.assert_awaited_once()
 
 
 def test_decide_review_promotes_approved_document_question(
@@ -141,18 +162,26 @@ def test_decide_review_promotes_approved_document_question(
     override_db.execute = AsyncMock(side_effect=[update, select, question_update])
     override_db.commit = AsyncMock()
     with (
-        patch("routes.human_validation.init_human_validation_tables", new=AsyncMock()),
+        patch("evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()),
         patch(
-            "routes.human_validation.promote_review_to_evaluation_bank",
+            "evaluation.application.hitl.promote_review_to_evaluation_bank",
             new=AsyncMock(),
         ) as promote,
     ):
         response = authenticated_client.post(
             "/api/v1/human-validation/reviews/r1",
-            json={"status": "approved", "reviewer_notes": "Correcto"},
+            json={
+                "status": "approved",
+                "reviewer_notes": "Correcto",
+                "keywords": ["SAT"],
+                "category": "direct_fact",
+                "corrected_answer": "Sociedad Agraria de Transformación.",
+            },
         )
     assert response.status_code == 200
     promote.assert_awaited_once()
+    assert promote.await_args.kwargs["keywords"] == ["SAT"]
+    assert promote.await_args.kwargs["category"] == "direct_fact"
 
 
 def test_decide_synthetic_review_updates_dataset_row(authenticated_client, override_db):
@@ -171,7 +200,15 @@ def test_decide_synthetic_review_updates_dataset_row(authenticated_client, overr
         side_effect=[update, select, MagicMock(), MagicMock()]
     )
     override_db.commit = AsyncMock()
-    with patch("routes.human_validation.init_human_validation_tables", new=AsyncMock()):
+    with (
+        patch(
+            "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+        ),
+        patch(
+            "evaluation.application.hitl.promote_review_to_evaluation_bank",
+            new=AsyncMock(),
+        ),
+    ):
         response = authenticated_client.post(
             "/api/v1/human-validation/reviews/r1",
             json={"status": "corrected", "corrected_answer": "21 toneladas"},

@@ -8,17 +8,24 @@ services:
     container_name: agrops-ollama
     volumes:
       - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    gpus: all
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-30m}
-      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
-      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-1}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-2}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-2}
+      OLLAMA_NUM_GPU: 1
+      OLLAMA_FLASH_ATTENTION: "1"
     healthcheck:
-      test: ["CMD", "ollama", "list"]
-      interval: 30s
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 10s
       timeout: 15s
-      retries: 10
-      start_period: 40s
+      retries: 12
+      start_period: 60s
 
   ollama-init:
     image: ollama/ollama:latest
@@ -31,7 +38,7 @@ services:
     restart: "no"
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      ollama pull ${RAG_EMBEDDING_MODEL:-qwen3-embedding:latest} &&
+      ollama pull ${RAG_EMBEDDING_MODEL:-nomic-embed-text} &&
       ollama pull ${RAG_GENERATION_MODEL:-llama3.2:latest}
 
   postgres:
@@ -39,6 +46,8 @@ services:
     image: pgvector/pgvector:pg18
     container_name: agrops-postgres
     env_file: [.env]
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -60,11 +69,13 @@ services:
   migrate:
     image: pgvector/pgvector:pg18
     restart: "no"
+    env_file: [.env]
     environment:
       PGHOST: postgres
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       PGDATABASE: ${POSTGRES_DB}
+      PGCONNECT_TIMEOUT: "10"
     volumes:
       - ./postgres/migrations:/migrations:ro
     depends_on:
@@ -73,7 +84,11 @@ services:
     command:
       - /bin/sh
       - -c
-      - for file in /migrations/*.sql; do psql -v ON_ERROR_STOP=1 -f "$$file"; done
+      - |
+        for file in /migrations/*.sql; do
+          echo "Applying $$file"
+          psql -v ON_ERROR_STOP=1 -f "$$file"
+        done
 
   api:
     <<: *restart
@@ -82,18 +97,40 @@ services:
     image: ${DOCKERHUB_USER:-local}/agrops-api:${IMAGE_TAG:-latest}
     container_name: agrops-api
     env_file: [.env]
+    ports:
+      - "8000:8000"
     environment:
-      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SECRET_KEY: ${SECRET_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       OLLAMA_BASE_URL: http://ollama:11434/v1
       OLLAMA_URL: http://ollama:11434
       OLLAMA_API_KEY: ${OLLAMA_API_KEY:-ollama}
-      RAG_MAX_TOKENS: ${RAG_MAX_TOKENS:-640}
+      RAG_MAX_TOKENS: ${RAG_MAX_TOKENS:-1536}
       RAG_USE_RERANKER: ${RAG_USE_RERANKER:-false}
-      RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-qwen3-embedding:latest}
+      RAG_USE_QUERY_REWRITE: ${RAG_USE_QUERY_REWRITE:-false}
+      RAG_AGENT_FAST: ${RAG_AGENT_FAST:-true}
+      RAG_AGENT_MAX_REWRITES: ${RAG_AGENT_MAX_REWRITES:-0}
+      RAG_CHAT_MAX_TOKENS: ${RAG_CHAT_MAX_TOKENS:-512}
+      RAG_NUM_CTX: ${RAG_NUM_CTX:-4096}
+      RAG_FINAL_K: ${RAG_FINAL_K:-8}
+      RAG_RETRIEVAL_K: ${RAG_RETRIEVAL_K:-12}
+      RAG_EMBEDDING_MODEL: ${RAG_EMBEDDING_MODEL:-nomic-embed-text}
       RAG_GENERATION_MODEL: ${RAG_GENERATION_MODEL:-llama3.2:latest}
+      RAG_KEEP_ALIVE: ${RAG_KEEP_ALIVE:-24h}
+      RAG_EMBED_BATCH_SIZE: ${RAG_EMBED_BATCH_SIZE:-64}
+      RAG_CHUNK_SIZE: ${RAG_CHUNK_SIZE:-1400}
+      RAG_CHUNK_OVERLAP: ${RAG_CHUNK_OVERLAP:-120}
+      RAG_PDF_OCR: ${RAG_PDF_OCR:-true}
+      RAG_PDF_MAX_PAGES: ${RAG_PDF_MAX_PAGES:-120}
+      RAG_PDF_OCR_SCALE: ${RAG_PDF_OCR_SCALE:-2}
+      RAG_WHISPER_MODEL: ${RAG_WHISPER_MODEL:-tiny}
+      RAG_WHISPER_DEVICE: ${RAG_WHISPER_DEVICE:-cpu}
+      RAG_WHISPER_LANGUAGE: ${RAG_WHISPER_LANGUAGE:-es}
       TOKENIZERS_PARALLELISM: "false"
+      DOCUMENT_STORAGE_ROOT: /app/uploads
+    volumes:
+      - ./data/uploads:/app/uploads
     depends_on:
       ollama:
         condition: service_healthy
@@ -121,6 +158,8 @@ services:
         condition: service_healthy
     ports:
       - "80:80"
+    volumes:
+      - ./frontend/agrops/nginx.conf:/etc/nginx/conf.d/default.conf:ro
 
 volumes:
   postgres_data:

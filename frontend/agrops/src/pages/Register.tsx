@@ -1,11 +1,13 @@
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
-import { Leaf, Mail, Lock, User } from "lucide-react";
+import { Lock, Mail, User } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
 
 import api from "@/api";
 import bgFarm from "@/assets/login-bg.png";
+import { BrandMark } from "@/components/BrandMark";
+import { useTranslation } from "@/i18n/I18nProvider";
 
 interface RegisterForm {
     name: string;
@@ -15,6 +17,7 @@ interface RegisterForm {
 }
 
 export default function Register() {
+    const { t } = useTranslation();
     const navigate = useNavigate();
 
     const {
@@ -29,223 +32,168 @@ export default function Register() {
     const onSubmit = async (data: RegisterForm) => {
         try {
             const { confirmPassword, ...payload } = data;
-
+            void confirmPassword;
             await api.post("/auth/register", payload);
-
-            toast.success("Cuenta creada correctamente");
-
+            toast.success(t("auth.accountCreated"));
             navigate("/login");
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 toast.error(
-                    error.response?.data?.detail ??
-                        "No se pudo crear la cuenta"
+                    error.response?.data?.detail ?? t("auth.accountCreateFailed"),
                 );
             } else {
-                toast.error("Ha ocurrido un error inesperado");
+                toast.error(t("auth.unexpectedError"));
             }
         }
     };
 
+    const fieldClass =
+        "w-full rounded-lg border border-slate-200 py-3 pl-10 pr-4 outline-none focus:border-[color:var(--agro-primary)] focus:ring-2 focus:ring-[color:var(--agro-pill)]";
+
     return (
-        <div className="min-h-screen flex">
-            {/* Panel izquierdo */}
-            <div
-                className="hidden lg:flex w-1/2 text-white items-center justify-center p-16 bg-cover bg-center relative"
-                style={{
-                    backgroundImage: `linear-gradient(rgba(21,128,61,.82), rgba(21,128,61,.82)), url(${bgFarm})`,
-                }}
-            >
-                <div className="max-w-md relative z-10">
-                    <Leaf size={60} />
-
-                    <h1 className="text-5xl font-bold mt-6">
-                        AgroPS
-                    </h1>
-
-                    <p className="mt-6 text-lg leading-relaxed opacity-95">
-                        Crea tu cuenta y comienza a utilizar la plataforma
-                        inteligente para la gestión documental agrícola.
-                    </p>
-
-                    <ul className="mt-10 space-y-4 text-green-50 font-medium">
-                        <li>Gestión documental</li>
-                        <li>Inteligencia Artificial</li>
-                        <li>Bases de conocimiento privadas</li>
-                        <li>Consulta normativa agrícola</li>
-                    </ul>
-                </div>
+        <div className="flex min-h-screen flex-col">
+            <div className="agro-flag-bar" aria-hidden>
+                <span />
+                <span />
+                <span />
             </div>
-
-            {/* Panel derecho */}
-            <div className="flex-1 flex items-center justify-center bg-gray-50 p-8">
-                <div className="w-full max-w-md">
-                    <div className="bg-white rounded-2xl shadow-xl p-10">
-                        <h2 className="text-3xl font-bold text-center text-gray-800">
-                            Crear cuenta
-                        </h2>
-
-                        <p className="text-center text-gray-500 mt-2 mb-8">
-                            Regístrate para comenzar
+            <div className="flex min-h-0 flex-1">
+                <div
+                    className="relative hidden w-1/2 items-center justify-center bg-cover bg-center p-16 text-white lg:flex"
+                    style={{
+                        backgroundImage: `linear-gradient(rgba(0, 56, 168, 0.88), rgba(0, 45, 134, 0.92)), url(${bgFarm})`,
+                    }}
+                >
+                    <div className="relative z-10 max-w-md">
+                        <BrandMark
+                            size="lg"
+                            subtitle={t("common.canary")}
+                            className="[&_p]:text-white [&_span]:text-[#FFD100]"
+                        />
+                        <h1 className="mt-8 text-4xl font-bold tracking-tight">
+                            {t("auth.registerHero")}
+                        </h1>
+                        <p className="mt-5 text-lg leading-relaxed text-blue-50">
+                            {t("auth.registerHeroDesc")}
                         </p>
+                    </div>
+                </div>
 
-                        <form
-                            onSubmit={handleSubmit(onSubmit)}
-                            className="space-y-6"
-                        >
-                            {/* Nombre */}
-                            <div>
-                                <label className="font-medium text-gray-700">
-                                    Nombre completo
-                                </label>
-
-                                <div className="relative mt-2">
-                                    <User
-                                        size={18}
-                                        className="absolute left-3 top-3 text-gray-400"
-                                    />
-
-                                    <input
-                                        type="text"
-                                        placeholder="Juan Pérez"
-                                        className="w-full border rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-green-600 outline-none"
-                                        {...register("name", {
-                                            required:
-                                                "Introduce tu nombre",
-                                        })}
-                                    />
-                                </div>
-
-                                {errors.name && (
-                                    <p className="text-red-500 text-sm mt-1">
-                                        {errors.name.message}
-                                    </p>
-                                )}
+                <div className="flex flex-1 items-center justify-center bg-[color:var(--agro-canvas)] p-8">
+                    <div className="w-full max-w-md">
+                        <div className="mb-6 lg:hidden">
+                            <BrandMark size="lg" />
+                        </div>
+                        <div className="overflow-hidden rounded-2xl border border-[color:var(--agro-border)] bg-white shadow-xl">
+                            <div className="agro-flag-bar" aria-hidden>
+                                <span />
+                                <span />
+                                <span />
                             </div>
-
-                            {/* Email */}
-                            <div>
-                                <label className="font-medium text-gray-700">
-                                    Correo electrónico
-                                </label>
-
-                                <div className="relative mt-2">
-                                    <Mail
-                                        size={18}
-                                        className="absolute left-3 top-3 text-gray-400"
-                                    />
-
-                                    <input
-                                        type="email"
-                                        placeholder="usuario@correo.com"
-                                        className="w-full border rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-green-600 outline-none"
-                                        {...register("email", {
-                                            required:
-                                                "Introduce tu correo",
-                                            pattern: {
-                                                value: /^\S+@\S+\.\S+$/,
-                                                message:
-                                                    "Correo electrónico inválido",
-                                            },
-                                        })}
-                                    />
+                            <div className="p-10">
+                                <h2 className="text-center text-3xl font-bold text-slate-900">
+                                    {t("auth.registerTitle")}
+                                </h2>
+                                <p className="mb-8 mt-2 text-center text-slate-500">
+                                    {t("auth.registerSubtitle")}
+                                </p>
+                                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                                    <div>
+                                        <label className="font-medium text-slate-700">{t("auth.fullName")}</label>
+                                        <div className="relative mt-2">
+                                            <User size={18} className="absolute left-3 top-3 text-slate-400" />
+                                            <input
+                                                type="text"
+                                                placeholder={t("auth.namePlaceholder")}
+                                                className={fieldClass}
+                                                {...register("name", { required: t("auth.nameRequired") })}
+                                            />
+                                        </div>
+                                        {errors.name && (
+                                            <p className="mt-1 text-sm text-red-500">{errors.name.message}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="font-medium text-slate-700">{t("auth.email")}</label>
+                                        <div className="relative mt-2">
+                                            <Mail size={18} className="absolute left-3 top-3 text-slate-400" />
+                                            <input
+                                                type="email"
+                                                placeholder={t("auth.emailPlaceholder")}
+                                                className={fieldClass}
+                                                {...register("email", {
+                                                    required: t("auth.emailRequired"),
+                                                    pattern: {
+                                                        value: /^\S+@\S+\.\S+$/,
+                                                        message: t("auth.emailInvalid"),
+                                                    },
+                                                })}
+                                            />
+                                        </div>
+                                        {errors.email && (
+                                            <p className="mt-1 text-sm text-red-500">{errors.email.message}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="font-medium text-slate-700">{t("auth.password")}</label>
+                                        <div className="relative mt-2">
+                                            <Lock size={18} className="absolute left-3 top-3 text-slate-400" />
+                                            <input
+                                                type="password"
+                                                placeholder="********"
+                                                className={fieldClass}
+                                                {...register("password", {
+                                                    required: t("auth.passwordRequired"),
+                                                    minLength: {
+                                                        value: 8,
+                                                        message: t("auth.passwordMin"),
+                                                    },
+                                                })}
+                                            />
+                                        </div>
+                                        {errors.password && (
+                                            <p className="mt-1 text-sm text-red-500">{errors.password.message}</p>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label className="font-medium text-slate-700">{t("auth.confirmPassword")}</label>
+                                        <div className="relative mt-2">
+                                            <Lock size={18} className="absolute left-3 top-3 text-slate-400" />
+                                            <input
+                                                type="password"
+                                                placeholder="********"
+                                                className={fieldClass}
+                                                {...register("confirmPassword", {
+                                                    required: t("auth.confirmRequired"),
+                                                    validate: (value) =>
+                                                        value === password || t("auth.passwordMismatch"),
+                                                })}
+                                            />
+                                        </div>
+                                        {errors.confirmPassword && (
+                                            <p className="mt-1 text-sm text-red-500">
+                                                {errors.confirmPassword.message}
+                                            </p>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="submit"
+                                        disabled={isSubmitting}
+                                        className="w-full rounded-lg bg-[color:var(--agro-primary)] py-3 font-semibold text-white transition hover:bg-[color:var(--agro-primary-hover)] disabled:opacity-50"
+                                    >
+                                        {isSubmitting ? t("auth.creatingAccount") : t("auth.registerTitle")}
+                                    </button>
+                                </form>
+                                <div className="mt-8 text-center text-slate-600">
+                                    {t("auth.hasAccount")}
+                                    <Link
+                                        to="/login"
+                                        className="ml-2 font-semibold text-[color:var(--agro-primary)] hover:underline"
+                                    >
+                                        {t("auth.loginTitle")}
+                                    </Link>
                                 </div>
-
-                                {errors.email && (
-                                    <p className="text-red-500 text-sm mt-1">
-                                        {errors.email.message}
-                                    </p>
-                                )}
                             </div>
-
-                            {/* Password */}
-                            <div>
-                                <label className="font-medium text-gray-700">
-                                    Contraseña
-                                </label>
-
-                                <div className="relative mt-2">
-                                    <Lock
-                                        size={18}
-                                        className="absolute left-3 top-3 text-gray-400"
-                                    />
-
-                                    <input
-                                        type="password"
-                                        placeholder="********"
-                                        className="w-full border rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-green-600 outline-none"
-                                        {...register("password", {
-                                            required:
-                                                "Introduce una contraseña",
-                                            minLength: {
-                                                value: 8,
-                                                message:
-                                                    "Debe tener al menos 8 caracteres",
-                                            },
-                                        })}
-                                    />
-                                </div>
-
-                                {errors.password && (
-                                    <p className="text-red-500 text-sm mt-1">
-                                        {errors.password.message}
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Confirmar password */}
-                            <div>
-                                <label className="font-medium text-gray-700">
-                                    Confirmar contraseña
-                                </label>
-
-                                <div className="relative mt-2">
-                                    <Lock
-                                        size={18}
-                                        className="absolute left-3 top-3 text-gray-400"
-                                    />
-
-                                    <input
-                                        type="password"
-                                        placeholder="********"
-                                        className="w-full border rounded-lg pl-10 pr-4 py-3 focus:ring-2 focus:ring-green-600 outline-none"
-                                        {...register("confirmPassword", {
-                                            required:
-                                                "Confirma la contraseña",
-                                            validate: (value) =>
-                                                value === password ||
-                                                "Las contraseñas no coinciden",
-                                        })}
-                                    />
-                                </div>
-
-                                {errors.confirmPassword && (
-                                    <p className="text-red-500 text-sm mt-1">
-                                        {errors.confirmPassword.message}
-                                    </p>
-                                )}
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isSubmitting}
-                                className="w-full bg-green-700 hover:bg-green-800 text-white rounded-lg py-3 font-semibold transition disabled:opacity-50"
-                            >
-                                {isSubmitting
-                                    ? "Creando cuenta..."
-                                    : "Crear cuenta"}
-                            </button>
-                        </form>
-
-                        <div className="mt-8 text-center text-gray-600">
-                            ¿Ya tienes cuenta?
-
-                            <Link
-                                to="/login"
-                                className="ml-2 text-green-700 font-semibold hover:underline"
-                            >
-                                Iniciar sesión
-                            </Link>
                         </div>
                     </div>
                 </div>

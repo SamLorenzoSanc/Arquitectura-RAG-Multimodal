@@ -1,3 +1,5 @@
+import type { KnowledgeBaseSummary } from "@/services/knowledge.service";
+
 export interface Department {
     id: string;
     name: string;
@@ -26,8 +28,11 @@ export interface OrgContextType {
     organizations: Organization[];
     selectedOrg: Organization | null;
     selectedDept: Department | null;
+    knowledgeBases: KnowledgeBaseSummary[];
+    generalKnowledgeBase: KnowledgeBaseSummary | null;
     setSelectedOrg: (org: Organization | null) => void;
     setSelectedDept: (dept: Department | null) => void;
+    reloadKnowledgeBases: () => Promise<KnowledgeBaseSummary[]>;
     addOrganization: (name: string, description: string) => Promise<void>;
     setOrganizations: (orgs: Organization[]) => void;
 }

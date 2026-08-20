@@ -13,6 +13,7 @@ export interface KnowledgeNode {
     words?: number;
     x: number;
     y: number;
+    z?: number;
     weight?: number;
     group?: string;
     has_embedding?: boolean;

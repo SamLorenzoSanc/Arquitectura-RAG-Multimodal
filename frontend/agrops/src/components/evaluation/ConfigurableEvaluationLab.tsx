@@ -15,6 +15,8 @@ import {
 import { queryKeys } from "@/lib/queryKeys";
 import DatasetService from "@/services/dataset.service";
 import EvaluationService from "@/services/evaluation.service";
+import FrozenRagConfigBar from "@/components/evaluation/FrozenRagConfigBar";
+import { useTranslation } from "@/i18n/I18nProvider";
 import type { RagDataset, RagField } from "@/types/dataset";
 import type {
   EvaluationCatalog,
@@ -29,7 +31,7 @@ type Props = {
   initialDatasetId?: string;
 };
 
-function message(error: unknown) {
+function message(error: unknown, fallback: string) {
   const candidate = error as {
     response?: { data?: { detail?: string | { message?: string } } };
     message?: string;
@@ -38,7 +40,7 @@ function message(error: unknown) {
   return (
     (typeof detail === "string" ? detail : detail?.message) ||
     candidate.message ||
-    "No se pudo completar la operación."
+    fallback
   );
 }
 
@@ -46,6 +48,7 @@ export default function ConfigurableEvaluationLab({
   organizationId,
   initialDatasetId,
 }: Props) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [datasetId, setDatasetId] = useState(initialDatasetId ?? "");
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -107,10 +110,10 @@ export default function ConfigurableEvaluationLab({
         <div>
           <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-700">
             <FlaskConical size={15} />
-            Laboratorio configurable
+            {t("evalExtended.configLabEyebrow")}
           </p>
           <h2 className="mt-1 text-xl font-extrabold text-slate-900">
-            Evaluaciones por dataset
+            {t("evalExtended.configLabTitle")}
           </h2>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -122,10 +125,13 @@ export default function ConfigurableEvaluationLab({
             }}
             className="h-10 min-w-64 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold"
           >
-            <option value="">Selecciona un dataset</option>
+            <option value="">{t("evalExtended.selectDataset")}</option>
             {(datasets.data ?? []).map((dataset: RagDataset) => (
               <option key={dataset.id} value={dataset.id}>
-                {dataset.name} · {dataset.row_count ?? 0} filas
+                {t("evalExtended.configDatasetRowsOption", {
+                  name: dataset.name,
+                  count: dataset.row_count ?? 0,
+                })}
               </option>
             ))}
           </select>
@@ -136,13 +142,15 @@ export default function ConfigurableEvaluationLab({
             className="flex h-10 items-center gap-2 rounded-lg bg-blue-700 px-4 text-sm font-bold text-white disabled:opacity-40"
           >
             <Plus size={16} />
-            Añadir evaluación
+            {t("evalExtended.addEvaluation")}
           </button>
         </div>
       </div>
 
+      <FrozenRagConfigBar />
+
       {catalog.isError && (
-        <ErrorBox text={message(catalog.error)} />
+        <ErrorBox text={message(catalog.error, t("evalExtended.operationFailed"))} />
       )}
 
       {datasetId && (
@@ -150,10 +158,12 @@ export default function ConfigurableEvaluationLab({
           <div className="overflow-hidden rounded-xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
               <p className="text-xs font-bold text-slate-700">
-                Muestra del dataset · {rows.length} filas cargadas
+                {t("evalExtended.configDatasetRows", { count: rows.length })}
               </p>
               <p className="text-[11px] text-slate-400">
-                Campos detectados: {columns.join(", ") || "ninguno"}
+                {t("evalExtended.configFieldsDetected", {
+                  fields: columns.join(", ") || t("evalExtended.configNoFields"),
+                })}
               </p>
             </div>
             <div className="max-h-64 overflow-auto">
@@ -215,7 +225,9 @@ export default function ConfigurableEvaluationLab({
                   <h3 className="font-bold text-slate-900">{activeConfig.name}</h3>
                   <p className="mt-1 text-xs text-slate-500">
                     Ollama · {activeConfig.model_name} ·{" "}
-                    {activeConfig.metrics.length} métricas
+                    {t("evalExtended.configMetricsCount", {
+                      count: activeConfig.metrics.length,
+                    })}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {activeConfig.metrics.map((metric) => (
@@ -244,7 +256,7 @@ export default function ConfigurableEvaluationLab({
                     className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600"
                   >
                     <Pencil size={14} />
-                    Editar
+                    {t("evalExtended.configEdit")}
                   </button>
                   <button
                     type="button"
@@ -253,24 +265,26 @@ export default function ConfigurableEvaluationLab({
                     className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
                   >
                     <Play size={14} />
-                    {runMutation.isPending ? "Ejecutando…" : "Ejecutar"}
+                    {runMutation.isPending
+                      ? t("evalExtended.configExecuting")
+                      : t("evalExtended.configRun")}
                   </button>
                 </div>
               </div>
               {runMutation.isError && (
                 <div className="mt-3">
-                  <ErrorBox text={message(runMutation.error)} />
+                  <ErrorBox text={message(runMutation.error, t("evalExtended.operationFailed"))} />
                 </div>
               )}
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-              Añade una evaluación para configurar métricas y umbrales.
+              {t("evalExtended.configAddHint")}
             </div>
           )}
 
           {latestRun && (
-            <EvaluationRunResults run={latestRun} catalog={catalog.data} />
+            <EvaluationRunResults run={latestRun} catalog={catalog.data} t={t} />
           )}
         </>
       )}
@@ -315,6 +329,7 @@ function EvaluationCatalogModal({
   onClose: () => void;
   onNext: (metrics: EvaluationMetric[]) => void;
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState<"all" | EvaluationMetric["category"]>(
     "all",
@@ -332,10 +347,10 @@ function EvaluationCatalogModal({
     <ModalShell onClose={onClose} width="max-w-4xl">
       <div className="border-b border-slate-200 px-6 py-5">
         <h2 className="text-lg font-extrabold text-slate-900">
-          Añadir evaluaciones
+          {t("evalExtended.configAddEvaluations")}
         </h2>
         <p className="mt-1 text-xs text-slate-500">
-          Selecciona métricas compatibles con las columnas del dataset.
+          {t("evalExtended.configAddEvaluationsHint")}
         </p>
       </div>
       <div className="space-y-4 p-6">
@@ -347,7 +362,7 @@ function EvaluationCatalogModal({
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar una evaluación"
+            placeholder={t("evalExtended.searchEval")}
             className="h-11 w-full rounded-lg border border-slate-200 pl-10 pr-3 text-sm outline-none focus:border-blue-500"
           />
         </label>
@@ -364,7 +379,7 @@ function EvaluationCatalogModal({
                     : "border-l border-slate-200 text-slate-500 first:border-0"
                 }`}
               >
-                {item === "all" ? "Todas" : item}
+                {item === "all" ? t("evalExtended.configAllCategories") : item}
               </button>
             ),
           )}
@@ -387,7 +402,7 @@ function EvaluationCatalogModal({
                 className={`rounded-xl border p-4 text-left transition ${
                   checked
                     ? "border-blue-500 bg-blue-50"
-                    : "border-slate-200 bg-white"
+                    : "border-slate-200 bg-white hover:bg-slate-50"
                 } disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-55`}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -404,9 +419,14 @@ function EvaluationCatalogModal({
                 <p className="mt-2 text-xs leading-relaxed text-slate-500">
                   {metric.description}
                 </p>
+                <span className="mt-3 inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                  {metric.engine}
+                </span>
                 {!metric.compatible && (
                   <p className="mt-2 text-[10px] font-bold text-amber-700">
-                    Faltan: {metric.missing_fields.join(", ")}
+                    {t("evalExtended.configMissingFields", {
+                      fields: metric.missing_fields.join(", "),
+                    })}
                   </p>
                 )}
               </button>
@@ -420,7 +440,7 @@ function EvaluationCatalogModal({
           onClick={onClose}
           className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600"
         >
-          Cancelar
+          {t("common.cancel")}
         </button>
         <button
           type="button"
@@ -430,7 +450,7 @@ function EvaluationCatalogModal({
           }
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
         >
-          Configurar {selected.length || ""}
+          {t("evalExtended.configure", { n: selected.length || "" })}
           <ChevronRight size={15} />
         </button>
       </div>
@@ -455,6 +475,7 @@ function EvaluationConfigPanel({
   onClose: () => void;
   onSaved: (config: EvaluationConfig) => void;
 }) {
+  const { t } = useTranslation();
   const requirements = useMemo(
     () => [...new Set(metrics.flatMap((metric) => metric.required_fields))],
     [metrics],
@@ -474,7 +495,9 @@ function EvaluationConfigPanel({
       "prompt"
     );
   };
-  const [name, setName] = useState(existing?.name ?? metrics[0]?.name ?? "Evaluación");
+  const [name, setName] = useState(
+    existing?.name ?? metrics[0]?.name ?? t("evalExtended.defaultEvalName"),
+  );
   const [model, setModel] = useState(
     existing?.model_name ?? catalog.models[0] ?? "llama3.2:latest",
   );
@@ -542,24 +565,26 @@ function EvaluationConfigPanel({
           className="w-full text-lg font-extrabold text-slate-900 outline-none"
         />
         <p className="mt-1 text-xs text-slate-500">
-          Configura proveedor, modelo, esquema, umbrales y filtros.
+          {t("evalExtended.configConfigureHint")}
         </p>
       </div>
       <div className="max-h-[68vh] space-y-6 overflow-auto p-6">
         <div>
-          <h3 className="text-sm font-extrabold text-slate-900">Parámetros</h3>
+          <h3 className="text-sm font-extrabold text-slate-900">
+            {t("evalExtended.configParameters")}
+          </h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <label className="text-xs font-bold text-slate-600">
-              Proveedor
+              {t("evalExtended.configProvider")}
               <select
                 disabled
                 className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3"
               >
-                <option>Ollama local</option>
+                <option>{t("evalExtended.configProviderOllama")}</option>
               </select>
             </label>
             <label className="text-xs font-bold text-slate-600">
-              Modelo
+              {t("evalExtended.configModel")}
               <select
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
@@ -574,7 +599,9 @@ function EvaluationConfigPanel({
         </div>
 
         <div>
-          <h3 className="text-sm font-extrabold text-slate-900">Esquema</h3>
+          <h3 className="text-sm font-extrabold text-slate-900">
+            {t("evalExtended.configSchema")}
+          </h3>
           <div className="mt-3 space-y-2">
             {requirements.map((requirement) => (
               <div
@@ -605,7 +632,9 @@ function EvaluationConfigPanel({
         </div>
 
         <div>
-          <h3 className="text-sm font-extrabold text-slate-900">Umbrales</h3>
+          <h3 className="text-sm font-extrabold text-slate-900">
+            {t("evalExtended.configThresholds")}
+          </h3>
           <div className="mt-3 space-y-2">
             {metrics.map((metric) => (
               <div
@@ -654,10 +683,12 @@ function EvaluationConfigPanel({
         </div>
 
         <div>
-          <h3 className="text-sm font-extrabold text-slate-900">Filtros</h3>
+          <h3 className="text-sm font-extrabold text-slate-900">
+            {t("evalExtended.configFilters")}
+          </h3>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <label className="text-xs font-bold text-slate-600">
-              Split
+              {t("evalExtended.configSplit")}
               <select
                 value={split}
                 onChange={(event) =>
@@ -665,13 +696,13 @@ function EvaluationConfigPanel({
                 }
                 className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-2"
               >
-                <option value="all">Todos</option>
+                <option value="all">{t("evalExtended.configSplitAll")}</option>
                 <option value="dev">Dev</option>
                 <option value="holdout">Holdout</option>
               </select>
             </label>
             <label className="text-xs font-bold text-slate-600">
-              Límite
+              {t("evalExtended.configLimit")}
               <input
                 type="number"
                 min={1}
@@ -682,7 +713,7 @@ function EvaluationConfigPanel({
               />
             </label>
             <label className="text-xs font-bold text-slate-600">
-              Categorías
+              {t("evalExtended.configCategories")}
               <input
                 value={categories}
                 onChange={(event) => setCategories(event.target.value)}
@@ -692,7 +723,9 @@ function EvaluationConfigPanel({
             </label>
           </div>
         </div>
-        {mutation.isError && <ErrorBox text={message(mutation.error)} />}
+        {mutation.isError && (
+          <ErrorBox text={message(mutation.error, t("evalExtended.operationFailed"))} />
+        )}
       </div>
       <div className="flex justify-end gap-2 border-t border-slate-200 px-6 py-4">
         <button
@@ -700,7 +733,7 @@ function EvaluationConfigPanel({
           onClick={onClose}
           className="rounded-lg border border-slate-200 px-5 py-2 text-xs font-bold text-slate-600"
         >
-          Atrás
+          {t("evalExtended.back")}
         </button>
         <button
           type="button"
@@ -708,7 +741,7 @@ function EvaluationConfigPanel({
           onClick={save}
           className="rounded-lg bg-blue-600 px-6 py-2 text-xs font-bold text-white disabled:opacity-40"
         >
-          {mutation.isPending ? "Guardando…" : "Guardar"}
+          {mutation.isPending ? t("evalExtended.configSaving") : t("common.save")}
         </button>
       </div>
     </ModalShell>
@@ -718,17 +751,24 @@ function EvaluationConfigPanel({
 function EvaluationRunResults({
   run,
   catalog,
+  t,
 }: {
   run: EvaluationRun;
   catalog?: EvaluationCatalog;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="font-bold text-slate-900">Resultado de la corrida</h3>
+          <h3 className="font-bold text-slate-900">{t("evalExtended.configRunResult")}</h3>
           <p className="text-xs text-slate-500">
-            {run.row_count} filas · {run.cached ? "resultado reutilizado" : "nueva ejecución"}
+            {t("evalExtended.configRunRows", {
+              count: run.row_count,
+              mode: run.cached
+                ? t("evalExtended.runReused")
+                : t("evalExtended.runNew"),
+            })}
           </p>
         </div>
         <div className="flex gap-2">

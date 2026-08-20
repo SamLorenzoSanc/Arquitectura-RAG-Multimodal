@@ -27,6 +27,7 @@ export interface RagDataset {
   description?: string | null;
   source: DatasetSource;
   source_type?: string;
+  source_name?: string | null;
   status: DatasetStatus;
   row_count?: number;
   knowledge_base_id: string;
@@ -34,6 +35,11 @@ export interface RagDataset {
   department_ids?: string[];
   departments?: Array<{ id: string; name: string }>;
   mapping?: DatasetMapping;
+  source_metadata?: {
+    kind?: "tabular" | "chunks";
+    format?: string;
+    [key: string]: unknown;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -46,6 +52,9 @@ export interface DatasetChunk {
   summary: string;
   fragment: string;
   characters: number;
+  filename?: string;
+  title?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DatasetPreview {
@@ -54,6 +63,7 @@ export interface DatasetPreview {
   total_rows?: number;
   kind?: "tabular" | "chunks";
   format?: string;
+  filename?: string;
   schema_mapping?: Record<string, { columnType: string }>;
   suggested_mapping?: DatasetMapping;
   chunks?: DatasetChunk[];
@@ -120,12 +130,21 @@ export interface DatasetTrace {
   llm_columns?: Record<string, unknown>;
 }
 
+export interface GuardrailRowVerdict {
+  row_id: string;
+  traceId: string;
+  passed: boolean;
+  flags: string[];
+  details?: Record<string, unknown>;
+}
+
 export interface GuardrailRunResult {
   id: string;
   scanned: number;
   passed: number;
   flagged: number;
   flags: Record<string, number>;
+  rows?: GuardrailRowVerdict[];
 }
 
 export const DEFAULT_LLM_COLUMN_TEMPLATE =

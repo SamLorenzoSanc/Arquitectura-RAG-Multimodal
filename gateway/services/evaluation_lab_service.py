@@ -26,6 +26,7 @@ from services.evaluation_metrics import (
 )
 from services.hallucination_metric import decide_is_hallucination
 from services.ragas_service import RAGAS_METRICS, RagasSample, run_ragas_evaluation
+from rag.adapters.outbound.ollama import RAG_TEMPERATURE
 
 RAG_FIELDS = (
     "traceId",
@@ -44,8 +45,8 @@ RAG_FIELDS = (
 METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "faithfulness",
-        "name": "Fidelidad",
-        "description": "Comprueba si la respuesta está respaldada por el contexto.",
+        "name": "Fidelidad al boletín",
+        "description": "Comprueba si el consejo agrícola está respaldado por la normativa o ficha recuperada.",
         "category": "response",
         "required_fields": ["context", "response"],
         "default_threshold": {"operator": "gte", "value": 0.7},
@@ -53,8 +54,8 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "answer_relevancy",
-        "name": "Relevancia de respuesta",
-        "description": "Mide si la respuesta atiende directamente al prompt.",
+        "name": "Pertinencia agraria",
+        "description": "Mide si la respuesta atiende al cultivo, parcela o trámite preguntado, sin relleno.",
         "category": "response",
         "required_fields": ["prompt", "response"],
         "default_threshold": {"operator": "gte", "value": 0.7},
@@ -63,7 +64,7 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "context_precision",
         "name": "Precisión de contexto",
-        "description": "Evalúa cuánto contexto recuperado resulta útil.",
+        "description": "Evalúa cuánto del contexto recuperado (PAC, POSEI, fitosanitario) resulta útil.",
         "category": "context",
         "required_fields": ["prompt", "context", "expected_response"],
         "default_threshold": {"operator": "gte", "value": 0.6},
@@ -72,7 +73,7 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "context_recall",
         "name": "Cobertura de contexto",
-        "description": "Evalúa si el contexto cubre la respuesta esperada.",
+        "description": "Evalúa si el contexto cubre la respuesta de referencia del agricultor.",
         "category": "context",
         "required_fields": ["context", "expected_response"],
         "default_threshold": {"operator": "gte", "value": 0.6},
@@ -81,7 +82,7 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "hallucination",
         "name": "Ausencia de alucinación",
-        "description": "Detecta afirmaciones no respaldadas; 1 significa respuesta segura.",
+        "description": "Detecta consejos no respaldados (dosis, plazos, ayudas). 1 significa respuesta segura.",
         "category": "response",
         "required_fields": ["context", "response"],
         "default_threshold": {"operator": "gte", "value": 1.0},
@@ -89,8 +90,8 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "numeric_match",
-        "name": "Coincidencia numérica",
-        "description": "Compara cifras entre respuesta real y esperada.",
+        "name": "Dosis y cifras",
+        "description": "Compara importes, dosis y hectáreas entre la respuesta y la referencia.",
         "category": "response",
         "required_fields": ["response", "expected_response"],
         "default_threshold": {"operator": "gte", "value": 1.0},
@@ -99,7 +100,7 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "citation_accuracy",
         "name": "Precisión de citas",
-        "description": "Valida las citas de la respuesta frente a las fuentes disponibles.",
+        "description": "Valida las citas del consejo frente a boletines y fichas recuperadas.",
         "category": "text",
         "required_fields": ["response", "context"],
         "default_threshold": {"operator": "gte", "value": 0.8},
@@ -108,7 +109,7 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "retrieval_precision",
         "name": "Precisión retrieval",
-        "description": "Compara los contextos recuperados con los esperados.",
+        "description": "Compara los fragmentos recuperados con los esperados para la pregunta agraria.",
         "category": "context",
         "required_fields": ["context", "expected_context"],
         "default_threshold": {"operator": "gte", "value": 0.6},
@@ -117,7 +118,7 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     {
         "id": "retrieval_recall",
         "name": "Recall retrieval",
-        "description": "Mide cuántos contextos esperados fueron recuperados.",
+        "description": "Mide cuántos fragmentos esperados (normativa, ficha, parcela) fueron recuperados.",
         "category": "context",
         "required_fields": ["context", "expected_context"],
         "default_threshold": {"operator": "gte", "value": 0.6},
@@ -125,8 +126,8 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "mrr",
-        "name": "MRR",
-        "description": "Posición del primer contexto relevante recuperado.",
+        "name": "MRR (fuentes)",
+        "description": "Posición del primer fragmento relevante para la consulta del agricultor.",
         "category": "context",
         "required_fields": ["context", "expected_context"],
         "default_threshold": {"operator": "gte", "value": 0.5},
@@ -134,8 +135,8 @@ METRIC_CATALOG: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "ndcg",
-        "name": "nDCG",
-        "description": "Calidad del orden de los contextos recuperados.",
+        "name": "nDCG (orden)",
+        "description": "Calidad del orden de las fuentes recuperadas (boletines, PAC, fichas).",
         "category": "context",
         "required_fields": ["context", "expected_context"],
         "default_threshold": {"operator": "gte", "value": 0.6},
@@ -477,7 +478,7 @@ Referencia: {sample.reference or ""}
                         "stream": False,
                         "format": "json",
                         "messages": [{"role": "user", "content": prompt}],
-                        "options": {"temperature": 0},
+                        "options": {"temperature": RAG_TEMPERATURE},
                     },
                 )
                 response.raise_for_status()

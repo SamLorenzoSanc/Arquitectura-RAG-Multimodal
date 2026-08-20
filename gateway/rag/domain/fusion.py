@@ -35,7 +35,14 @@ def rrf_fusion(
     rrf_k: int = 60,
     candidate_k: int = 15,
 ) -> list[RetrievedChunk]:
-    lists = [dense_original, dense_rewritten, bm25_original, bm25_rewritten]
+    rankings = [dense_original, dense_rewritten, bm25_original, bm25_rewritten]
+    lists: list[list[RetrievedChunk]] = []
+    seen_objects: set[int] = set()
+    for ranking in rankings:
+        if not ranking or id(ranking) in seen_objects:
+            continue
+        seen_objects.add(id(ranking))
+        lists.append(ranking)
     merged = merge_unique(*lists)
     scores: dict[tuple[str, str], float] = {key: 0.0 for key in merged}
     sources: dict[tuple[str, str], set[str]] = {key: set() for key in merged}

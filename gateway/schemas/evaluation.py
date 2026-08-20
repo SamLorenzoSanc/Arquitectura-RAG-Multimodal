@@ -56,7 +56,7 @@ class SimulatorSaveRequest(BaseModel):
 
 class EvaluationConfig(BaseModel):
     model_name: str = "llama3.2:latest"
-    embedding_model: str = "qwen3-embedding:latest"
+    embedding_model: str = "nomic-embed-text"
     retrieval_k: int = 10
     bm25_k: int = 10
     rrf_k: int = 60
@@ -70,7 +70,7 @@ class EvaluationConfig(BaseModel):
 
 class DatasetEvaluationRequest(BaseModel):
     model_name: str = "llama3.2:latest"
-    embedding_model: str = "qwen3-embedding:latest"
+    embedding_model: str = "nomic-embed-text"
     top_k: int = Field(default=5, ge=1)
     retrieval_k: int = Field(default=10, ge=1)
     bm25_k: int = Field(default=10, ge=1)
@@ -85,6 +85,7 @@ class DatasetEvaluationRequest(BaseModel):
     reranking_strategy: str | None = None
     agentic_rag_enabled: bool = False
     rag_strategy: str | None = None
+    temperature: float = Field(default=0, ge=0, le=2)
 
     distance_metric: Literal[
         "cosine",
@@ -134,6 +135,11 @@ class AnswerEvaluation(BaseModel):
     citation_accuracy: float = Field(ge=0, le=1)
     numeric_match: float = Field(ge=0, le=1)
     abstention: float = Field(ge=0, le=1)
+    mrr: float = Field(default=0.0, ge=0, le=1)
+    ndcg: float = Field(default=0.0, ge=0, le=1)
+    keywords_found: int = 0
+    total_keywords: int = 0
+    keyword_coverage: float = Field(default=0.0, ge=0, le=100)
 
 
 class EvaluationHistoryItem(BaseModel):
@@ -143,7 +149,7 @@ class EvaluationHistoryItem(BaseModel):
     embedding_model: str
     distance_metric: str = "cosine"
     dataset_size: int = 0
-    top_k: int = 10
+    top_k: int = 3
     recall_1: float = 0.0
     recall_k: float = 0.0
     precision_at_k: float | None = None
@@ -156,11 +162,12 @@ class EvaluationHistoryItem(BaseModel):
     duration_ms: float = 0.0
     status: str = "completed"
     experiment_type: str = "retrieval_dataset"
+    retrieval_strategy: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExperimentRunRequest(BaseModel):
-    embedding_model: str = "qwen3-embedding:latest"
+    embedding_model: str = "nomic-embed-text"
     distance_metric: Literal[
         "cosine",
         "euclidean",
@@ -169,20 +176,58 @@ class ExperimentRunRequest(BaseModel):
         "l1",
         "l2",
     ] = "cosine"
-    top_k: int = Field(default=10, ge=1)
+    top_k: int = Field(default=3, ge=1)
     knowledge_base_id: str | None = None
     persist: bool = True
+    temperature: float = Field(default=0, ge=0, le=2)
 
 
 class ExperimentCompareRequest(BaseModel):
     embedding_models: list[str] = Field(
-        default_factory=lambda: ["qwen3-embedding:latest"]
+        default_factory=lambda: ["nomic-embed-text"]
     )
     distance_metrics: list[str] = Field(
         default_factory=lambda: ["cosine", "euclidean", "manhattan"]
     )
-    top_k: int = Field(default=10, ge=1)
+    top_k: int = Field(default=3, ge=1)
     knowledge_base_id: str | None = None
+
+
+RetrievalStrategy = Literal[
+    "dense",
+    "bm25",
+    "hybrid_rrf",
+    "hybrid_rrf_rerank",
+    "hybrid_expansion_rrf",
+    "hybrid_expansion_rrf_rerank",
+]
+
+
+class RetrievalStrategyCompareRequest(BaseModel):
+    strategies: list[RetrievalStrategy] = Field(
+        default_factory=lambda: [
+            "dense",
+            "bm25",
+            "hybrid_rrf",
+            "hybrid_rrf_rerank",
+            "hybrid_expansion_rrf",
+            "hybrid_expansion_rrf_rerank",
+        ]
+    )
+    embedding_model: str = "nomic-embed-text"
+    distance_metric: Literal[
+        "cosine",
+        "euclidean",
+        "manhattan",
+        "inner_product",
+        "l1",
+        "l2",
+    ] = "cosine"
+    top_k: int = Field(default=3, ge=1, le=50)
+    organization_id: str | None = None
+    department_id: str | None = None
+    knowledge_base_id: str | None = None
+    temperature: float = Field(default=0, ge=0, le=2)
 
 
 class ExperimentCompareResponse(BaseModel):

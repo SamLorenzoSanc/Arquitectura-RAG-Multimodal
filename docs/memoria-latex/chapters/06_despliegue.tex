@@ -1,24 +1,45 @@
 % -*- coding: utf-8 -*-
 \chapter{Despliegue operativo del prototipo contenedorizado}
+\label{ch:despliegue}
 
 
 \section{Despliegue operativo del prototipo funcional contenedorizado}
-El despliegue local y de demostración se realiza con Docker Compose (servicios \texttt{api}, \texttt{frontend}, \texttt{postgres}, \texttt{ollama}, job \texttt{migrate}). Existe pipeline de publicación de imágenes hacia un VPS; la validación en entorno de cliente se documenta como \textbf{prototipo}, no como certificación de producción industrial.
+El despliegue local y de demostración se realiza con Docker Compose (servicios \texttt{api}, \texttt{frontend}, \texttt{postgres}, \texttt{ollama}, job \texttt{migrate}). Existe además un pipeline de integración continua que publica imágenes en Docker Hub y las despliega en un VPS. La validación en entorno de cliente se documenta como \textbf{prototipo}, no como certificación de producción industrial.
+
+La figura~\ref{fig:diagrama-despliegue} resume ese flujo de extremo a extremo. La figura~\ref{fig:diagrama-aplicacion} del Capítulo~\ref{ch:implementacion} complementa la vista estática de los bloques orquestados: el frontend es el adaptador de entrada; el backend FastAPI aloja el hexágono; PostgreSQL/\texttt{pgvector} y Ollama son adaptadores de salida.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/diagrama-despliegue-agrops.png}
+\caption{Diagrama de despliegue de AgroPS: publicación de imágenes con GitHub Actions hacia Docker Hub y orquestación con Docker Compose.}
+\label{fig:diagrama-despliegue}
+\end{figure}
+
+Cuando se hace un \emph{push} al repositorio en GitHub, se dispara el workflow \texttt{deploy-ionos.yml}. La acción construye las imágenes propias a partir de los Dockerfiles del gateway y del frontend, y las sube a Docker Hub con etiquetas \texttt{:sha} y \texttt{:latest} (\texttt{\$\{DOCKERHUB\_USER\}/agrops-api} y \texttt{\$\{DOCKERHUB\_USER\}/agrops-frontend}). A continuación, el mismo flujo sincroniza el Compose de producción y las migraciones SQL al VPS, hace \texttt{docker compose pull} y levanta los contenedores.
+
+La orquestación multi-contenedor se gestiona con Docker Compose. El fichero \texttt{docker-compose.prod.yaml} declara los servicios del prototipo; en local, \texttt{docker-compose.yaml} permite además construir las imágenes en el anfitrión (\texttt{docker compose up --build}) sin pasar por el registro. PostgreSQL y Ollama se toman de registries oficiales (\texttt{pgvector/pgvector:pg18} y \texttt{ollama/ollama}); solo las piezas de aplicación propias se publican en Docker Hub.
 
 \section{Despliegue Operativo y Arquitectura de Contenedores (Docker)}
-Con el propósito de validar de forma práctica los hallazgos empíricos y demostrar la eficacia de la solución propuesta en la erradicación de alucinaciones factuales, se procedió al diseño, contenedorización y despliegue de la plataforma AgroRAG. Para garantizar la reproductibilidad, modularidad y portabilidad del entorno de pruebas en cualquier infraestructura, la arquitectura completa fue orquestada mediante Docker y Docker Compose.
+Con el propósito de validar de forma práctica los hallazgos y demostrar el MVP, se contenedorizó AgroPS con Docker Compose. El entorno de demostración orquesta frontend (Nginx/React), API FastAPI, PostgreSQL/\texttt{pgvector} y Ollama. El arranque local se describe en \texttt{docs/DOCKER.md}. El sistema \textbf{mitiga} alucinaciones en los casos evaluados; no las erradica.
 
-Este entorno multi-contenedor integra de forma desacoplada los componentes esenciales del sistema, permitiendo su evaluación y prueba interactiva por parte de usuarios externos, técnicos y el panel de expertos:
+Este entorno multi-contenedor integra de forma desacoplada los componentes esenciales del sistema, permitiendo su evaluación y prueba interactiva por parte del autor, del tutor y de evaluadores a los que se les entregue el prototipo:
 
-Base de Datos Relacional (PostgreSQL): Encargada de la persistencia de datos estructurados, gestión de usuarios, almacenamiento de metadatos de los documentos (títulos, fechas, fuentes de la PAC/POSEI, páginas y secciones) y registro de trazabilidad de las auditorías e historial de consultas.
-
-Base de Datos Vectorial (Qdrant / PostgreSQL/pgvector): Optimizada para el almacenamiento y búsqueda eficiente de embeddings densos de alta dimensión, permitiendo la recuperación híbrida y semántica de los fragmentos normativos en tiempos de respuesta de milisegundos.
-
-Servicio de Inferencia y Recuperación (Backend \& LLM Engine): Módulo encargado de ejecutar la ingesta documental, el procesamiento multimodal (OCR/Docling), la ejecución de consultas mediante modelos de lenguaje locales (vía Ollama) y el reordenamiento de contexto mediante Cross-Encoders.
-
-Interfaz Gráfica de Usuario (Dashboard Frontend): Entorno interactivo que permite a los evaluadores realizar consultas en lenguaje natural, visualizar en tiempo real el contexto recuperado, verificar las citas documentales y comprobar de manera directa cómo el anclaje estricto (Strict Grounding) mitiga las alucinaciones en los casos evaluados extrínsecas.
+\begin{itemize}
+  \item \textbf{Base de datos relacional y vectorial} (PostgreSQL/\texttt{pgvector}): persistencia de usuarios, metadatos de documentos, fragmentos, embeddings e historial de consultas.
+  \item \textbf{Servicio de inferencia y recuperación} (API FastAPI + Ollama): ingesta documental, extracción de texto (incl.\ OCR cuando aplica), consultas con modelos locales y, si se activa, reordenamiento con Cross-Encoder.
+  \item \textbf{Interfaz gráfica de usuario} (frontend React): consultas en lenguaje natural, visualización del contexto recuperado, verificación de citas y comprobación del anclaje estricto (\emph{strict grounding}).
+\end{itemize}
 
 La puesta a disposición de esta plataforma contenedorizada no solo demuestra la viabilidad técnica de la arquitectura RAG en un prototipo funcional contenedorizado, sino que transforma un experimento teórico en una herramienta funcional y auditable por cualquier stakeholder del sector agrícola.
 
+\section{Servicios, volúmenes y variables de entorno}
+El fichero \texttt{docker-compose.yaml} declara, en esencia, seis piezas. \texttt{postgres} usa la imagen \texttt{pgvector/pgvector:pg18}, publica el puerto 5432 en el anfitrión y monta el volumen \texttt{postgres\_data} más los scripts de \texttt{init} y migraciones. \texttt{migrate} aplica esas migraciones una vez que Postgres responde a \texttt{pg\_isready}. \texttt{ollama} publica 11434 y persiste los pesos en \texttt{ollama\_data}; \texttt{ollama-init} hace \texttt{pull} de \texttt{nomic-embed-text} y \texttt{llama3.2:latest} y termina. \texttt{api} construye el Dockerfile del gateway (Python 3.12, \texttt{uv sync}) y recibe \texttt{DATABASE\_URL}, \texttt{SECRET\_KEY}, \texttt{RAG\_*} y \texttt{DOCUMENT\_STORAGE\_ROOT}. \texttt{frontend} construye el estático de Vite y lo sirve con Nginx.
 
+Existe un overlay \texttt{docker-compose.gpu.yaml} para quien disponga de NVIDIA Container Toolkit; no es requisito de la demostración en CPU. El arranque documentado en \texttt{docs/DOCKER.md} es: copiar \texttt{.env.example}, levantar Compose y esperar a que Ollama descargue los modelos.
 
+La exposición de 5432 y 11434 en el anfitrión facilita la depuración local y, al mismo tiempo, deja claro que este ensamblado es un \textbf{prototipo funcional contenedorizado}, no un endurecimiento de producción (red interna only, secretos rotados, TLS terminado, backups ensayados). No se documenta aquí una validación productiva en cliente.
+
+\section{Reproducibilidad del arranque}
+Un evaluador debería poder clonar el repositorio, copiar el \texttt{.env} de ejemplo, ejecutar \texttt{docker compose up --build} y alcanzar el login. La primera ejecución es lenta por la descarga de imágenes y de modelos Ollama. Las migraciones crean extensiones \texttt{vector}, índices HNSW, tablas de evaluación y, si se sembró, un usuario de demostración. A partir de ahí, el flujo de tesis es: crear cuenta, subir el corpus PAC/POSEI de ejemplo, esperar a que el estado del documento pase a indexado, preguntar en el chat y, opcionalmente, lanzar el banco en el laboratorio.
+
+Ese protocolo es la evidencia de ``despliegue operativo'' que pide la estructura de la memoria: no un SLA, sino un artefacto que otra persona puede levantar.

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useOrganization } from "@/context/OrganizationContext";
+import { useTranslation } from "@/i18n/I18nProvider";
 import AccountService, {
   type OrgAdmin,
   type SupportTicket,
@@ -16,6 +17,7 @@ function formatDate(value?: string) {
 }
 
 export default function SupportPage() {
+  const { t } = useTranslation();
   const { selectedOrg } = useOrganization();
   const [admins, setAdmins] = useState<OrgAdmin[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
@@ -32,9 +34,9 @@ export default function SupportPage() {
         AccountService.admins(selectedOrg?.id),
         AccountService.supportTickets(),
       ]);
-      setAdmins(adminList);
-      setTickets(inbox.tickets);
-      setIsAdmin(inbox.is_admin);
+      setAdmins(Array.isArray(adminList) ? adminList : []);
+      setTickets(Array.isArray(inbox?.tickets) ? inbox.tickets : []);
+      setIsAdmin(Boolean(inbox?.is_admin));
     } catch {
       setAdmins([]);
       setTickets([]);
@@ -58,66 +60,66 @@ export default function SupportPage() {
       });
       setSubject("");
       setMessage("");
-      setStatus("Mensaje enviado a los administradores.");
+      setStatus(t("support.sent"));
       await load();
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })
         .response?.data?.detail;
-      setError(detail || "No se pudo enviar el mensaje.");
+      setError(detail || t("support.sendFailed"));
     } finally {
       setSending(false);
     }
   };
 
+  const hintText = admins.length
+    ? t("support.hintWithAdmins", {
+        names: admins.map((admin) => admin.name).join(", "),
+      })
+    : t("support.hintNoAdmins");
+
   return (
-    <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-lg font-bold text-slate-900">Soporte</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Escribe a los administradores de la aplicación. Recibirán tu aviso
-          {admins.length
-            ? `: ${admins.map((admin) => admin.name).join(", ")}`
-            : " en cuanto esté disponible un administrador de tu organización"}
-          .
-        </p>
+    <div className="grid gap-4 pb-8 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="rounded-xl border border-[color:var(--agro-border)] bg-white p-6 shadow-sm">
+        <h1 className="text-lg font-bold text-slate-900">{t("support.title")}</h1>
+        <p className="mt-1 text-sm text-slate-500">{hintText}</p>
         <form onSubmit={(event) => void handleSubmit(event)} className="mt-5 space-y-3">
           <input
             required
             minLength={4}
             value={subject}
             onChange={(event) => setSubject(event.target.value)}
-            placeholder="Asunto"
-            className="h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
+            placeholder={t("support.subject")}
+            className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-[color:var(--agro-primary)]"
           />
           <textarea
             required
             minLength={10}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
-            placeholder="Describe el problema o la duda…"
+            placeholder={t("support.messagePlaceholder")}
             rows={7}
-            className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[color:var(--agro-primary)]"
           />
           {error && <p className="text-xs text-red-600">{error}</p>}
           {status && <p className="text-xs text-emerald-700">{status}</p>}
           <button
             type="submit"
             disabled={sending}
-            className="rounded-lg bg-[color:var(--agro-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+            className="rounded-lg bg-[color:var(--agro-primary)] px-4 py-2 text-xs font-bold text-white hover:bg-[color:var(--agro-primary-hover)] disabled:opacity-50"
           >
-            {sending ? "Enviando…" : "Enviar a administradores"}
+            {sending ? t("common.sending") : t("support.sendToAdmins")}
           </button>
         </form>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <section className="rounded-xl border border-[color:var(--agro-border)] bg-white p-6 shadow-sm">
         <h2 className="text-sm font-bold text-slate-800">
-          {isAdmin ? "Bandeja de administradores" : "Tus mensajes"}
+          {isAdmin ? t("support.adminInbox") : t("support.yourMessages")}
         </h2>
         <div className="mt-3 space-y-3">
           {tickets.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">
-              Todavía no hay mensajes.
+            <p className="py-16 text-center text-sm text-slate-400">
+              {t("support.noResults")}
             </p>
           ) : (
             tickets.map((ticket) => (
@@ -129,7 +131,7 @@ export default function SupportPage() {
                   <p className="text-sm font-semibold text-slate-800">
                     {ticket.subject}
                   </p>
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold uppercase text-blue-700">
+                  <span className="rounded-full bg-[color:var(--agro-pill)] px-2 py-0.5 text-[10px] font-bold uppercase text-[color:var(--agro-primary)]">
                     {ticket.status}
                   </span>
                 </div>

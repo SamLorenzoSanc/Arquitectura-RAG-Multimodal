@@ -22,8 +22,9 @@ POSTGRES_DB=agrops
 DATABASE_URL=postgresql+asyncpg://postgres:change-me@postgres:5432/agrops
 SECRET_KEY=replace-with-a-long-random-secret
 OLLAMA_API_KEY=ollama
-RAG_GENERATION_MODEL=llama3
-RAG_EMBEDDING_MODEL=qwen3-embedding:latest
+RAG_GENERATION_MODEL=llama3.2:latest
+RAG_EMBEDDING_MODEL=nomic-embed-text
+FRONTEND_HOST_PORT=80
 ```
 
 Compose fija internamente `OLLAMA_BASE_URL=http://ollama:11434/v1` y
@@ -37,24 +38,40 @@ runtime.
 ## Desarrollo
 
 ```powershell
+Copy-Item .env.example .env
+.\scripts\demo_up.ps1
+# Con GPU NVIDIA (opcional):
+.\scripts\demo_up.ps1 -Gpu
+```
+
+O a mano:
+
+```powershell
 docker compose config
 docker compose build
 docker compose up -d
 ```
 
-El servicio `ollama-init` descarga `qwen3-embedding:latest` (embeddings) y
+El servicio `ollama-init` descarga `nomic-embed-text` (embeddings) y
 `llama3.2:latest` (generación) la primera vez. Hasta que termine, el chat
 responderá que el modelo no está disponible. Si hace falta repetirlo a mano:
 
 ```powershell
 docker compose exec ollama ollama pull llama3.2:latest
-docker compose exec ollama ollama pull qwen3-embedding:latest
+docker compose exec ollama ollama pull nomic-embed-text
 docker compose exec ollama ollama list
 ```
 
-Accesos: frontend `http://localhost`, API/OpenAPI
-`http://localhost:8000/docs`, PostgreSQL `localhost:5432` y Ollama
-`localhost:11434`.
+Accesos: frontend `http://localhost` (o el puerto de `FRONTEND_HOST_PORT`),
+API/OpenAPI `http://localhost:8000/docs`, PostgreSQL `localhost:5432` y Ollama
+`localhost:11434`. El Compose por defecto no exige GPU; para usarla:
+
+```powershell
+docker compose -f docker-compose.yaml -f docker-compose.gpu.yaml up -d
+```
+
+El `docker-compose.yaml` local publica esos cuatro puertos. `docker-compose.prod.yaml`
+también los expone en este prototipo para poder inspeccionar la base y Ollama en el host.
 
 ## Producción
 

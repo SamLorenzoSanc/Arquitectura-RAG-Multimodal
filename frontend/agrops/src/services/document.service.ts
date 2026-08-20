@@ -1,5 +1,9 @@
 import api from "@/api";
-import type { DocumentItem } from "@/types/document";
+import type {
+    DocumentChunksResponse,
+    DocumentItem,
+    IngestProgress,
+} from "@/types/document";
 
 class DocumentService {
     async list(
@@ -23,20 +27,17 @@ class DocumentService {
         file: File;
         title?: string;
         description?: string;
+        onUploadProgress?: (percent: number) => void;
     }): Promise<{
         id: string;
         filename: string;
         status: string;
-        questions?: Array<{
-            question: string;
-            rationale?: string;
-            category?: string;
-            keywords?: string[];
-            reference_answer?: string;
-        }>;
+        chunks?: number;
+        embedding_model?: string | null;
         message?: string;
         processing_status?: string;
         error?: string | null;
+        progress?: IngestProgress | null;
     }> {
         const form = new FormData();
         form.append("knowledge_base_id", params.knowledgeBaseId);
@@ -45,7 +46,54 @@ class DocumentService {
         if (params.description) form.append("description", params.description);
         const response = await api.post("/documents", form, {
             headers: { "Content-Type": "multipart/form-data" },
+            timeout: 600_000,
+            onUploadProgress: (event) => {
+                if (!params.onUploadProgress) return;
+                const total = event.total || params.file.size || 0;
+                if (!total) return;
+                params.onUploadProgress(
+                    Math.min(100, Math.round((event.loaded / total) * 100)),
+                );
+            },
         });
+        return response.data;
+    }
+
+    async chunks(
+        documentId: string,
+        knowledgeBaseId?: string,
+    ): Promise<DocumentChunksResponse> {
+        const response = await api.get<DocumentChunksResponse>(
+            `/documents/${documentId}/chunks`,
+            {
+                params: knowledgeBaseId
+                    ? { knowledge_base_id: knowledgeBaseId }
+                    : undefined,
+            },
+        );
+        return response.data;
+    }
+
+    async progress(
+        knowledgeBaseId: string,
+        documentId: string,
+    ): Promise<IngestProgress> {
+        const response = await api.get<IngestProgress>(
+            `/documents/${documentId}/progress`,
+            { params: { knowledge_base_id: knowledgeBaseId } },
+        );
+        return response.data;
+    }
+
+    async reprocess(
+        knowledgeBaseId: string,
+        documentId: string,
+    ): Promise<{ status: string; id: string; message?: string }> {
+        const response = await api.post(
+            `/documents/${documentId}/reprocess`,
+            null,
+            { params: { knowledge_base_id: knowledgeBaseId } },
+        );
         return response.data;
     }
 

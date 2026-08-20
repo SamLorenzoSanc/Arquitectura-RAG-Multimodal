@@ -2,11 +2,20 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import { useOrganization } from "@/context/OrganizationContext";
 import { useKnowledgeBases, useKnowledgeMap } from "@/hooks/useCachedApi";
+import EmbeddingCloud3D from "@/components/EmbeddingCloud3D";
+import { useTranslation } from "@/i18n/I18nProvider";
 
 const BG = "#ffffff";
 const CANARY_BLUE = "#0768A9";
 const CANARY_YELLOW = "#FFCC00";
-const PALETTE = [CANARY_BLUE, CANARY_YELLOW, "#ffffff"];
+function hashHue(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = value.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue} 58% 44%)`;
+}
 
 type GraphNode = {
   id: string;
@@ -22,6 +31,7 @@ type GraphNode = {
   val: number;
   x?: number;
   y?: number;
+  z?: number;
 };
 
 type GraphLink = {
@@ -30,24 +40,18 @@ type GraphLink = {
   value: number;
 };
 
-function hashHue(value: string): string {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = value.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return PALETTE[Math.abs(hash) % PALETTE.length];
-}
 
 function nodeId(ref: string | GraphNode): string {
   return typeof ref === "object" ? String(ref.id) : String(ref);
 }
 
-function fileName(path?: string) {
-  if (!path) return "Sin documento";
+function fileName(path: string | undefined, t: (key: string) => string) {
+  if (!path) return t("knowledgeGraph.noDocument");
   return path.split(/[\\/]/).pop() ?? path;
 }
 
 export default function KnowledgeGraphPage() {
+  const { t } = useTranslation();
   const { selectedOrg } = useOrganization();
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoverNode, setHoverNode] = useState<GraphNode | null>(null);
@@ -57,6 +61,7 @@ export default function KnowledgeGraphPage() {
   const [localGraph, setLocalGraph] = useState(false);
   const [showOrphans, setShowOrphans] = useState(true);
   const [showLabels, setShowLabels] = useState(false);
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("3d");
   const [charge, setCharge] = useState(-90);
   const [linkDistance, setLinkDistance] = useState(55);
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -132,12 +137,12 @@ export default function KnowledgeGraphPage() {
   const groups = useMemo(() => {
     const counts = new Map<string, { color: string; count: number }>();
     for (const node of rawData.nodes) {
-      const key = fileName(node.group);
+      const key = fileName(node.group, t);
       const prev = counts.get(key) ?? { color: node.color, count: 0 };
       counts.set(key, { color: node.color, count: prev.count + 1 });
     }
     return [...counts.entries()].sort((a, b) => b[1].count - a[1].count);
-  }, [rawData.nodes]);
+  }, [rawData.nodes, t]);
 
   const graphData = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -226,7 +231,7 @@ export default function KnowledgeGraphPage() {
       globalScale > 2.4 ||
       Boolean(search.trim());
     if (showText && !dimmed) {
-      const label = fileName(node.label || node.document);
+      const label = fileName(node.label || node.document, t);
       ctx.font = `${Math.max(9, 11 / globalScale)}px Inter, ui-sans-serif, system-ui`;
       ctx.fillStyle = "rgba(15,23,42,0.9)";
       ctx.fillText(label.slice(0, 42), (node.x ?? 0) + radius + 4, (node.y ?? 0) + 3);
@@ -237,30 +242,30 @@ export default function KnowledgeGraphPage() {
   if (!selectedOrg) {
     return (
       <div className="flex h-full items-center justify-center bg-white text-slate-500">
-        Selecciona una organización para ver el grafo.
+        {t("knowledgeGraph.noOrg")}
       </div>
     );
   }
 
   return (
-    <div className="relative flex h-full min-h-[calc(100vh-64px)] w-full overflow-hidden bg-white text-slate-800">
+    <div className="relative flex h-[calc(100vh-7.5rem)] min-h-[520px] w-full overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-800">
       <div ref={containerRef} className="absolute inset-0">
         {loadingGraph && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/85 text-sm text-slate-500">
-            Trazando el grafo de embeddings…
+            {t("knowledgeGraph.loading")}
           </div>
         )}
         {graphError && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/90 p-6 text-center text-sm text-red-600">
-            No se pudo cargar el grafo. Revisa la sesión y vuelve a intentarlo.
+            {t("knowledgeGraph.error")}
           </div>
         )}
         {!loadingGraph && !graphError && rawData.nodes.length === 0 && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white text-sm text-slate-500">
-            No hay chunks con los filtros seleccionados.
+            {t("knowledgeGraph.empty")}
           </div>
         )}
-        {size.width > 0 && size.height > 0 && (
+        {size.width > 0 && size.height > 0 && viewMode === "2d" && (
           <ForceGraph2D
             key={`${selectedKbId || "all"}:${rawData.nodes.length}:${rawData.links.length}`}
             ref={graphRef}
@@ -271,7 +276,7 @@ export default function KnowledgeGraphPage() {
             nodeRelSize={4}
             nodeVal={(node: GraphNode) => node.val}
             nodeColor={(node: GraphNode) => node.color}
-            nodeLabel={(node: GraphNode) => fileName(node.label || node.document)}
+            nodeLabel={(node: GraphNode) => fileName(node.label || node.document, t)}
             nodeCanvasObject={paintNode}
             nodePointerAreaPaint={(node: GraphNode, color, ctx) => {
               ctx.fillStyle = color;
@@ -306,6 +311,22 @@ export default function KnowledgeGraphPage() {
             }}
           />
         )}
+        {viewMode === "3d" && graphData.nodes.length > 0 && (
+          <div className="absolute inset-0">
+            <EmbeddingCloud3D
+              points={graphData.nodes}
+              selectedId={selectedNode?.id ?? null}
+              onSelect={(point) =>
+                setSelectedNode(
+                  point
+                    ? (graphData.nodes.find((node) => node.id === point.id) ??
+                        null)
+                    : null,
+                )
+              }
+            />
+          </div>
+        )}
       </div>
 
       <aside className="absolute left-4 top-4 z-20 w-72 rounded-xl border border-blue-100 bg-white/95 p-4 shadow-xl backdrop-blur">
@@ -317,10 +338,10 @@ export default function KnowledgeGraphPage() {
         <div className="mb-3 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0768A9]">
-              Grafo
+              {t("knowledgeGraph.corpus")}
             </p>
             <h1 className="text-sm font-semibold text-slate-900">
-              Vista de embeddings
+              {t("knowledgeGraph.sidebarTitle")}
             </h1>
           </div>
           <button
@@ -328,17 +349,44 @@ export default function KnowledgeGraphPage() {
             onClick={() => setFiltersOpen((open) => !open)}
             className="text-[11px] text-slate-500 hover:text-[#0768A9]"
           >
-            {filtersOpen ? "Ocultar" : "Filtros"}
+            {filtersOpen ? t("knowledgeGraph.hide") : t("knowledgeGraph.showFilters")}
           </button>
         </div>
         <p className="mb-3 text-[11px] text-slate-500">
-          {stats?.nodes ?? 0} notas · {stats?.edges ?? 0} enlaces ·{" "}
-          {stats?.chunks_with_embedding ?? 0} con vector
+          {t("knowledgeGraph.introFull", {
+            fragments: stats?.nodes ?? 0,
+            docs: stats?.documents ?? groups.length,
+            withVector: stats?.chunks_with_embedding ?? 0,
+          })}
         </p>
+        <div className="mb-3 grid grid-cols-2 gap-1 rounded-md border border-slate-200 p-0.5 text-[11px] font-semibold">
+          <button
+            type="button"
+            onClick={() => setViewMode("3d")}
+            className={`rounded py-1 ${
+              viewMode === "3d"
+                ? "bg-[#0768A9] text-white"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {t("knowledgeGraph.view3d")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("2d")}
+            className={`rounded py-1 ${
+              viewMode === "2d"
+                ? "bg-[#0768A9] text-white"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {t("knowledgeGraph.view2d")}
+          </button>
+        </div>
         <input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Filtrar notas…"
+          placeholder={t("knowledgeGraph.filterNotes")}
           className="mb-3 h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs text-slate-800 outline-none placeholder:text-slate-400 focus:border-[#0768A9]"
         />
         {filtersOpen && (
@@ -348,7 +396,7 @@ export default function KnowledgeGraphPage() {
               value={selectedKbId}
               onChange={(event) => setSelectedKbId(event.target.value)}
             >
-              <option value="">Todas las bases</option>
+              <option value="">{t("knowledgeGraph.allBases")}</option>
               {knowledgeBases.map((kb) => (
                 <option key={kb.id} value={kb.id}>
                   {kb.name}
@@ -356,7 +404,7 @@ export default function KnowledgeGraphPage() {
               ))}
             </select>
             <label className="flex items-center justify-between text-slate-600">
-              Grafo local
+              {t("knowledgeGraph.localGraph")}
               <input
                 type="checkbox"
                 checked={localGraph}
@@ -364,7 +412,7 @@ export default function KnowledgeGraphPage() {
               />
             </label>
             <label className="flex items-center justify-between text-slate-600">
-              Huérfanos (sin embedding)
+              {t("knowledgeGraph.orphans")}
               <input
                 type="checkbox"
                 checked={showOrphans}
@@ -372,7 +420,7 @@ export default function KnowledgeGraphPage() {
               />
             </label>
             <label className="flex items-center justify-between text-slate-600">
-              Etiquetas siempre
+              {t("knowledgeGraph.alwaysLabels")}
               <input
                 type="checkbox"
                 checked={showLabels}
@@ -380,7 +428,9 @@ export default function KnowledgeGraphPage() {
               />
             </label>
             <label className="block text-slate-500">
-              Umbral {similarityThreshold.toFixed(2)}
+              {t("knowledgeGraph.threshold", {
+                value: similarityThreshold.toFixed(2),
+              })}
               <input
                 type="range"
                 min={0.2}
@@ -393,8 +443,10 @@ export default function KnowledgeGraphPage() {
                 className="mt-1 w-full accent-[#0768A9]"
               />
             </label>
+            {viewMode === "2d" && (
+              <>
             <label className="block text-slate-500">
-              Repulsión
+              {t("knowledgeGraph.repulsion")}
               <input
                 type="range"
                 min={-180}
@@ -406,7 +458,7 @@ export default function KnowledgeGraphPage() {
               />
             </label>
             <label className="block text-slate-500">
-              Distancia de enlace
+              {t("knowledgeGraph.linkDistance")}
               <input
                 type="range"
                 min={20}
@@ -417,12 +469,14 @@ export default function KnowledgeGraphPage() {
                 className="mt-1 w-full accent-[#0768A9]"
               />
             </label>
+              </>
+            )}
             <button
               type="button"
               onClick={() => void refetchGraph()}
               className="h-8 w-full rounded-md border border-[#0768A9]/30 text-[#0768A9] hover:bg-blue-50"
             >
-              Recargar grafo
+              {t("knowledgeGraph.reload")}
             </button>
             <div className="max-h-36 space-y-1 overflow-y-auto pt-1">
               {groups.slice(0, 12).map(([name, info]) => (
@@ -448,10 +502,10 @@ export default function KnowledgeGraphPage() {
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <p className="text-[10px] uppercase tracking-[0.18em] text-[#0768A9]">
-                Nota
+                {t("knowledgeGraph.note")}
               </p>
               <h2 className="text-sm font-semibold text-slate-900">
-                {fileName(selectedNode.label || selectedNode.document)}
+                {fileName(selectedNode.label || selectedNode.document, t)}
               </h2>
             </div>
             <button
@@ -463,9 +517,13 @@ export default function KnowledgeGraphPage() {
             </button>
           </div>
           <p className="mb-2 text-[11px] text-slate-500">
-            {fileName(selectedNode.document)} ·{" "}
-            {selectedNode.has_embedding === false ? "sin vector" : "con embedding"}
-            {selectedNode.words ? ` · ${selectedNode.words} palabras` : ""}
+            {fileName(selectedNode.document, t)} ·{" "}
+            {selectedNode.has_embedding === false
+              ? t("knowledgeGraph.withoutVector")
+              : t("knowledgeGraph.withVector")}
+            {selectedNode.words
+              ? t("knowledgeGraph.words", { count: selectedNode.words })
+              : ""}
           </p>
           {selectedNode.content && (
             <p className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700">

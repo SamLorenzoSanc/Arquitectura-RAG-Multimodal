@@ -44,6 +44,8 @@ class RetrievalInfo(BaseModel):
     reranking: bool
     architecture: str | None = None
     agent_tools: list[str] | None = None
+    intent: str | None = None
+    strategy: str | None = None
 
 
 class ChatRequest(BaseModel):
@@ -51,18 +53,18 @@ class ChatRequest(BaseModel):
     history: list[dict] = Field(default_factory=list)
     conversation_id: str | None = None
     knowledge_base_id: Optional[str] = None
+    department_id: Optional[str] = None
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
-    retrieval_k: int = 10
-    final_k: int = 3
+    retrieval_k: int = 12
+    final_k: int = 8
     model: str | None = None
     temperature: float = 0
-    # Desactivados por defecto: menos latencia (respuesta ~1 llamada LLM).
+    # Reescritura solo se dispara si la pregunta es compleja (should_rewrite_query).
     use_query_rewrite: bool = False
     use_reranking: bool = False
     use_rag: bool = True
-    # Comparación controlada Hybrid vs Agentic
-    rag_mode: Literal["hybrid", "agentic", "compare"] = "hybrid"
+    rag_mode: Literal["hybrid", "agentic", "compare"] = "agentic"
 
 
 class ModeComparisonSide(BaseModel):

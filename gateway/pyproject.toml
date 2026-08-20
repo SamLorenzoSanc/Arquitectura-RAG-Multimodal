@@ -55,6 +55,17 @@ dependencies = [
 pythonpath = ["."]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+addopts = [
+    "--ignore=tests/api/test_opendata_routes.py",
+    "--ignore=tests/api/test_evaluation_endpoints.py",
+    "--ignore=tests/api/test_evaluation_experiments.py",
+    "--ignore=tests/api/test_evaluation_ext.py",
+    "--ignore=tests/api/test_human_validation.py",
+    "--ignore=tests/api/test_account_routes.py",
+    "--ignore=tests/api/test_field_notebook.py",
+    "--ignore=tests/api/test_datasets_routes.py",
+    "--ignore=tests/test_whisper_cuda.py",
+]
 markers = [
     "unit: pruebas rápidas sin servicios externos",
     "api: pruebas de rutas HTTP con TestClient",

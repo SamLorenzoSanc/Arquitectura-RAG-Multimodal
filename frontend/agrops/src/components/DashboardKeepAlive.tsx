@@ -1,52 +1,35 @@
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
-import ChatPage from "@/pages/ChatPage";
-import CuadernoCampoPage from "@/pages/CuadernoCampoPage";
-import DatasetsPage from "@/pages/DatasetsPage";
-import OrganizationPage from "@/pages/OrganizationPage";
-import TenantPage from "@/pages/TenantPage";
-import SettingsPage from "@/pages/SettingsPage";
-import KnowledgeGraphPage from "@/pages/KnowledgeGraphPage";
+import DocumentsPage from "@/pages/DocumentsPage";
 import EvaluationPage from "@/pages/EvalutionPage";
 import HelpDocsPage from "@/pages/HelpDocsPage";
+import KnowledgeGraphPage from "@/pages/KnowledgeGraphPage";
+import OrganizationPage from "@/pages/OrganizationPage";
+import RagPipelinePage from "@/pages/RagPipelinePage";
+import SettingsPage from "@/pages/SettingsPage";
 import SupportPage from "@/pages/SupportPage";
+import ValidacionHumanaPage from "@/pages/ValidacionHumanaPage";
+import DashboardOverview from "@/pages/Dashboard";
 
 type DashRoute = {
   path: string;
-  group: "work" | "admin" | "labs";
   Component: ComponentType;
 };
 
-const OPS_REDIRECTS = new Set([
-  "/dashboard/cultivos",
-  "/dashboard/almacenamiento",
-  "/dashboard/analytics",
-  "/dashboard/logistics",
-  "/dashboard/flota",
-  "/dashboard/reefer",
-  "/dashboard/transito",
-  "/dashboard/fincas",
-  "/dashboard/farm-dashboard",
-  "/dashboard/recogida",
-]);
+const DEFAULT_DASHBOARD = "/dashboard";
 
-/** Páginas del panel centradas en documentación y evaluación RAG. */
 export const DASHBOARD_ROUTES: DashRoute[] = [
-  { path: "/dashboard/chat", group: "work", Component: ChatPage },
-  { path: "/dashboard/cuaderno", group: "work", Component: CuadernoCampoPage },
-  { path: "/dashboard/datasets", group: "work", Component: DatasetsPage },
-  { path: "/dashboard/organization", group: "admin", Component: OrganizationPage },
-  { path: "/dashboard/tenants", group: "admin", Component: TenantPage },
-  { path: "/dashboard/settings", group: "admin", Component: SettingsPage },
-  { path: "/dashboard/help", group: "admin", Component: HelpDocsPage },
-  { path: "/dashboard/support", group: "admin", Component: SupportPage },
-  {
-    path: "/dashboard/knowledge-graph",
-    group: "labs",
-    Component: KnowledgeGraphPage,
-  },
-  { path: "/dashboard/evaluacion", group: "labs", Component: EvaluationPage },
+  { path: "/dashboard", Component: DashboardOverview },
+  { path: "/dashboard/documentos", Component: DocumentsPage },
+  { path: "/dashboard/embeddings", Component: KnowledgeGraphPage },
+  { path: "/dashboard/flujo-rag", Component: RagPipelinePage },
+  { path: "/dashboard/evaluacion", Component: EvaluationPage },
+  { path: "/dashboard/validacion", Component: ValidacionHumanaPage },
+  { path: "/dashboard/organization", Component: OrganizationPage },
+  { path: "/dashboard/docs", Component: HelpDocsPage },
+  { path: "/dashboard/settings", Component: SettingsPage },
+  { path: "/dashboard/support", Component: SupportPage },
 ];
 
 function normalizePath(pathname: string): string {
@@ -56,11 +39,6 @@ function normalizePath(pathname: string): string {
   return pathname;
 }
 
-/**
- * Mantiene montadas las páginas ya visitadas del dashboard.
- * Al cambiar de pestaña solo se ocultan; no se destruye el árbol React
- * ni se vuelven a lanzar los useEffect de carga iniciales.
- */
 export default function DashboardKeepAlive() {
   const { pathname } = useLocation();
   const current = normalizePath(pathname);
@@ -71,7 +49,7 @@ export default function DashboardKeepAlive() {
   );
 
   const [visited, setVisited] = useState<string[]>(() =>
-    known.has(current) ? [current] : ["/dashboard/datasets"],
+    known.has(current) ? [current] : [DEFAULT_DASHBOARD],
   );
 
   useEffect(() => {
@@ -79,27 +57,40 @@ export default function DashboardKeepAlive() {
     setVisited((prev) => (prev.includes(current) ? prev : [...prev, current]));
   }, [current, known]);
 
-  if (current === "/dashboard/validacion") {
-    return <Navigate to="/dashboard/evaluacion?tab=validacion" replace />;
+  if (current === "/dashboard/proyectos") {
+    return <Navigate to="/dashboard/documentos" replace />;
   }
 
-  if (current === "/dashboard/documentation" || OPS_REDIRECTS.has(current)) {
-    return <Navigate to="/dashboard/datasets" replace />;
+  if (current === "/dashboard/guardrails") {
+    return <Navigate to="/dashboard/evaluacion" replace />;
   }
 
-  if (current === "/dashboard") {
-    return <Navigate to="/dashboard/datasets" replace />;
+  if (current === "/dashboard/chat") {
+    return <Navigate to={DEFAULT_DASHBOARD} replace />;
   }
 
   if (!known.has(current)) {
-    return <Navigate to="/dashboard/datasets" replace />;
+    return <Navigate to={DEFAULT_DASHBOARD} replace />;
   }
 
   return (
     <>
       {DASHBOARD_ROUTES.map(({ path, Component }) => {
-        if (!visited.includes(path)) return null;
         const active = path === current;
+        // El canvas WebGL no sobrevive a display:none: montar solo en la ruta activa.
+        if (path === "/dashboard/embeddings") {
+          if (!active) return null;
+          return (
+            <div
+              key={path}
+              data-dashboard-page={path}
+              className="flex h-full min-h-0 w-full flex-1 flex-col"
+            >
+              <Component />
+            </div>
+          );
+        }
+        if (!visited.includes(path)) return null;
         return (
           <div
             key={path}
@@ -107,7 +98,7 @@ export default function DashboardKeepAlive() {
             aria-hidden={!active}
             className={
               active
-                ? "flex h-full min-h-0 w-full flex-1 flex-col"
+                ? "flex min-h-full w-full flex-col"
                 : "hidden"
             }
           >

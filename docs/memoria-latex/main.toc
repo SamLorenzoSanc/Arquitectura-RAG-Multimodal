@@ -6,51 +6,72 @@
 \contentsline {section}{\numberline {1.4}Utilidad real de la propuesta}{6}{section.1.4}%
 \contentsline {section}{\numberline {1.5}Estructura del trabajo}{6}{section.1.5}%
 \contentsline {section}{\numberline {1.6}Estructura del trabajo}{6}{section.1.6}%
-\contentsline {chapter}{\numberline {2}Objetivos}{8}{chapter.2}%
+\contentsline {chapter}{\numberline {2}Objetivos y planificación}{8}{chapter.2}%
 \contentsline {section}{\numberline {2.1}Objetivo general}{8}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Objetivos específicos}{8}{section.2.2}%
-\contentsline {chapter}{\numberline {3}Marco teórico / Estado del arte}{9}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Arquitectura Transformers y Grandes Modelos del Lenguaje}{9}{section.3.1}%
-\contentsline {subsection}{\numberline {3.1.1}Fundamentos Matemáticos de los Transformers y Mecanismos de Atención}{10}{subsection.3.1.1}%
-\contentsline {subsection}{\numberline {3.1.2}Limitaciones Estructurales de los LLMs}{11}{subsection.3.1.2}%
-\contentsline {subsection}{\numberline {3.1.3}Taxonomía del Problema de las Alucinaciones en Dominios Normativos}{11}{subsection.3.1.3}%
-\contentsline {subsection}{\numberline {3.1.4}Restricciones en la Ventana de Contexto y el Fenómeno Lost in the Middle}{12}{subsection.3.1.4}%
-\contentsline {subsection}{\numberline {3.1.5}Volatilidad Normativa y Falta de Determinismo y Trazabilidad}{12}{subsection.3.1.5}%
-\contentsline {section}{\numberline {3.2}Arquitectura Retrieval-Augmented Generation (RAG)}{13}{section.3.2}%
-\contentsline {subsection}{\numberline {3.2.1}Descomposición del Pipeline de RAG: Indexación, Recuperación y Generación}{13}{subsection.3.2.1}%
-\contentsline {section}{\numberline {3.3}Revisión Crítica de la Arquitectura RAG en Dominios Regulados}{15}{section.3.3}%
-\contentsline {section}{\numberline {3.4}Alucinaciones en modelos de lenguaje en entornos normativos (definición, causas y estudios relevantes).}{16}{section.3.4}%
-\contentsline {section}{\numberline {3.5}Métricas de evaluación en sistemas RAG (definición formal de RAGAS: fidelidad, relevancia de respuesta, precisión y exhaustividad del contexto, tasa de alucinaciones, calidad de citación).}{18}{section.3.5}%
-\contentsline {chapter}{\numberline {4}Marco metodológico}{20}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Población y muestra}{20}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Objetivos de investigación}{21}{section.4.2}%
-\contentsline {section}{\numberline {4.3}Variables intervinientes e instrumentos de evaluación}{21}{section.4.3}%
-\contentsline {section}{\numberline {4.4}Diseño experimental}{22}{section.4.4}%
-\contentsline {subsection}{\numberline {4.4.1}Variables intervinientes e Instrumentos de Evaluación}{23}{subsection.4.4.1}%
-\contentsline {section}{\numberline {4.5}Modelo de análisis de datos}{24}{section.4.5}%
-\contentsline {section}{\numberline {4.6}Configuración experimental del prototipo}{25}{section.4.6}%
-\contentsline {section}{\numberline {4.7}Dataset de evaluación y categorías}{25}{section.4.7}%
-\contentsline {section}{\numberline {4.8}Origen de las métricas: propias, juez y RAGAS}{25}{section.4.8}%
-\contentsline {chapter}{\numberline {5}Arquitectura e implementación}{28}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Implementación del prototipo AgroPS}{28}{section.5.1}%
-\contentsline {subsection}{\numberline {5.1.1}Componentes relevantes}{28}{subsection.5.1.1}%
-\contentsline {section}{\numberline {5.2}Implementación / Resultados}{28}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Alcance multimodal del prototipo}{29}{section.5.3}%
-\contentsline {chapter}{\numberline {6}Despliegue operativo del prototipo contenedorizado}{30}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Despliegue operativo del prototipo funcional contenedorizado}{30}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Despliegue Operativo y Arquitectura de Contenedores (Docker)}{30}{section.6.2}%
-\contentsline {chapter}{\numberline {7}Evaluación, resultados y discusión}{32}{chapter.7}%
-\contentsline {section}{\numberline {7.1}Análisis descriptivo de la muestra e instrumentalización Experimental}{32}{section.7.1}%
-\contentsline {section}{\numberline {7.2}Resultados obtenidos}{33}{section.7.2}%
-\contentsline {section}{\numberline {7.3}Discusión y análisis de los resultados}{33}{section.7.3}%
-\contentsline {subsection}{\numberline {7.3.1}Discusión y Análisis de los Resultados}{35}{subsection.7.3.1}%
-\contentsline {section}{\numberline {7.4}Comparación LLM sin RAG frente a LLM con RAG}{37}{section.7.4}%
-\contentsline {section}{\numberline {7.5}Resultados por categoría}{37}{section.7.5}%
-\contentsline {section}{\numberline {7.6}Fallos en consultas holísticas}{37}{section.7.6}%
-\contentsline {section}{\numberline {7.7}Concordancia experto--juez}{38}{section.7.7}%
-\contentsline {chapter}{\numberline {8}Conclusiones}{39}{chapter.8}%
-\contentsline {section}{\numberline {8.1}Limitaciones}{40}{section.8.1}%
-\contentsline {section}{\numberline {8.2}Prospectiva}{41}{section.8.2}%
-\contentsline {section}{\numberline {8.3}Consideraciones finales}{41}{section.8.3}%
-\contentsline {chapter}{\numberline {A}Glosario}{43}{appendix.A}%
-\contentsline {chapter}{Bibliografía}{47}{appendix*.4}%
+\contentsline {section}{\numberline {2.2}Objetivos específicos}{9}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Planificación Scrum y lista de tareas}{9}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Tarea 1. Documentación, investigación y análisis del estado del arte}{10}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Tarea 2. Diseño del prototipo, las entidades y el dominio}{10}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}Tarea 3. Diseño y creación del back-end}{11}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}Tarea 4. Diseño y creación del front-end}{11}{subsection.2.3.4}%
+\contentsline {subsection}{\numberline {2.3.5}Tarea 5. Módulo de trazabilidad y citación automática}{11}{subsection.2.3.5}%
+\contentsline {subsection}{\numberline {2.3.6}Tarea 6. Evaluación del rendimiento y de la adopción}{12}{subsection.2.3.6}%
+\contentsline {subsection}{\numberline {2.3.7}Tarea 7. Redacción de la memoria y presentación final}{12}{subsection.2.3.7}%
+\contentsline {section}{\numberline {2.4}Correspondencia entre objetivos y tareas}{12}{section.2.4}%
+\contentsline {chapter}{\numberline {3}Marco teórico / Estado del arte}{14}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Arquitectura Transformers y Grandes Modelos del Lenguaje}{14}{section.3.1}%
+\contentsline {subsection}{\numberline {3.1.1}Fundamentos Matemáticos de los Transformers y Mecanismos de Atención}{17}{subsection.3.1.1}%
+\contentsline {subsection}{\numberline {3.1.2}Limitaciones Estructurales de los LLMs}{18}{subsection.3.1.2}%
+\contentsline {subsection}{\numberline {3.1.3}Taxonomía del Problema de las Alucinaciones en Dominios Normativos}{19}{subsection.3.1.3}%
+\contentsline {subsection}{\numberline {3.1.4}Restricciones en la Ventana de Contexto y el Fenómeno Lost in the Middle}{20}{subsection.3.1.4}%
+\contentsline {subsection}{\numberline {3.1.5}Volatilidad Normativa y Falta de Determinismo y Trazabilidad}{20}{subsection.3.1.5}%
+\contentsline {section}{\numberline {3.2}Arquitectura Retrieval-Augmented Generation (RAG)}{21}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Descomposición del Pipeline de RAG: Indexación, Recuperación y Generación}{22}{subsection.3.2.1}%
+\contentsline {section}{\numberline {3.3}Revisión Crítica de la Arquitectura RAG en Dominios Regulados}{26}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Alucinaciones en modelos de lenguaje en entornos normativos (definición, causas y estudios relevantes).}{27}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Métricas de evaluación en sistemas RAG (definición formal de RAGAS: fidelidad, relevancia de respuesta, precisión y exhaustividad del contexto, tasa de alucinaciones, calidad de citación).}{28}{section.3.5}%
+\contentsline {chapter}{\numberline {4}Marco metodológico}{30}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Arquitectura hexagonal como método de construcción del núcleo RAG}{30}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Población y muestra}{33}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Objetivos de investigación}{34}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Variables intervinientes e instrumentos de evaluación}{34}{section.4.4}%
+\contentsline {section}{\numberline {4.5}Diseño experimental}{35}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Variables intervinientes e Instrumentos de Evaluación}{35}{subsection.4.5.1}%
+\contentsline {section}{\numberline {4.6}Modelo de análisis de datos}{37}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Configuración experimental del prototipo}{38}{section.4.7}%
+\contentsline {section}{\numberline {4.8}Dataset de evaluación y categorías}{38}{section.4.8}%
+\contentsline {section}{\numberline {4.9}Origen de las métricas: propias, juez y RAGAS}{39}{section.4.9}%
+\contentsline {chapter}{\numberline {5}Arquitectura e implementación}{40}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Diseño e implementación de la aplicación}{40}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Back-end, diseño e implementación}{40}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Capa de dominio}{43}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}Entidades}{43}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}Objetos valor}{44}{subsection.5.2.3}%
+\contentsline {subsection}{\numberline {5.2.4}Enumerados}{45}{subsection.5.2.4}%
+\contentsline {subsection}{\numberline {5.2.5}Capa de aplicación}{45}{subsection.5.2.5}%
+\contentsline {subsection}{\numberline {5.2.6}Capa de adaptadores}{45}{subsection.5.2.6}%
+\contentsline {paragraph}{Adaptador API REST.}{46}{subsection.5.2.6}%
+\contentsline {paragraph}{Adaptador PostgreSQL.}{46}{subsection.5.2.6}%
+\contentsline {paragraph}{Adaptadores de inferencia y léxico.}{46}{subsection.5.2.6}%
+\contentsline {subsection}{\numberline {5.2.7}Flujo end-to-end de una consulta}{46}{subsection.5.2.7}%
+\contentsline {section}{\numberline {5.3}Capturas del prototipo AgroPS}{48}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Alcance multimodal del prototipo}{48}{section.5.4}%
+\contentsline {chapter}{\numberline {6}Despliegue operativo del prototipo contenedorizado}{51}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Despliegue operativo del prototipo funcional contenedorizado}{51}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Despliegue Operativo y Arquitectura de Contenedores (Docker)}{51}{section.6.2}%
+\contentsline {chapter}{\numberline {7}Evaluación, resultados y discusión}{53}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Análisis descriptivo de la muestra}{53}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Resultados del recuperador}{53}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Calidad de generación (LLM-as-a-Judge)}{55}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Comparación LLM sin RAG frente a LLM con RAG}{55}{section.7.4}%
+\contentsline {section}{\numberline {7.5}Resultados por categoría (juez y alucinación)}{55}{section.7.5}%
+\contentsline {section}{\numberline {7.6}Adaptador RAGAS}{55}{section.7.6}%
+\contentsline {section}{\numberline {7.7}Fallos en consultas de amplitud}{57}{section.7.7}%
+\contentsline {section}{\numberline {7.8}Concordancia experto--juez}{57}{section.7.8}%
+\contentsline {section}{\numberline {7.9}Discusión}{57}{section.7.9}%
+\contentsline {chapter}{\numberline {8}Conclusiones}{58}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Limitaciones}{59}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Prospectiva}{60}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Consideraciones finales}{60}{section.8.3}%
+\contentsline {chapter}{\numberline {A}Glosario}{62}{appendix.A}%
+\contentsline {chapter}{Bibliografía}{66}{appendix*.4}%

@@ -1,3 +1,5 @@
+import { useTranslation } from "@/i18n/I18nProvider";
+
 type ExperimentRun = {
   id: number;
   created_at: string;
@@ -26,18 +28,11 @@ function pct(value?: number | null): string {
   return `${Math.round(scaled)}%`;
 }
 
-function metricLabel(metric: string): string {
-  if (metric === "euclidean" || metric === "l2") return "Euclídea (L2)";
-  if (metric === "manhattan" || metric === "l1") return "Manhattan (L1)";
-  if (metric === "inner_product") return "Producto interno";
-  return "Coseno";
-}
-
-function formatWhen(iso: string): string {
+function formatWhen(iso: string, locale: string): string {
   if (!iso) return "—";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString("es-ES", {
+  return date.toLocaleString(locale, {
     dateStyle: "short",
     timeStyle: "short",
   });
@@ -52,6 +47,16 @@ export default function ExperimentHistory({
   bestMrrId?: number | null;
   loading?: boolean;
 }) {
+  const { t, language } = useTranslation();
+  const locale = language === "en" ? "en-US" : "es-ES";
+
+  const metricLabel = (metric: string): string => {
+    if (metric === "euclidean" || metric === "l2") return t("evalExtended.metricEuclidean");
+    if (metric === "manhattan" || metric === "l1") return t("evalExtended.metricManhattan");
+    if (metric === "inner_product") return t("evalExtended.metricInnerProduct");
+    return t("evalExtended.metricCosine");
+  };
+
   const winner =
     bestMrrId ??
     (runs.length
@@ -63,40 +68,37 @@ export default function ExperimentHistory({
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-base font-bold text-slate-900">
-            Historial experimental
+            {t("evalExtended.historyTitle")}
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            Cada fila es una corrida persistida: modelo de embeddings × métrica
-            de distancia frente a Recall, MRR, nDCG y precisión. Tras reindexar
-            con varios modelos, la columna Embedding muestra cuál mejora al otro.
+            {t("evalExtended.historyIntro")}
           </p>
         </div>
         <span className="text-xs font-semibold text-slate-400">
-          {runs.length} corrida{runs.length === 1 ? "" : "s"}
+          {t("evalExtended.runCount", { count: runs.length })}
         </span>
       </div>
 
       {loading ? (
-        <p className="text-sm text-slate-500">Cargando historial…</p>
+        <p className="text-sm text-slate-500">{t("evalExtended.loadingHistory")}</p>
       ) : runs.length === 0 ? (
         <p className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-400">
-          Aún no hay corridas guardadas. Pulsa «Guardar corrida» o «Comparar 3
-          distancias» para dejar constancia ante el tribunal.
+          {t("evalExtended.noRunsYet")}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wide text-slate-500">
-                <th className="px-2 py-2 font-semibold">Fecha</th>
-                <th className="px-2 py-2 font-semibold">Embedding</th>
-                <th className="px-2 py-2 font-semibold">Distancia</th>
-                <th className="px-2 py-2 font-semibold">Recall@1</th>
-                <th className="px-2 py-2 font-semibold">MRR</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.colDate")}</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.colEmbedding")}</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.colDistance")}</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.colRecall1")}</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.colMrr")}</th>
                 <th className="px-2 py-2 font-semibold">nDCG</th>
-                <th className="px-2 py-2 font-semibold">Precisión</th>
-                <th className="px-2 py-2 font-semibold">Cobertura</th>
-                <th className="px-2 py-2 font-semibold">Fallos</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.colPrecision")}</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.coverage")}</th>
+                <th className="px-2 py-2 font-semibold">{t("evalExtended.colFailures")}</th>
               </tr>
             </thead>
             <tbody>
@@ -112,7 +114,7 @@ export default function ExperimentHistory({
                     }
                   >
                     <td className="whitespace-nowrap px-2 py-2">
-                      {formatWhen(run.created_at)}
+                      {formatWhen(run.created_at, locale)}
                     </td>
                     <td className="px-2 py-2 font-mono text-xs">
                       {run.embedding_model}
@@ -125,7 +127,7 @@ export default function ExperimentHistory({
                       {pct(run.mrr)}
                       {isBest ? (
                         <span className="ml-1 text-[10px] uppercase text-emerald-700">
-                          mejor
+                          {t("evalExtended.best")}
                         </span>
                       ) : null}
                     </td>

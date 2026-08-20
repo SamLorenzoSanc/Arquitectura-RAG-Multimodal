@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from gateway.parsers.llama_parser import PdfParser
+from parsers.pdf_parser import PdfParser
 
 
 @pytest.fixture

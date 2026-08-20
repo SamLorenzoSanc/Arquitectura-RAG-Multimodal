@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { Plus, Search } from "lucide-react";
 import api from "@/api";
+import { NewOrgModal } from "@/components/NewOrgModal";
 import { useOrganization } from "@/context/OrganizationContext";
+import { useTranslation } from "@/i18n/I18nProvider";
 import { roleGuide, type RoleGuide } from "@/lib/roles";
 import DepartmentService from "@/services/department.service";
 
@@ -38,14 +41,14 @@ function selectedRoleName(roles: RoleOption[], roleId: string) {
     return roles.find((role) => role.id === roleId)?.name;
 }
 
-function RolePermissionsCard({ guide }: { guide: RoleGuide }) {
+function RolePermissionsCard({ guide, t }: { guide: RoleGuide; t: (key: string) => string }) {
     return (
         <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/50 p-3">
             <p className="text-sm font-semibold text-slate-800">{guide.label}</p>
             <p className="mt-1 text-xs leading-relaxed text-slate-600">{guide.summary}</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Puede</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">{t("organization.canDo")}</p>
                     <ul className="mt-1 space-y-1">
                         {guide.can.map((item) => (
                             <li key={item} className="text-xs text-slate-600">
@@ -56,7 +59,7 @@ function RolePermissionsCard({ guide }: { guide: RoleGuide }) {
                 </div>
                 {guide.cannot.length > 0 && (
                     <div>
-                        <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700">No puede</p>
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-rose-700">{t("organization.cannotDo")}</p>
                         <ul className="mt-1 space-y-1">
                             {guide.cannot.map((item) => (
                                 <li key={item} className="text-xs text-slate-600">
@@ -107,11 +110,13 @@ export const addDepartmentMember = async (departmentId: string, payload: { email
 };
 
 export default function OrganizationPage() {
+    const { t } = useTranslation();
     const {
         selectedOrg,
         setSelectedOrg,
         organizations,
         setOrganizations,
+        addOrganization,
     } = useOrganization();
 
     const [activeDept, setActiveDept] = useState<Department | null>(null);
@@ -131,6 +136,16 @@ export default function OrganizationPage() {
     const [submittingDepartment, setSubmittingDepartment] = useState(false);
     const [submittingMember, setSubmittingMember] = useState(false);
     const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null);
+    const [showOrgModal, setShowOrgModal] = useState(false);
+    const [orgQuery, setOrgQuery] = useState("");
+
+    const visibleOrgs = useMemo(() => {
+        const q = orgQuery.trim().toLowerCase();
+        if (!q) return organizations;
+        return organizations.filter((org) =>
+            `${org.name} ${org.description ?? ""}`.toLowerCase().includes(q),
+        );
+    }, [organizations, orgQuery]);
 
     // Carga inicial optimizada cargando organizaciones y roles globales en paralelo
     useEffect(() => {
@@ -299,7 +314,7 @@ export default function OrganizationPage() {
             await loadDepartmentMembers(selectedOrg.id, activeDept.id);
         } catch (error: any) {
             console.error("Error al añadir el miembro al departamento", error);
-            alert(error.response?.data?.detail || "No se pudo añadir al usuario. Verifica que el correo electrónico pertenezca a un usuario registrado en la plataforma.");
+            alert(error.response?.data?.detail || t("organization.addMemberFailed"));
         } finally {
             setSubmittingMember(false);
         }
@@ -309,7 +324,7 @@ export default function OrganizationPage() {
         const targetOrg = org ?? selectedOrg;
         if (!targetOrg) return;
 
-        const confirm = window.confirm(`¿Seguro que deseas desactivar ${targetOrg.name}?`);
+        const confirm = window.confirm(t("organization.deactivateConfirm", { name: targetOrg.name }));
         if (confirm) {
             try {
                 await deleteOrganization(targetOrg.id);
@@ -327,24 +342,41 @@ export default function OrganizationPage() {
 
     if (loading) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50">
-                <div className="animate-pulse font-medium text-[#0055A5]">Sincronizando Workspace Multi-tenant...</div>
+            <div className="flex h-full items-center justify-center">
+                <div className="animate-pulse text-sm font-medium text-[color:var(--agro-primary)]">
+                    {t("organization.loading")}
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex min-h-screen flex-col gap-6 bg-slate-50 p-4 md:p-8 overflow-x-hidden w-full">
-            <div className="flex items-center justify-between border-b-4 border-[#FFCD00] pb-4">
-                <div>
-                    <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-[#0055A5]">Workspace</h4>
-                    <h1 className="text-3xl font-extrabold text-slate-900">Configuración Organizacional y Roles</h1>
+        <div className="flex w-full flex-col gap-5 pb-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                    <Search
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                        value={orgQuery}
+                        onChange={(event) => setOrgQuery(event.target.value)}
+                        placeholder={t("organization.searchPlaceholder")}
+                        className="h-11 w-full rounded-xl border border-[color:var(--agro-border)] bg-white pl-10 pr-4 text-sm outline-none focus:border-[color:var(--agro-primary)] focus:ring-2 focus:ring-[color:var(--agro-pill)]"
+                    />
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setShowOrgModal(true)}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[color:var(--agro-primary)] px-4 text-sm font-semibold text-white hover:bg-[color:var(--agro-primary-hover)]"
+                >
+                    <Plus size={16} /> {t("organization.createOrg")}
+                </button>
             </div>
 
             <div className="flex flex-col gap-4">
-                {organizations.length > 0 ? (
-                    organizations.map((org) => {
+                {visibleOrgs.length > 0 ? (
+                    visibleOrgs.map((org) => {
                         const summary = orgDetails[org.id];
                         const orgDepartments = summary?.departments ?? [];
                         const deptCount = orgDepartments.length;
@@ -365,7 +397,7 @@ export default function OrganizationPage() {
                                 >
                                     <div>
                                         <h2 className="text-xl font-bold text-slate-800">{org.name}</h2>
-                                        <p className="mt-1 text-sm text-slate-500">{org.description || "Sin descripción proporcionada."}</p>
+                                        <p className="mt-1 text-sm text-slate-500">{org.description || t("organization.noDescription")}</p>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-[#0055A5]">
@@ -385,7 +417,7 @@ export default function OrganizationPage() {
                                                 }}
                                                 className="rounded-xl bg-[#0055A5] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
                                             >
-                                                Sincronizar detalles
+                                                {t("organization.syncDetails")}
                                             </button>
                                             <button
                                                 onClick={(event) => {
@@ -395,7 +427,7 @@ export default function OrganizationPage() {
                                                 }}
                                                 className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                             >
-                                                + Departamento
+                                                {t("organization.addDepartment")}
                                             </button>
                                             <button
                                                 onClick={(event) => {
@@ -408,7 +440,7 @@ export default function OrganizationPage() {
                                                 }}
                                                 className="rounded-xl border border-slate-200 bg-white px-4 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
                                             >
-                                                + Añadir Miembro
+                                                {t("organization.addMember")}
                                             </button>
                                             <button
                                                 onClick={(event) => {
@@ -417,21 +449,21 @@ export default function OrganizationPage() {
                                                 }}
                                                 className="ml-auto rounded-xl border border-red-200 bg-red-50 px-4 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
                                             >
-                                                Desactivar
+                                                {t("organization.deactivate")}
                                             </button>
                                         </div>
 
                                         <div className="flex flex-wrap gap-2 text-xs">
-                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{deptCount} departamentos</span>
-                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{roleCount} roles</span>
-                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{memberCount} miembros</span>
+                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{t("organization.departmentsCount", { count: deptCount })}</span>
+                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{t("organization.rolesCount", { count: roleCount })}</span>
+                                            <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-700 font-medium">{t("organization.membersCount", { count: memberCount })}</span>
                                         </div>
 
                                         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-start">
                                             <div className="flex flex-col gap-3 lg:col-span-5 min-w-0">
                                                 <div className="flex items-center justify-between">
-                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">Departamentos</h3>
-                                                    <span className="text-xs text-slate-400">{orgDepartments.length} totales</span>
+                                                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">{t("organization.departments")}</h3>
+                                                    <span className="text-xs text-slate-400">{orgDepartments.length} {t("organization.total")}</span>
                                                 </div>
                                                 <div className="flex flex-col gap-2">
                                                     {orgDepartments.length > 0 ? (
@@ -451,14 +483,14 @@ export default function OrganizationPage() {
                                                                         <p className="mt-0.5 text-xs text-slate-400">{dept.description}</p>
                                                                     </div>
                                                                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                                                                        {dept.members ?? 0} miembros
+                                                                        {t("organization.deptMembers", { count: dept.members ?? 0 })}
                                                                     </span>
                                                                 </div>
                                                             </div>
                                                         ))
                                                     ) : (
                                                         <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
-                                                            No hay departamentos registrados.
+                                                            {t("organization.noDepartments")}
                                                         </div>
                                                     )}
                                                 </div>
@@ -467,7 +499,10 @@ export default function OrganizationPage() {
                                             <div className="flex flex-col gap-3 lg:col-span-7">
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                                        Miembros de: <span className="font-bold normal-case text-[#0055A5]">{activeDeptForOrg ? activeDeptForOrg.name : "Ninguno"}</span>
+                                                        {t("organization.membersOf")}{" "}
+                                                        <span className="font-bold normal-case text-[#0055A5]">
+                                                            {activeDeptForOrg ? activeDeptForOrg.name : t("organization.none")}
+                                                        </span>
                                                     </h3>
                                                     {activeDeptForOrg && (
                                                         <button
@@ -479,7 +514,7 @@ export default function OrganizationPage() {
                                                             }}
                                                             className="text-sm font-semibold text-[#0055A5] hover:underline"
                                                         >
-                                                            + Añadir
+                                                            {t("organization.add")}
                                                         </button>
                                                     )}
                                                 </div>
@@ -498,10 +533,10 @@ export default function OrganizationPage() {
                                                                 </div>
                                                             ))
                                                         ) : (
-                                                            <div className="p-8 text-center text-xs text-slate-400">No hay miembros en este departamento.</div>
+                                                            <div className="p-8 text-center text-xs text-slate-400">{t("organization.noDeptMembers")}</div>
                                                         )
                                                     ) : (
-                                                        <div className="p-8 text-center text-xs text-slate-400">Selecciona un departamento para ver sus miembros.</div>
+                                                        <div className="p-8 text-center text-xs text-slate-400">{t("organization.selectDeptHint")}</div>
                                                     )}
                                                 </div>
                                             </div>
@@ -512,43 +547,49 @@ export default function OrganizationPage() {
                         );
                     })
                 ) : (
-                    <div className="rounded-xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-                        No hay organizaciones registradas.
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+                        {t("organization.emptyOrgs")}
                     </div>
                 )}
             </div>
 
+            <NewOrgModal
+                isOpen={showOrgModal}
+                onClose={() => setShowOrgModal(false)}
+                onSave={addOrganization}
+            />
+
             {showDeptModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
                     <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-                        <h3 className="mb-4 text-xl font-bold text-slate-900">Nuevo departamento</h3>
+                        <h3 className="mb-4 text-xl font-bold text-slate-900">{t("organization.newDeptTitle")}</h3>
                         <form onSubmit={handleCreateDepartment} className="flex flex-col gap-4">
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Nombre</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{t("common.name")}</label>
                                 <input
                                     required
                                     value={departmentName}
                                     onChange={(e) => setDepartmentName(e.target.value)}
                                     className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5]"
-                                    placeholder="Ej. Logística y Calidad"
+                                    placeholder={t("organization.deptNamePlaceholder")}
                                 />
                             </div>
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Descripción</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{t("common.description")}</label>
                                 <textarea
                                     value={departmentDescription}
                                     onChange={(e) => setDepartmentDescription(e.target.value)}
                                     className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5]"
                                     rows={3}
-                                    placeholder="Describe el propósito del departamento"
+                                    placeholder={t("organization.deptDescPlaceholder")}
                                 />
                             </div>
                             <div className="flex justify-end gap-2">
                                 <button type="button" onClick={() => setShowDeptModal(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-                                    Cancelar
+                                    {t("common.cancel")}
                                 </button>
                                 <button type="submit" disabled={submittingDepartment} className="rounded-lg bg-[#0055A5] px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                                    {submittingDepartment ? "Creando..." : "Crear departamento"}
+                                    {submittingDepartment ? t("organization.creating") : t("organization.createDept")}
                                 </button>
                             </div>
                         </form>
@@ -559,23 +600,23 @@ export default function OrganizationPage() {
             {showMemberModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                     <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
-                        <h3 className="mb-1 text-xl font-bold text-slate-900">Añadir miembro al departamento</h3>
+                        <h3 className="mb-1 text-xl font-bold text-slate-900">{t("organization.addMemberTitle")}</h3>
                         <p className="mb-4 text-sm text-slate-500">
-                            El rol define qué podrá hacer esta persona en la cooperativa, no solo el nombre del puesto.
+                            {t("organization.addMemberHint")}
                         </p>
                         <form onSubmit={handleAddMember} className="flex flex-col gap-4">
                             <div>
-                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Departamento activo</label>
+                                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">{t("organization.activeDept")}</label>
                                 <input
                                     readOnly
-                                    value={activeDept?.name ?? "Selecciona un departamento"}
+                                    value={activeDept?.name ?? t("organization.selectDept")}
                                     className="w-full rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-sm text-slate-600"
                                 />
                             </div>
                             
                             <div>
                                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                    Correo del Usuario (Registrado)
+                                    {t("organization.userEmail")}
                                 </label>
                                 <input
                                     type="email"
@@ -583,16 +624,16 @@ export default function OrganizationPage() {
                                     value={selectedUserEmail}
                                     onChange={(e) => setSelectedUserEmail(e.target.value)}
                                     className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5]"
-                                    placeholder="ejemplo@correo.com"
+                                    placeholder={t("organization.emailPlaceholder")}
                                 />
                                 <p className="mt-1 text-[11px] text-slate-400">
-                                    * El usuario debe estar previamente registrado en la plataforma global para ser añadido.
+                                    {t("organization.userMustExist")}
                                 </p>
                             </div>
 
                             <div>
                                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                    Rol y permisos
+                                    {t("organization.rolePermissions")}
                                 </label>
                                 <select
                                     value={selectedRoleId}
@@ -600,9 +641,9 @@ export default function OrganizationPage() {
                                     className="w-full rounded-lg border border-slate-200 p-2.5 text-sm focus:outline-[#0055A5] font-medium"
                                     required
                                 >
-                                    <option value="">Selecciona el rol...</option>
+                                    <option value="">{t("organization.selectRole")}</option>
                                     {roles.map((role) => {
-                                        const guide = roleGuide(role.name);
+                                        const guide = roleGuide(t, role.name);
                                         return (
                                             <option key={role.id} value={role.id}>
                                                 {guide.label}
@@ -612,11 +653,12 @@ export default function OrganizationPage() {
                                 </select>
                                 {selectedRoleId ? (
                                     <RolePermissionsCard
-                                        guide={roleGuide(selectedRoleName(roles, selectedRoleId))}
+                                        guide={roleGuide(t, selectedRoleName(roles, selectedRoleId))}
+                                        t={t}
                                     />
                                 ) : (
                                     <p className="mt-2 text-[11px] text-slate-400">
-                                        Elige un rol para ver qué podrá consultar, evaluar o administrar.
+                                        {t("organization.chooseRoleHint")}
                                     </p>
                                 )}
                             </div>
@@ -630,10 +672,10 @@ export default function OrganizationPage() {
                                     }}
                                     className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
                                 >
-                                    Cancelar
+                                    {t("common.cancel")}
                                 </button>
                                 <button type="submit" disabled={submittingMember} className="rounded-lg bg-[#0055A5] px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                                    {submittingMember ? "Añadiendo..." : "Añadir miembro"}
+                                    {submittingMember ? t("organization.adding") : t("organization.addMemberBtn")}
                                 </button>
                             </div>
                         </form>

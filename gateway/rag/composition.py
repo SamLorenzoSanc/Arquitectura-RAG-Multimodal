@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 
 from rag.adapters.outbound.bm25 import Bm25LexicalIndex
 from rag.adapters.outbound.ollama import OllamaEmbeddingAdapter, OllamaLlmAdapter
@@ -27,7 +28,7 @@ class RagContainer:
 def build_rag_container(
     *,
     model: str = "llama3.2:latest",
-    embedding_model: str = "qwen3-embedding:latest",
+    embedding_model: str | None = None,
     retrieval_k: int = 10,
     bm25_k: int = 10,
     rrf_k: int = 60,
@@ -37,6 +38,9 @@ def build_rag_container(
     reranker_batch_size: int = 16,
     bm25_index_dir: str | None = None,
 ) -> RagContainer:
+    embedding_model = embedding_model or os.getenv(
+        "RAG_EMBEDDING_MODEL", "nomic-embed-text"
+    )
     llm = OllamaLlmAdapter()
     embeddings = OllamaEmbeddingAdapter(model=embedding_model)
     chunks = PgvectorChunkRepository(embeddings, embedding_model=embedding_model)

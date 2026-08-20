@@ -20,7 +20,7 @@ def test_get_sat_requires_auth(client):
 
 def test_get_sat_authenticated(authenticated_client):
     with patch(
-        "routes.opendata.opendata_service.list_sat_societies",
+        "opendata.adapters.inbound.http.opendata_service.list_sat_societies",
         new=AsyncMock(return_value=[{"denominacion": "SAT Demo"}]),
     ):
         response = authenticated_client.get("/api/v1/opendata/sat?municipio=Tenerife")
@@ -31,7 +31,7 @@ def test_get_sat_authenticated(authenticated_client):
 
 
 def test_import_requires_admin(authenticated_client):
-    with patch("routes.opendata.user_is_admin", new=AsyncMock(return_value=False)):
+    with patch("opendata.adapters.inbound.http.user_is_admin", new=AsyncMock(return_value=False)):
         response = authenticated_client.post("/api/v1/opendata/import")
     assert response.status_code == 403
 
@@ -40,7 +40,7 @@ def test_import_as_admin(authenticated_client):
     app.dependency_overrides[require_admin] = lambda: MagicUser()
     try:
         with patch(
-            "routes.opendata.opendata_service.import_opendata_directory",
+            "opendata.adapters.inbound.http.opendata_service.import_opendata_directory",
             new=AsyncMock(
                 return_value={
                     "directory": "data/opendata",
@@ -60,7 +60,7 @@ def test_import_as_admin(authenticated_client):
 
 def test_istac_series_and_observations(authenticated_client):
     with patch(
-        "routes.opendata.opendata_service.list_istac_series",
+        "opendata.adapters.inbound.http.opendata_service.list_istac_series",
         new=AsyncMock(return_value=[{"series_id": "s1", "title": "Plátanos"}]),
     ):
         series = authenticated_client.get("/api/v1/opendata/istac/series")
@@ -68,7 +68,7 @@ def test_istac_series_and_observations(authenticated_client):
     assert series.json()["data"][0]["series_id"] == "s1"
 
     with patch(
-        "routes.opendata.opendata_service.list_istac_observations",
+        "opendata.adapters.inbound.http.opendata_service.list_istac_observations",
         new=AsyncMock(return_value=[{"row_label": "Tenerife", "value": 10.0}]),
     ):
         obs = authenticated_client.get(

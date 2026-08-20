@@ -18,6 +18,12 @@ from fastapi import HTTPException, UploadFile
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.video_extract import (
+    MAX_UPLOAD_BYTES,
+    is_video_file,
+    transcribe_video_segments,
+)
+
 RAG_FIELDS = (
     "traceId",
     "prompt",
@@ -84,8 +90,6 @@ ALIASES = {
 }
 TABULAR_SUFFIXES = {".csv", ".json", ".jsonl", ".ndjson", ".xlsx", ".xls"}
 LOG_SUFFIXES = {".log"}
-VIDEO_SUFFIXES = {".mp4", ".webm", ".mov", ".mkv", ".avi", ".mpeg", ".mpg", ".m4v"}
-MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 _NUMBER_RE = re.compile(r"^-?\d+(?:[.,]\d+)?$")
 _INT_RE = re.compile(r"^-?\d+$")
 _TABLES_READY = False
@@ -574,37 +578,7 @@ def _parse_excel(content: bytes, suffix: str) -> tuple[list[dict[str, Any]], lis
 
 def _video_segments(content: bytes, filename: str) -> list[str]:
     """Transcribe el vídeo a fragmentos de habla. No modifica los parsers documentales."""
-    import os
-    import tempfile
-
-    suffix = Path(filename).suffix or ".mp4"
-    handle, path = tempfile.mkstemp(suffix=suffix)
-    try:
-        os.write(handle, content)
-        os.close(handle)
-        from faster_whisper import WhisperModel
-
-        model = WhisperModel("tiny", device="cpu", compute_type="int8")
-        segments, _info = model.transcribe(path, beam_size=1, vad_filter=True)
-        parts: list[str] = []
-        for segment in segments:
-            text = (getattr(segment, "text", None) or "").strip()
-            if not text:
-                continue
-            start = getattr(segment, "start", None)
-            end = getattr(segment, "end", None)
-            if isinstance(start, (int, float)) and isinstance(end, (int, float)):
-                parts.append(f"[{start:.1f}s–{end:.1f}s] {text}")
-            else:
-                parts.append(text)
-        if not parts:
-            raise ValueError("El vídeo no contiene habla transcribible")
-        return parts
-    finally:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+    return transcribe_video_segments(content, filename)
 
 
 def _split_fragments(text: str, size: int = 1000, overlap: int = 200) -> list[str]:
@@ -696,8 +670,7 @@ def _document_chunks(
     filename: str, content: bytes, mime_type: str | None
 ) -> tuple[list[dict], dict]:
     suffix = Path(filename or "").suffix.lower()
-    mime = (mime_type or "").lower()
-    is_video = suffix in VIDEO_SUFFIXES or mime.startswith("video/")
+    is_video = is_video_file(filename, mime_type)
     try:
         if is_video:
             parts = _video_segments(content, filename)
@@ -759,6 +732,9 @@ def _document_chunks(
                 "headline": row["headline"],
                 "summary": row["summary"],
                 "fragment": row["fragment"],
+                "filename": row["filename"],
+                "title": row["filename"],
+                "metadata": row["metadata"],
                 "characters": len(str(row["fragment"])),
             }
             for row in rows
@@ -770,7 +746,10 @@ def parse_content(
     filename: str, content: bytes, mime_type: str | None = None
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=413, detail="El archivo supera 20 MiB")
+        raise HTTPException(
+            status_code=413,
+            detail="El archivo supera 100 MiB",
+        )
     suffix = Path(filename or "").suffix.lower()
     if suffix in TABULAR_SUFFIXES:
         try:

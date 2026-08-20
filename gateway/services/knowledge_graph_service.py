@@ -1,17 +1,20 @@
-import re
 import math
-from collections import Counter, defaultdict
+import os
+import re
+from collections import Counter
 
 import numpy as np
 import umap
 
 from sklearn.neighbors import NearestNeighbors
-from sqlalchemy import select
+from sqlalchemy import and_, select
 
 from services.database import AsyncSessionLocal
 from models.embedding import Embedding
 from models.chunk import Chunk
 from models.document import Document
+
+DEFAULT_EMBEDDING_MODEL = os.getenv("RAG_EMBEDDING_MODEL", "nomic-embed-text")
 
 
 class KnowledgeGraphService:
@@ -180,6 +183,7 @@ class KnowledgeGraphService:
                     "metadata": {"id": str(doc.id)},
                     "x": 0.0,
                     "y": 0.0,
+                    "z": 0.0,
                     "weight": 50,
                 }
             )
@@ -197,6 +201,7 @@ class KnowledgeGraphService:
                         "metadata": {"freq": int(freq[w])},
                         "x": float(coords[i][0]),
                         "y": float(coords[i][1]),
+                        "z": 0.0,
                         "weight": min(30, 5 + freq[w]),
                     }
                 )
@@ -257,7 +262,13 @@ class KnowledgeGraphService:
                 stmt = (
                     select(Chunk, Document, Embedding)
                     .join(Document, Document.id == Chunk.document_id)
-                    .outerjoin(Embedding, Embedding.chunk_id == Chunk.id)
+                    .outerjoin(
+                        Embedding,
+                        and_(
+                            Embedding.chunk_id == Chunk.id,
+                            Embedding.model == DEFAULT_EMBEDDING_MODEL,
+                        ),
+                    )
                     .where(Document.tenant_id == tenant_id)
                     .order_by(Document.filename, Chunk.position)
                 )
@@ -296,7 +307,10 @@ class KnowledgeGraphService:
                 ids.append(str(chunk.id))
 
                 if embedding is not None and embedding.vector is not None:
-                    embeddings_list.append(list(embedding.vector))
+                    vector = list(embedding.vector)
+                    if len(vector) > 768:
+                        vector = vector[:768]
+                    embeddings_list.append(vector)
                     embedded_indices.append(len(ids) - 1)
 
             embeddings = np.array(embeddings_list) if embeddings_list else np.array([])
@@ -304,11 +318,11 @@ class KnowledgeGraphService:
         if len(ids) == 0:
             return {"nodes": [], "edges": [], "stats": {}}
 
-        # Layout 2D solo con chunks que tienen embedding; el resto se coloca alrededor.
-        coords = np.zeros((len(ids), 2), dtype=float)
+        # Layout 3D (UMAP) para la nube de embeddings; x,y también alimentan la vista 2D.
+        coords = np.zeros((len(ids), 3), dtype=float)
         if len(embeddings) >= 2:
             reducer = umap.UMAP(
-                n_components=2,
+                n_components=3,
                 n_neighbors=min(15, max(2, len(embeddings) - 1)),
                 min_dist=0.15,
                 metric="cosine",
@@ -319,15 +333,23 @@ class KnowledgeGraphService:
             for local_i, global_i in enumerate(embedded_indices):
                 coords[global_i] = embedded_coords[local_i]
         elif len(embeddings) == 1:
-            coords[embedded_indices[0]] = [0.0, 0.0]
+            coords[embedded_indices[0]] = [0.0, 0.0, 0.0]
 
-        # Colocar chunks sin embedding en un anillo
+        orphan_count = sum(1 for meta in metadatas if not meta.get("has_embedding"))
         orphan_i = 0
+        golden = (1 + 5**0.5) / 2
         for i, meta in enumerate(metadatas):
             if meta.get("has_embedding"):
                 continue
-            angle = (2 * math.pi * orphan_i) / max(1, sum(1 for m in metadatas if not m.get("has_embedding")))
-            coords[i] = [math.cos(angle) * 3.5, math.sin(angle) * 3.5]
+            if orphan_count <= 1:
+                coords[i] = [3.5, 0.0, 0.0]
+            else:
+                t = (orphan_i + 0.5) / orphan_count
+                coords[i] = [
+                    3.5 * math.cos(2 * math.pi * golden * orphan_i) * math.sin(math.pi * t),
+                    3.5 * math.sin(2 * math.pi * golden * orphan_i) * math.sin(math.pi * t),
+                    3.5 * math.cos(math.pi * t),
+                ]
             orphan_i += 1
 
         # NODOS (todos los chunks)
@@ -349,6 +371,7 @@ class KnowledgeGraphService:
                     "words": len(content.split()),
                     "x": float(coords[i][0]),
                     "y": float(coords[i][1]),
+                    "z": float(coords[i][2]),
                     "weight": min(30, max(5, len(content) / 100)),
                     "group": source,
                     "has_embedding": bool(metadata.get("has_embedding")),

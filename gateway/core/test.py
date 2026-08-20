@@ -23,15 +23,92 @@ class TestQuestion(BaseModel):
     category: str = Field(
         description="Categoría de la pregunta (p. ej., hecho directo, abarcante, temporal)"
     )
+    source_file: str = ""
+    page: str = ""
     split: str = "dev"
     out_of_knowledge: bool = False
     metadata: dict = Field(default_factory=dict)
 
 
+def _dump_bank_row(item: TestQuestion) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "question": item.question,
+        "keywords": list(item.keywords or []),
+        "reference_answer": item.reference_answer or "",
+        "category": item.category or "direct_fact",
+    }
+    if item.source_file:
+        row["source_file"] = item.source_file
+    if item.page:
+        row["page"] = item.page
+    if item.split:
+        row["split"] = item.split
+    if item.out_of_knowledge:
+        row["out_of_knowledge"] = True
+    if item.metadata:
+        row["metadata"] = item.metadata
+    return row
+
+
+def upsert_test_question_jsonl(
+    *,
+    question: str,
+    keywords: list[str],
+    reference_answer: str,
+    category: str,
+    source_file: str = "",
+    path: str | Path | None = None,
+) -> bool:
+    """Añade o actualiza una pregunta HITL en el JSONL del banco."""
+    text = (question or "").strip()
+    if not text:
+        return False
+    target = Path(path or TEST_FILE)
+    key = normalize_text(text)
+    incoming = TestQuestion(
+        question=text,
+        keywords=[str(item).strip() for item in keywords if str(item).strip()][:8],
+        reference_answer=(reference_answer or "").strip(),
+        category=(category or "direct_fact").strip() or "direct_fact",
+        source_file=(source_file or "").strip(),
+        split="dev",
+        metadata={"source": "hitl", "validated": True},
+    )
+    existing = load_tests(target) if target.exists() else []
+    replaced = False
+    out: list[TestQuestion] = []
+    for item in existing:
+        if normalize_text(item.question) != key:
+            out.append(item)
+            continue
+        meta = dict(item.metadata or {})
+        meta.update(incoming.metadata)
+        out.append(
+            item.model_copy(
+                update={
+                    "keywords": incoming.keywords or item.keywords,
+                    "reference_answer": incoming.reference_answer
+                    or item.reference_answer,
+                    "category": incoming.category or item.category,
+                    "source_file": incoming.source_file or item.source_file,
+                    "metadata": meta,
+                }
+            )
+        )
+        replaced = True
+    if not replaced:
+        out.append(incoming)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with target.open("w", encoding="utf-8") as handle:
+        for item in out:
+            handle.write(json.dumps(_dump_bank_row(item), ensure_ascii=False) + "\n")
+    return True
+
+
 def load_tests(
     path: str | Path | None = None, split: str | None = None
 ) -> list[TestQuestion]:
-    """Carga los bancos actual y anterior, elimina duplicados y filtra el split."""
+    """Carga el banco de oro versionado en JSON/JSONL."""
     sources = [Path(path or TEST_FILE)]
     uses_default_bank = path is None and TEST_FILE == DEFAULT_TEST_FILE
     if uses_default_bank and LEGACY_TEST_FILE.exists():
@@ -41,7 +118,11 @@ def load_tests(
     seen: set[str] = set()
     row_index = 0
     for source in sources:
-        raw = source.read_text(encoding="utf-8-sig")
+        if not source.exists():
+            continue
+        raw = source.read_text(encoding="utf-8-sig").strip()
+        if not raw:
+            continue
         try:
             parsed = json.loads(raw)
             rows = parsed if isinstance(parsed, list) else [parsed]
@@ -135,6 +216,8 @@ def merge_test_banks(
                 metadata["source"] = "merged"
             else:
                 metadata.setdefault("source", "file")
+            if row.get("flag_different_info"):
+                metadata["different_info"] = True
             merged[index_by_question[key]] = current.model_copy(
                 update={
                     "keywords": current.keywords or keywords,
@@ -150,6 +233,8 @@ def merge_test_banks(
         metadata = dict(extra_meta)
         if chunk_ids:
             metadata["expected_chunk_ids"] = chunk_ids
+        if row.get("flag_different_info"):
+            metadata["different_info"] = True
         metadata.setdefault("source", "annotated")
 
         merged.append(

@@ -2,9 +2,29 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Arquitectura Transformer (codificador--decodificador) con atención multi-cabeza, conexiones residuales y normalización (Vaswani et al., 2017).}}{15}{figure.3.1}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Línea temporal de modelos de lenguaje, desde n-gramas y RNN/LSTM hasta Transformer, BERT, GPT y los LLM contemporáneos.}}{16}{figure.3.2}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Desvanecimiento del gradiente en retropropagación: la magnitud de la señal decae al alejarse del instante actual, limitando a las RNN clásicas.}}{17}{figure.3.3}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces Matriz de autoatención sobre la oración «El banco de madera estaba en el parque»: cada consulta pondera las claves del contexto. Ilustra por qué el sentido de un token depende de su entorno y no de un embedding estático.}}{18}{figure.3.4}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces Hiperplano de decisión lineal $W\cdot X+b=0$ en un espacio de dos atributos. Sirve de analogía geométrica a la separación de representaciones, previa a los espacios densos de los embeddings.}}{19}{figure.3.5}%
+\contentsline {figure}{\numberline {3.6}{\ignorespaces Fenómeno \emph {Lost in the Middle}: la retención de un dato clave cae en el centro del prompt y se recupera en los extremos (primacía y recencia).}}{21}{figure.3.6}%
+\contentsline {figure}{\numberline {3.7}{\ignorespaces Pipeline RAG: la pregunta dispara una consulta de recuperación; los textos recuperados se concatenan al prompt completo y el LLM genera la respuesta anclada.}}{22}{figure.3.7}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Mapeo de la arquitectura hexagonal al caso práctico AgroPS: dominio, aplicación y adaptadores de entrada y salida sobre el bounded context RAG.}}{31}{figure.4.1}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Diagrama de la aplicación AgroPS: frontend, backend, base de datos e inferencia orquestados con Docker Compose.}}{41}{figure.5.1}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Esquema del back-end AgroPS: dominio en el centro, aplicación con casos de uso y puertos, y tres adaptadores en el anillo exterior (API REST, PostgreSQL y Ollama).}}{41}{figure.5.2}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Esquema del back-end hexagonal (\texttt {gateway/rag}). El lado conductor entra por \emph {Adapter In} / \emph {Port In}; el lado conducido se conecta por \emph {Port Out} / \emph {Adapter Out}.}}{42}{figure.5.3}%
+\contentsline {figure}{\numberline {5.4}{\ignorespaces Entidades y objetos valor del dominio RAG: la consulta produce un \texttt {RetrievalBundle} que contiene uno o más \texttt {RetrievedChunk}, cada uno identificable por documento y fuente.}}{43}{figure.5.4}%
+\contentsline {figure}{\numberline {5.5}{\ignorespaces Flujo end-to-end de una consulta en AgroPS: de la pregunta en el chat a la respuesta citada, pasando por FastAPI, la aplicación RAG, la recuperación híbrida y la generación local.}}{47}{figure.5.5}%
+\contentsline {figure}{\numberline {5.6}{\ignorespaces Plataforma de gestión documental: listado de corpus PAC/POSEI, base de conocimiento, estado de indexado y número de chunks.}}{48}{figure.5.6}%
+\contentsline {figure}{\numberline {5.7}{\ignorespaces Gestión de la organización: cooperativas y departamentos con aislamiento multi-tenant y roles de administrador, técnico e inspector.}}{49}{figure.5.7}%
+\contentsline {figure}{\numberline {5.8}{\ignorespaces Componente de chat RAG: pregunta en lenguaje natural, respuesta anclada y panel de evidencia recuperada con puntuación y modo híbrido RRF.}}{49}{figure.5.8}%
+\contentsline {figure}{\numberline {5.9}{\ignorespaces Wizard de datasets e ingesta: schema mapping, preview tabular y banco de evaluación con las siete categorías normativas.}}{50}{figure.5.9}%
+\contentsline {figure}{\numberline {5.10}{\ignorespaces Información representada en grafo: entidades normativas (PAC, POSEI, BCAM, ayudas) y relaciones extraídas del corpus.}}{50}{figure.5.10}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\addvspace {10\p@ }
-\addvspace {10\p@ }
+\contentsline {figure}{\numberline {7.1}{\ignorespaces MRR del recuperador híbrido por categoría, con la línea global $0{,}7911$.}}{54}{figure.7.1}%
+\contentsline {figure}{\numberline {7.2}{\ignorespaces Comparación visual del LLM autónomo frente a AgroRAG en exactitud, exhaustividad, relevancia, fidelidad y tasa de alucinación.}}{56}{figure.7.2}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }

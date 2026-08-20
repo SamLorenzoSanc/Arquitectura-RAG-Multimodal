@@ -15,6 +15,26 @@ from rag.domain.ports import EmbeddingPort
 from services.database import AsyncSessionLocal
 
 HNSW_INDEX_DIMENSIONS = int(os.getenv("HNSW_INDEX_DIMENSIONS", "2000"))
+STORAGE_VECTOR_DIM = int(os.getenv("PGVECTOR_STORAGE_DIM", "4096"))
+
+
+def pad_query_vector(values: list[float], dim: int = STORAGE_VECTOR_DIM) -> list[float]:
+    vector = list(values or [])
+    if len(vector) >= dim:
+        return vector[:dim]
+    return vector + [0.0] * (dim - len(vector))
+
+
+def prepare_query_vectors(
+    raw_embedding: list[float],
+    *,
+    storage_dim: int = STORAGE_VECTOR_DIM,
+    index_dim: int = HNSW_INDEX_DIMENSIONS,
+) -> tuple[list[float], list[float], int]:
+    """Alinea la consulta Nomic (768) con la columna pgvector (4096) y el HNSW."""
+    padded = pad_query_vector(list(raw_embedding or []), storage_dim)
+    index_dimensions = min(max(index_dim, 1), storage_dim)
+    return padded, padded[:index_dimensions], index_dimensions
 
 
 def _vector_distance(column, query, metric: str = "cosine"):
@@ -48,8 +68,7 @@ class PgvectorChunkRepository:
         t0 = time.time()
         raw_embedding = await self.embeddings.embed(question)
         t_emb = time.time() - t0
-        index_dimensions = min(HNSW_INDEX_DIMENSIONS, len(raw_embedding))
-        query_index = raw_embedding[:index_dimensions]
+        padded, query_index, index_dimensions = prepare_query_vectors(raw_embedding)
         approximate_distance = _vector_distance(
             func.subvector(Embedding.vector, 1, index_dimensions).cast(
                 Vector(index_dimensions)
@@ -58,7 +77,7 @@ class PgvectorChunkRepository:
             distance_metric,
         )
         exact_distance = _vector_distance(
-            Embedding.vector, raw_embedding, distance_metric
+            Embedding.vector, padded, distance_metric
         )
         stmt = (
             select(Chunk, Document, exact_distance.label("distance"))
@@ -98,6 +117,7 @@ class PgvectorChunkRepository:
                         "tenant_id": str(document.tenant_id),
                         "knowledge_base_id": str(document.knowledge_base_id),
                         "source": document.filename,
+                        "headline": chunk.headline or "",
                         "type": document.mime_type,
                         "distance": float(distance),
                         "retrieval_source": "dense",

@@ -1,76 +1,67 @@
-import sys
+"""
+Smoke test manual de Faster-Whisper + CUDA.
+
+No forma parte de la suite por defecto (ver pyproject.toml --ignore).
+Ejecutar solo cuando haya GPU y el fixture de audio:
+
+    uv run pytest tests/test_whisper_cuda.py -m slow -s
+"""
+
+from __future__ import annotations
+
 from pathlib import Path
 
-from faster_whisper import WhisperModel
+import pytest
 
-print("=" * 70)
-print("TEST REAL FASTER-WHISPER + CUDA")
-print("=" * 70)
-
-print("\n[1] Python")
-print(sys.version)
-print(sys.executable)
-
-print("\n[2] Cargando modelo")
-
-model = WhisperModel(
-    "large-v3",
-    device="cuda",
-    compute_type="float16",
+AUDIO_CANDIDATES = (
+    Path(__file__).with_name("test_audio.mp3"),
+    Path(__file__).with_name("test_audio.mp4"),
+    Path(__file__).resolve().parent / "fixtures" / "test_audio.wav",
+    Path(__file__).resolve().parent / "fixtures" / "test_audio.mp3",
 )
 
-print("Modelo cargado correctamente")
 
-# Cambia esta ruta por un audio pequeño
-audio_path = Path("test_audio.mp4")
+def _resolve_audio() -> Path | None:
+    for path in AUDIO_CANDIDATES:
+        if path.exists():
+            return path
+    return None
 
-if not audio_path.exists():
-    print()
-    print(f"ERROR: No existe {audio_path}")
-    print("Pon un archivo test_audio.mp3 junto a este script.")
-    sys.exit(1)
 
-print("\n[3] Iniciando transcripción REAL")
-print(f"Archivo: {audio_path}")
+def _cuda_available() -> bool:
+    try:
+        import ctranslate2
 
-try:
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return False
+
+
+pytestmark = pytest.mark.slow
+
+
+@pytest.mark.skipif(not _cuda_available(), reason="CUDA no disponible")
+@pytest.mark.skipif(
+    _resolve_audio() is None,
+    reason="Falta audio de prueba (tests/fixtures/test_audio.wav o test_audio.mp3 junto al script)",
+)
+def test_faster_whisper_cuda_transcription():
+    from faster_whisper import WhisperModel
+
+    audio_path = _resolve_audio()
+    assert audio_path is not None
+
+    model = WhisperModel(
+        "large-v3",
+        device="cuda",
+        compute_type="float16",
+    )
+
     segments, info = model.transcribe(
         str(audio_path),
         beam_size=5,
     )
 
-    print("\n[4] Transcripción iniciada correctamente")
-    print(f"Idioma: {info.language}")
-    print(f"Probabilidad idioma: {info.language_probability}")
-
-    print("\n[5] Segmentos")
-
-    count = 0
-
-    for segment in segments:
-        count += 1
-
-        print(f"[{segment.start:.2f}s -> {segment.end:.2f}s] " f"{segment.text}")
-
-    print()
-    print(f"Segmentos generados: {count}")
-
-except Exception as exc:
-    print()
-    print("=" * 70)
-    print("ERROR DURANTE LA TRANSCRIPCIÓN")
-    print("=" * 70)
-    print(f"Tipo: {type(exc).__name__}")
-    print(f"Error: {exc}")
-
-    import traceback
-
-    traceback.print_exc()
-
-    sys.exit(1)
-
-print()
-print("=" * 70)
-print("RESULTADO")
-print("=" * 70)
-print("CUDA + CTranslate2 + Faster-Whisper + TRANSCRIPCIÓN: OK")
+    assert info is not None
+    # El fixture puede ser silencio; basta con que la API no falle.
+    list(segments)

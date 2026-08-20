@@ -12,6 +12,9 @@ class TestQuestion(BaseModel):
     keywords: list[str] = Field(description="Palabras clave que deben aparecer en el contexto recuperado")
     reference_answer: str = Field(description="La respuesta de referencia a esta pregunta")
     category: str = Field(description="Categoría de la pregunta (p. ej., hecho directo, abarcante, temporal)")
+    source_file: str = ""
+    page: str = ""
+    split: str = "dev"
 
 
 def load_tests() -> list[TestQuestion]:

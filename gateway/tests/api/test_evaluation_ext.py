@@ -47,7 +47,7 @@ def test_ragas_run_with_fallback(authenticated_client):
         ]
 
     with patch(
-        "routes.evaluation_ext.run_ragas_evaluation",
+        "evaluation.adapters.inbound.lab.run_ragas_evaluation",
         side_effect=lambda samples, evaluator=None: run_ragas_evaluation(
             samples, evaluator=fake_evaluator
         ),

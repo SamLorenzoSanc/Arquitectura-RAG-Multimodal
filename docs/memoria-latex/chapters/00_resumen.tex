@@ -1,21 +1,19 @@
 
 \begin{abstract}
-El presente Trabajo de Fin de Máster evalúa la capacidad de la arquitectura Generación Aumentada por Recuperación (RAG) para \textbf{mitigar} la tasa de alucinaciones y mejorar la exactitud factual en Modelos de Lenguaje de Gran Escala (LLM) aplicados a documentación normativa y técnica del sector agrícola (PAC y POSEI), en el marco del prototipo AgroPS.
+El presente Trabajo de Fin de Máster evalúa la capacidad de la arquitectura Generación Aumentada por Recuperación (RAG) para \textbf{mitigar} la tasa de alucinaciones y mejorar la exactitud factual en Modelos de Lenguaje de Gran Escala (LLM) aplicados a documentación normativa y técnica del sector agrícola (PAC y POSEI).
 
-Se implementó un \textbf{prototipo funcional contenedorizado} con tubería de recuperación híbrida (búsqueda densa sobre PostgreSQL/pgvector, BM25 y reordenador Cross-Encoder). El corpus se procesó con análisis de maquetación y OCR para estructurar tablas y jerarquías legales.
+Se implementa un \textbf{MVP contenedorizado} de asistente documental: el usuario inicia sesión, sube documentos e interroga un RAG agéntico que decide cuándo consultar la base de conocimiento y responde con citas. El núcleo se construye con arquitectura hexagonal en FastAPI, PostgreSQL/\texttt{pgvector}, Ollama (Llama~3.2 y \texttt{nomic-embed-text}) y un front-end en React, Vite y Tailwind CSS. La evaluación experimental del Capítulo~\ref{ch:evaluacion} se realiza sobre un banco versionado; la interfaz incluye un laboratorio de evaluación como herramienta del prototipo, no como certificación de producción.
 
-Para la auditoría experimental se versiona un banco de evaluación de \textbf{21 ítems (19 preguntas únicas)} en siete categorías; la ampliación a 150 casos con validación experta documentada permanece como trabajo pendiente. La evaluación separa: (i)~métricas propias de retrieval, (ii)~LLM-as-a-Judge y (iii)~adaptador RAGAS con métrica binaria \texttt{is\_hallucination}, sin mezclar familias de métricas.
-
-Los resultados exploratorios disponibles no permiten aún una conclusión causal definitiva sobre las siete categorías; se documentan limitaciones en consultas holísticas y se actualiza el estado del prototipo (ingesta documental, asistente RAG y laboratorio de evaluación).
+El banco de evaluación versionado contiene \textbf{35 ítems} (cinco por categoría) anclados a \texttt{asesor-canarias}. Sobre la corrida \texttt{run\_20260819T165515Z}: MRR $0{,}8108$, exactitud del juez $4{,}46$ con RAG frente a $3{,}31$ sin RAG, y tasa de alucinación $0{,}086$ frente a $0{,}314$.
 \end{abstract}
 
 \renewcommand{\abstractname}{Abstract}
 \begin{abstract}
-This Master's Thesis evaluates Retrieval-Augmented Generation (RAG) for \textbf{mitigating} factual hallucinations in LLMs applied to agricultural regulatory documentation (CAP/POSEI), within the AgroPS containerized prototype. Hybrid retrieval combines dense search on PostgreSQL/pgvector, BM25 and a Cross-Encoder reranker. The versioned evaluation bank currently contains 21 items (19 unique questions) across seven categories; a documented 150-item expansion remains pending. Metrics are separated into custom retrieval scores, LLM-as-a-Judge, and a RAGAS adapter with binary \texttt{is\_hallucination}.
+This Master's Thesis evaluates Retrieval-Augmented Generation (RAG) for \textbf{mitigating} factual hallucinations in LLMs applied to agricultural regulatory documentation (CAP/POSEI). The artefact is a containerized MVP: login, document ingest and an agentic RAG assistant with citations. The hexagonal backend uses FastAPI, PostgreSQL/pgvector and Ollama (Llama 3.2 and nomic-embed-text); the frontend uses React, Vite and Tailwind CSS. Frozen run \texttt{run\_20260819T165515Z} ($N=35$): MRR 0.8108, judge accuracy 4.46 with RAG versus 3.31 without, hallucination rate 0.086 versus 0.314.
 \end{abstract}
 
 \section*{Palabras clave}
-Generación Aumentada por Recuperación (RAG), Alucinaciones, NLP, LLM, IA Generativa, PostgreSQL/pgvector, Evaluación RAGAS.
+Generación Aumentada por Recuperación (RAG), RAG agéntico, Alucinaciones, LLM, PostgreSQL/pgvector, Arquitectura hexagonal.
 
 \section*{Keywords}
-Retrieval-Augmented Generation (RAG), AI Hallucinations, NLP, LLM, Generative AI, PostgreSQL/pgvector, RAGAS evaluation.
+Retrieval-Augmented Generation (RAG), Agentic RAG, AI Hallucinations, LLM, PostgreSQL/pgvector, Hexagonal architecture.

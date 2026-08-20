@@ -21,11 +21,14 @@ _RETRIEVAL_CACHE_MAX_SIZE = 256
 _RETRIEVAL_CACHE_LOCK = Lock()
 
 
-def _cache_key(query: RetrievalQuery, rerank: bool, rewrite: bool) -> str:
+def _cache_key(
+    query: RetrievalQuery, strategy: str, rerank: bool, rewrite: bool
+) -> str:
     cols = ",".join(sorted(query.collections or []))
     raw = (
         f"{query.tenant_id}|{query.question.strip()}|"
-        f"rr={int(rerank)}|rw={int(rewrite)}|d={query.distance_metric}|{cols}"
+        f"s={strategy}|rr={int(rerank)}|rw={int(rewrite)}|"
+        f"d={query.distance_metric}|{cols}"
     )
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -81,11 +84,29 @@ class HybridRetrieve:
 
     async def execute(self, query: RetrievalQuery) -> RetrievalBundle:
         question = " ".join(query.question.strip().split())
-        do_rerank = bool(query.use_reranking)
-        allow_rewrite = bool(query.use_query_rewrite)
+        strategy = (query.retrieval_strategy or "hybrid").strip().lower()
+        valid_strategies = {
+            "hybrid",
+            "dense",
+            "bm25",
+            "hybrid_rrf",
+            "hybrid_rrf_rerank",
+            "hybrid_expansion_rrf",
+            "hybrid_expansion_rrf_rerank",
+        }
+        if strategy not in valid_strategies:
+            raise ValueError(f"Estrategia de recuperación no soportada: {strategy}")
+        explicit_rerank = strategy.endswith("_rerank")
+        explicit_expansion = "_expansion_" in strategy
+        legacy_mode = strategy == "hybrid"
+        do_rerank = explicit_rerank or (legacy_mode and bool(query.use_reranking))
+        allow_rewrite = explicit_expansion or (
+            legacy_mode and bool(query.use_query_rewrite)
+        )
+        expand_lexical = explicit_expansion or legacy_mode
         metric = (query.distance_metric or "cosine").lower()
 
-        cache_key = _cache_key(query, do_rerank, allow_rewrite)
+        cache_key = _cache_key(query, strategy, do_rerank, allow_rewrite)
         now = time.time()
         if not query.evaluation_mode:
             with _RETRIEVAL_CACHE_LOCK:
@@ -99,6 +120,16 @@ class HybridRetrieve:
             return empty
 
         t0 = time.time()
+        if strategy in {"dense", "bm25"}:
+            return await self._execute_single_retriever(
+                query,
+                question=question,
+                strategy=strategy,
+                metric=metric,
+                cache_key=cache_key,
+                started_at=t0,
+            )
+
         t_rewrite = time.time()
         rewrite_required = allow_rewrite and should_rewrite_query(question)
         if rewrite_required:
@@ -111,14 +142,23 @@ class HybridRetrieve:
         t_retrieval = time.time()
         if rewritten == question:
             dense_original, bm25_original = await self._parallel_pair(
-                question, query.tenant_id, query.collections, metric
+                question,
+                query.tenant_id,
+                query.collections,
+                metric,
+                expand_lexical=expand_lexical,
             )
             dense_rewritten = dense_original
             bm25_rewritten = bm25_original
         else:
             dense_original, dense_rewritten, bm25_original, bm25_rewritten = (
                 await self._parallel_four(
-                    question, rewritten, query.tenant_id, query.collections, metric
+                    question,
+                    rewritten,
+                    query.tenant_id,
+                    query.collections,
+                    metric,
+                    expand_lexical=expand_lexical,
                 )
             )
         retrieval_latency_ms = (time.time() - t_retrieval) * 1000
@@ -156,6 +196,7 @@ class HybridRetrieve:
             retrieval={
                 "original_query": question,
                 "rewritten_query": rewritten,
+                "strategy": strategy,
                 "retrieved_chunks": len(dense_original),
                 "rewritten_chunks": len(dense_rewritten),
                 "merged_chunks": len(candidates),
@@ -212,6 +253,74 @@ class HybridRetrieve:
                     _RETRIEVAL_CACHE.popitem(last=False)
         return bundle
 
+    async def _execute_single_retriever(
+        self,
+        query: RetrievalQuery,
+        *,
+        question: str,
+        strategy: str,
+        metric: str,
+        cache_key: str,
+        started_at: float,
+    ) -> RetrievalBundle:
+        if strategy == "dense":
+            chunks = await self.chunks.retrieve_dense(
+                question,
+                query.tenant_id,
+                query.collections,
+                k=self.retrieval_k,
+                distance_metric=metric,
+                embedding_model=self.embedding_model,
+            )
+            dense, lexical = chunks, []
+        else:
+            chunks = await self.lexical.retrieve(
+                question,
+                query.tenant_id,
+                query.collections,
+                k=self.bm25_k,
+            )
+            dense, lexical = [], chunks
+        elapsed_ms = (time.time() - started_at) * 1000
+        final_chunks = chunks[: self.final_k]
+        bundle = RetrievalBundle(
+            chunks=final_chunks,
+            rewritten_query=question,
+            dense_original=dense,
+            dense_rewritten=[],
+            bm25_original=lexical,
+            bm25_rewritten=[],
+            candidates=chunks,
+            cache_scope=(
+                f"{query.tenant_id}|{','.join(sorted(query.collections or []))}"
+            ),
+            retrieval={
+                "original_query": question,
+                "rewritten_query": question,
+                "strategy": strategy,
+                "retrieved_chunks": len(chunks),
+                "merged_chunks": len(chunks),
+                "candidate_chunks": len(chunks),
+                "final_chunks": len(final_chunks),
+                "retrieval_k": self.retrieval_k,
+                "bm25_k": self.bm25_k,
+                "candidate_k": self.candidate_k,
+                "final_k": self.final_k,
+                "rrf_k": None,
+                "reranking": False,
+                "query_rewriting": False,
+                "parallel_retrieval": False,
+                "timings_ms": {"total_retrieval": elapsed_ms},
+            },
+        )
+        if not query.evaluation_mode:
+            with _RETRIEVAL_CACHE_LOCK:
+                _RETRIEVAL_CACHE[cache_key] = (time.time(), bundle)
+                _RETRIEVAL_CACHE.move_to_end(cache_key)
+                while len(_RETRIEVAL_CACHE) > _RETRIEVAL_CACHE_MAX_SIZE:
+                    _RETRIEVAL_CACHE.popitem(last=False)
+        return bundle
+
     async def _rewrite(self, question: str) -> str:
         prompt = (
             "Respuesta en español.\nReescribe únicamente la consulta.\n"
@@ -227,6 +336,8 @@ class HybridRetrieve:
         tenant_id: str,
         collections: list[str] | None,
         metric: str,
+        *,
+        expand_lexical: bool,
     ) -> tuple[list[RetrievedChunk], list[RetrievedChunk]]:
         import asyncio
 
@@ -240,7 +351,7 @@ class HybridRetrieve:
                 embedding_model=self.embedding_model,
             ),
             self.lexical.retrieve(
-                expand_agro_query(question),
+                expand_agro_query(question) if expand_lexical else question,
                 tenant_id,
                 collections,
                 k=self.bm25_k,
@@ -254,6 +365,8 @@ class HybridRetrieve:
         tenant_id: str,
         collections: list[str] | None,
         metric: str,
+        *,
+        expand_lexical: bool,
     ):
         import asyncio
 
@@ -275,13 +388,13 @@ class HybridRetrieve:
                 embedding_model=self.embedding_model,
             ),
             self.lexical.retrieve(
-                expand_agro_query(question),
+                expand_agro_query(question) if expand_lexical else question,
                 tenant_id,
                 collections,
                 k=self.bm25_k,
             ),
             self.lexical.retrieve(
-                expand_agro_query(rewritten),
+                expand_agro_query(rewritten) if expand_lexical else rewritten,
                 tenant_id,
                 collections,
                 k=self.bm25_k,

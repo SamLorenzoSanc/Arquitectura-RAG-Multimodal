@@ -1,5 +1,6 @@
 import api from "@/api";
 import type { Organization } from "@/types/organization";
+import type { Department } from "@/types/organization";
 
 export const getOrganizations = async () => {
     const { data } = await api.get("/organization");
@@ -17,6 +18,15 @@ export const getOrganizationMembers = async (id: string) => {
     const { data } = await api.get(`/organization/${id}/members`);
 
     return data;
+};
+
+export const getOrganizationDepartments = async (
+    id: string,
+): Promise<Department[]> => {
+    const { data } = await api.get<Department[]>(
+        `/organization/${id}/departments`,
+    );
+    return Array.isArray(data) ? data : [];
 };
 
 export const createOrganization = async (body: any) => {

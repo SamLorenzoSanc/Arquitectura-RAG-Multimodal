@@ -43,7 +43,7 @@ Detalles: [arquitectura](docs/ARCHITECTURE.md), [pipeline RAG](docs/RAG_PIPELINE
 
 ## Inicio con Docker (Windows)
 
-Requisitos: Docker Desktop con Compose v2 y los modelos de Ollama disponibles. Cree `.env` en la raíz:
+Requisitos: Docker Desktop con Compose v2 y los modelos de Ollama disponibles. Cree `.env` en la raíz (hay `.env.example`):
 
 ```dotenv
 POSTGRES_USER=postgres
@@ -58,14 +58,13 @@ RAG_GENERATION_MODEL=llama3
 RAG_EMBEDDING_MODEL=qwen3-embedding:latest
 ```
 
-La ruta de modelos de Ollama en `docker-compose.yaml` es actualmente específica de este equipo Windows. Ajústela antes de iniciar:
+Los modelos se descargan en el volumen `ollama_data` la primera vez (`ollama-init`).
 
 ```powershell
 docker compose build
 docker compose up -d
 docker compose ps
-docker compose exec ollama ollama pull llama3
-docker compose exec ollama ollama pull llama3.2
+docker compose exec ollama ollama pull llama3.2:latest
 docker compose exec ollama ollama pull qwen3-embedding:latest
 ```
 

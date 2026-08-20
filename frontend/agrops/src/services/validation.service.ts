@@ -20,6 +20,7 @@ export type HumanReview = {
   category?: string | null;
   filename?: string | null;
   rationale?: string | null;
+  keywords?: string[] | null;
 };
 
 export type DocumentQuestion = {
@@ -54,9 +55,25 @@ export async function decideHumanReview(
     status: "approved" | "rejected" | "corrected";
     reviewer_notes?: string;
     corrected_answer?: string;
+    question?: string;
+    keywords?: string[];
+    category?: string;
   },
 ): Promise<void> {
   await api.post(`/human-validation/reviews/${id}`, payload);
+}
+
+export async function extractMissingQuestions(params?: {
+  organizationId?: string;
+}): Promise<{ status: string; organization_id?: string | null }> {
+  const { data } = await api.post(
+    "/human-validation/extract-missing",
+    null,
+    {
+      params: { organization_id: params?.organizationId },
+    },
+  );
+  return data;
 }
 
 export async function fetchDocumentQuestions(params?: {

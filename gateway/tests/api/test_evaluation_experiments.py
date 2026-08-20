@@ -5,6 +5,7 @@ from services.rag_service import RetrievalEval
 
 EXPERIMENTS_ROUTE = "/api/v1/chat/evaluation/experiments"
 COMPARE_ROUTE = "/api/v1/chat/evaluation/experiments/compare"
+STRATEGIES_ROUTE = "/api/v1/chat/evaluation/experiments/strategies"
 MODELS_ROUTE = "/api/v1/chat/evaluation/embedding-models"
 
 
@@ -61,8 +62,8 @@ def test_list_experiments_returns_history(authenticated_client, override_db):
     override_db.execute = AsyncMock(return_value=mock_result)
 
     with patch(
-        "routes.chat.get_user_tenant_id", AsyncMock(return_value="tenant-1")
-    ), patch("routes.chat.init_experiment_runs_table", AsyncMock()):
+        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+    ), patch("chat.adapters.inbound.http.init_experiment_runs_table", AsyncMock()):
         res = authenticated_client.get(EXPERIMENTS_ROUTE)
 
     assert res.status_code == 200
@@ -90,14 +91,14 @@ def test_create_experiment_persists_run(authenticated_client, override_db):
     saved = {"id": 11, "created_at": None}
 
     with patch(
-        "routes.chat.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch(
-        "routes.chat.resolve_evaluation_tests", AsyncMock(return_value=sample)
+        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
     ), patch(
-        "routes.chat.evaluate_retrieval_internal",
+        "chat.adapters.inbound.http.evaluate_retrieval_internal",
         AsyncMock(return_value=_fake_eval()),
     ), patch(
-        "routes.chat.record_experiment_run", AsyncMock(return_value=saved)
+        "chat.adapters.inbound.http.record_experiment_run", AsyncMock(return_value=saved)
     ):
         res = authenticated_client.post(
             EXPERIMENTS_ROUTE,
@@ -133,14 +134,14 @@ def test_compare_experiments_runs_three_distances(authenticated_client):
     saved = {"id": 1, "created_at": None}
 
     with patch(
-        "routes.chat.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch(
-        "routes.chat.resolve_evaluation_tests", AsyncMock(return_value=sample)
+        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
     ), patch(
-        "routes.chat.evaluate_retrieval_internal",
+        "chat.adapters.inbound.http.evaluate_retrieval_internal",
         AsyncMock(return_value=_fake_eval(mrr=0.9)),
     ), patch(
-        "routes.chat.record_experiment_run", AsyncMock(return_value=saved)
+        "chat.adapters.inbound.http.record_experiment_run", AsyncMock(return_value=saved)
     ) as persist:
         res = authenticated_client.post(
             COMPARE_ROUTE,
@@ -179,14 +180,14 @@ def test_compare_experiments_runs_two_embeddings(authenticated_client):
     saved = {"id": 3, "created_at": None}
 
     with patch(
-        "routes.chat.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch(
-        "routes.chat.resolve_evaluation_tests", AsyncMock(return_value=sample)
+        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
     ), patch(
-        "routes.chat.evaluate_retrieval_internal",
+        "chat.adapters.inbound.http.evaluate_retrieval_internal",
         AsyncMock(return_value=_fake_eval(mrr=0.85)),
     ), patch(
-        "routes.chat.record_experiment_run", AsyncMock(return_value=saved)
+        "chat.adapters.inbound.http.record_experiment_run", AsyncMock(return_value=saved)
     ) as persist:
         res = authenticated_client.post(
             COMPARE_ROUTE,
@@ -207,6 +208,59 @@ def test_compare_experiments_runs_two_embeddings(authenticated_client):
         "qwen3-embedding:latest",
         "nomic-embed-text",
     }
+
+
+def test_compare_retrieval_strategies_runs_same_bank(authenticated_client):
+    sample = [
+        type(
+            "T",
+            (),
+            {
+                "question": "¿Qué regula la Orden APA/102/2024?",
+                "keywords": ["APA/102/2024"],
+                "reference_answer": "Una ayuda agraria.",
+                "category": "identifier",
+                "out_of_knowledge": False,
+                "metadata": {},
+            },
+        )()
+    ]
+    evaluator = AsyncMock(return_value=_fake_eval(mrr=0.75))
+
+    with patch(
+        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+    ), patch(
+        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
+    ), patch(
+        "chat.adapters.inbound.http.evaluate_retrieval_internal", evaluator
+    ), patch(
+        "chat.adapters.inbound.http.record_experiment_run",
+        AsyncMock(side_effect=[
+            {"id": 21, "created_at": None},
+            {"id": 22, "created_at": None},
+        ]),
+    ) as persist:
+        res = authenticated_client.post(
+            STRATEGIES_ROUTE,
+            json={
+                "strategies": ["dense", "hybrid_rrf"],
+                "embedding_model": "qwen3-embedding:latest",
+                "distance_metric": "cosine",
+                "top_k": 5,
+            },
+        )
+
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["runs"]) == 2
+    assert persist.await_count == 2
+    assert {run["retrieval_strategy"] for run in body["runs"]} == {
+        "dense",
+        "hybrid_rrf",
+    }
+    assert {
+        call.kwargs["retrieval_strategy"] for call in evaluator.await_args_list
+    } == {"dense", "hybrid_rrf"}
 
 
 def test_dataset_evaluation_request_can_skip_cache():

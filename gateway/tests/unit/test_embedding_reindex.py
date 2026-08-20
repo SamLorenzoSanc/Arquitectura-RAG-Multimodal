@@ -1,12 +1,14 @@
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from services.embedding_reindex import (
     EMBEDDING_CATALOG,
+    _ensure_model_available,
     chunk_text,
+    embedding_payload,
     ensure_document_chunks,
     extract_index_text,
     pad_vector,
@@ -28,10 +30,66 @@ def test_chunk_text_joins_parts():
     assert chunk_text("", "", "") == ""
 
 
+def test_embedding_payload_skips_duplicate_headline():
+    body = "El riego por goteo reduce pérdidas de agua."
+    assert embedding_payload("El riego por goteo", body[:20], body) == body
+    assert embedding_payload("titular", "resumen", "") == "titular\n\nresumen"
+
+
+def test_embed_batch_uses_native_ollama_api():
+    from services.embedding_reindex import _embed_batch
+
+    client = MagicMock()
+    response = MagicMock()
+    response.status_code = 200
+    response.json.return_value = {"embeddings": [[1.0, 0.0], [0.0, 1.0]]}
+    client.post.return_value = response
+    client.is_closed = False
+
+    import services.embedding_reindex as mod
+
+    previous = mod._HTTP
+    mod._HTTP = client
+    try:
+        vectors = _embed_batch("qwen3-embedding:latest", ["a", "b"])
+    finally:
+        mod._HTTP = previous
+
+    assert client.post.call_args.args[0].endswith("/api/embed")
+    assert client.post.call_args.kwargs["json"]["input"] == ["a", "b"]
+    assert len(vectors) == 2
+    assert vectors[0][0] == 1.0
+
+
 def test_embedding_catalog_has_qwen_and_baseline():
     ids = {item["id"] for item in EMBEDDING_CATALOG}
     assert "qwen3-embedding:latest" in ids
     assert "nomic-embed-text" in ids
+
+
+def test_ensure_model_available_pulls_only_missing_model():
+    client = MagicMock()
+    tags = MagicMock()
+    tags.json.return_value = {
+        "models": [{"name": "qwen3-embedding:latest"}]
+    }
+    client.get.return_value = tags
+    client.post.return_value = MagicMock()
+    context = MagicMock()
+    context.__enter__.return_value = client
+    context.__exit__.return_value = False
+
+    with patch("services.embedding_reindex.httpx.Client", return_value=context):
+        _ensure_model_available("qwen3-embedding:latest")
+        client.post.assert_not_called()
+        _ensure_model_available("nomic-embed-text")
+
+    pull_call = client.post.call_args
+    assert pull_call.args[0].endswith("/api/pull")
+    assert pull_call.kwargs["json"] == {
+        "name": "nomic-embed-text",
+        "stream": False,
+    }
 
 
 def test_split_into_chunks_respects_size():
@@ -62,15 +120,39 @@ def test_extract_index_text_pptx_slides():
     assert "Riego por goteo" in text
 
 
+def test_extract_index_text_transcribes_video(monkeypatch):
+    monkeypatch.setattr(
+        "services.embedding_reindex.transcribe_video_text",
+        lambda *_args, **_kwargs: "[0.0s–2.1s] Revisa el filtro de malla.",
+    )
+    text = extract_index_text("riego.mp4", b"\x00\x01\x02not-utf8", "video/mp4")
+    assert "filtro de malla" in text
+
+
+def test_extract_index_text_does_not_decode_video_bytes():
+    from services.video_extract import is_video_file
+
+    assert is_video_file("charla.webm", "video/webm")
+    assert is_video_file("nota.mp3", "audio/mpeg")
+    assert not is_video_file("posei.pdf", "application/pdf")
+
+
 @pytest.mark.asyncio
 async def test_ensure_document_chunks_skips_when_present():
     db = AsyncMock()
     count = MagicMock()
     count.scalar.return_value = 3
-    db.execute = AsyncMock(return_value=count)
+    sample = MagicMock()
+    sample.all.return_value = [
+        (
+            "El riego por goteo reduce pérdidas de agua en la platanera canaria durante el verano.",
+        )
+    ]
+    db.execute = AsyncMock(side_effect=[count, sample])
     created = await ensure_document_chunks(db, str(uuid4()))
     assert created == 3
     db.add.assert_not_called()
+    db.add_all.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -93,8 +175,46 @@ async def test_ensure_document_chunks_creates_from_txt(tmp_path: Path):
     db.add = MagicMock()
     created = await ensure_document_chunks(db, str(uuid4()))
     assert created >= 1
-    assert db.add.call_count == created
+    db.add_all.assert_called_once()
+    stored = db.add_all.call_args.args[0]
+    assert len(stored) == created
     db.commit.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_ensure_document_chunks_rebuilds_garbled(tmp_path: Path):
+    path = tmp_path / "posei.txt"
+    path.write_text(
+        "Resolución del segundo pago de la subvención POSEI 2025 en Canarias.\n\n"
+        + ("texto " * 400),
+        encoding="utf-8",
+    )
+    db = AsyncMock()
+    count = MagicMock()
+    count.scalar.return_value = 3
+    sample = MagicMock()
+    sample.all.return_value = [("\ufffd" * 120,)]
+    delete_emb = MagicMock()
+    delete_chunks = MagicMock()
+    mappings = MagicMock()
+    mappings.first.return_value = {
+        "id": str(uuid4()),
+        "filename": "posei.txt",
+        "mime_type": "text/plain",
+        "storage_path": str(path),
+    }
+    doc_result = MagicMock()
+    doc_result.mappings.return_value = mappings
+    db.execute = AsyncMock(
+        side_effect=[count, sample, delete_emb, delete_chunks, doc_result]
+    )
+    db.add = MagicMock()
+    created = await ensure_document_chunks(db, str(uuid4()))
+    assert created >= 1
+    db.add_all.assert_called_once()
+    sqls = [str(call.args[0]) for call in db.execute.await_args_list]
+    assert any("DELETE FROM embeddings" in sql for sql in sqls)
+    assert any("DELETE FROM chunks" in sql for sql in sqls)
 
 
 @pytest.mark.asyncio

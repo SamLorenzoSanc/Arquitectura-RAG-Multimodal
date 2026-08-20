@@ -5,95 +5,142 @@ export interface RoleGuide {
   cannot: string[];
 }
 
-const SHARED_CONSULTATION = [
-  "Consultar la organización y los departamentos",
-  "Leer documentos, datasets y bases de conocimiento",
-  "Usar el chat RAG",
-  "Ver y lanzar evaluaciones RAG",
-];
+type TranslateFn = (key: string) => string;
 
-const ADMIN_ONLY = [
-  "Crear o desactivar la organización y los inquilinos",
-  "Añadir o quitar miembros y departamentos",
-  "Crear o borrar bases de conocimiento",
-  "Cambiar ajustes de la organización",
-];
+const ROLE_KEYS = [
+  "ORG_ADMIN",
+  "SUPER_ADMIN",
+  "FARM_MANAGER",
+  "QUALITY_CONTROLLER",
+  "LOGISTICS_OPERATOR",
+  "USER",
+  "MEMBER",
+  "VIEWER",
+] as const;
 
-export const ROLE_GUIDES: Record<string, RoleGuide> = {
+type RoleKey = (typeof ROLE_KEYS)[number];
+
+const ROLE_PERMISSIONS: Record<
+  RoleKey,
+  { can: string[]; cannot: string[] }
+> = {
   ORG_ADMIN: {
-    label: "Administrador de organización",
-    summary:
-      "Responsable de la cooperativa: configura el workspace y tiene acceso completo al RAG.",
     can: [
-      ...ADMIN_ONLY,
-      ...SHARED_CONSULTATION,
-      "Ver métricas de uso",
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+      "perm_viewOrg",
+      "perm_readDocs",
+      "perm_useChat",
+      "perm_viewEval",
+      "perm_viewMetrics",
     ],
-    cannot: ["Acceso de depuración interna del sistema"],
+    cannot: ["perm_debugDenied"],
   },
   SUPER_ADMIN: {
-    label: "Superadministrador",
-    summary: "Mismos poderes que el administrador, más depuración interna. Reservado al equipo técnico.",
     can: [
-      ...ADMIN_ONLY,
-      ...SHARED_CONSULTATION,
-      "Ver métricas de uso",
-      "Acceso de depuración interna",
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+      "perm_viewOrg",
+      "perm_readDocs",
+      "perm_useChat",
+      "perm_viewEval",
+      "perm_viewMetrics",
+      "perm_debug",
     ],
     cannot: [],
   },
   FARM_MANAGER: {
-    label: "Gestor de fincas / producción",
-    summary:
-      "Técnico de campo: consulta el conocimiento de producción, riego y cuaderno, sin administrar la org.",
-    can: [...SHARED_CONSULTATION, "Ver métricas de uso"],
-    cannot: ADMIN_ONLY,
+    can: [
+      "perm_viewOrg",
+      "perm_readDocs",
+      "perm_useChat",
+      "perm_viewEval",
+      "perm_viewMetrics",
+    ],
+    cannot: [
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+    ],
   },
   QUALITY_CONTROLLER: {
-    label: "Controlador de calidad",
-    summary:
-      "Calidad e IGP: consulta normativa, trazabilidad y evaluaciones, sin gestionar miembros.",
-    can: [...SHARED_CONSULTATION, "Ver métricas de uso"],
-    cannot: ADMIN_ONLY,
+    can: [
+      "perm_viewOrg",
+      "perm_readDocs",
+      "perm_useChat",
+      "perm_viewEval",
+      "perm_viewMetrics",
+    ],
+    cannot: [
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+    ],
   },
   LOGISTICS_OPERATOR: {
-    label: "Operador logístico",
-    summary:
-      "Empaquetado y comercialización operativa: consulta el RAG de tránsito y mercado, sin administrar.",
-    can: [...SHARED_CONSULTATION, "Ver métricas de uso"],
-    cannot: ADMIN_ONLY,
+    can: [
+      "perm_viewOrg",
+      "perm_readDocs",
+      "perm_useChat",
+      "perm_viewEval",
+      "perm_viewMetrics",
+    ],
+    cannot: [
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+    ],
   },
   USER: {
-    label: "Usuario estándar",
-    summary:
-      "Socio o personal de consulta: puede preguntar al asistente y ver datasets, sin métricas ni administración.",
-    can: SHARED_CONSULTATION,
-    cannot: [...ADMIN_ONLY, "Ver métricas de uso"],
+    can: ["perm_viewOrg", "perm_readDocs", "perm_useChat", "perm_viewEval"],
+    cannot: [
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+      "perm_viewMetrics",
+    ],
   },
   MEMBER: {
-    label: "Miembro",
-    summary: "Equivalente al usuario estándar: consulta RAG y evaluaciones, sin administrar la cooperativa.",
-    can: SHARED_CONSULTATION,
-    cannot: [...ADMIN_ONLY, "Ver métricas de uso"],
+    can: ["perm_viewOrg", "perm_readDocs", "perm_useChat", "perm_viewEval"],
+    cannot: [
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+      "perm_viewMetrics",
+    ],
   },
   VIEWER: {
-    label: "Lector",
-    summary: "Solo lectura: chat y documentos, sin gestionar evaluaciones ni métricas.",
     can: [
-      "Consultar la organización y los departamentos",
-      "Leer documentos y bases de conocimiento",
-      "Usar el chat RAG",
-      "Ver evaluaciones (sin gestionarlas)",
+      "perm_viewOrg",
+      "perm_readDocsViewer",
+      "perm_useChat",
+      "perm_viewEvalReadOnly",
     ],
-    cannot: [...ADMIN_ONLY, "Gestionar evaluaciones", "Ver métricas de uso"],
+    cannot: [
+      "perm_adminOrg",
+      "perm_manageMembers",
+      "perm_manageDocs",
+      "perm_orgSettings",
+      "perm_manageEvalDenied",
+      "perm_viewMetrics",
+    ],
   },
 };
 
-export function roleGuide(roleName?: string | null): RoleGuide {
+function resolveRoleKey(roleName?: string | null): RoleKey | null {
   const key = (roleName || "").trim().toUpperCase();
-  if (ROLE_GUIDES[key]) return ROLE_GUIDES[key];
+  if (ROLE_KEYS.includes(key as RoleKey)) return key as RoleKey;
   const lower = (roleName || "").trim().toLowerCase();
-  const alias: Record<string, string> = {
+  const alias: Record<string, RoleKey> = {
     admin: "ORG_ADMIN",
     org_admin: "ORG_ADMIN",
     super_admin: "SUPER_ADMIN",
@@ -104,12 +151,37 @@ export function roleGuide(roleName?: string | null): RoleGuide {
     member: "MEMBER",
     viewer: "VIEWER",
   };
-  const mapped = alias[lower];
-  if (mapped && ROLE_GUIDES[mapped]) return ROLE_GUIDES[mapped];
+  return alias[lower] ?? null;
+}
+
+export function roleGuide(
+  t: TranslateFn,
+  roleName?: string | null,
+): RoleGuide {
+  const key = resolveRoleKey(roleName);
+  if (key) {
+    const perms = ROLE_PERMISSIONS[key];
+    return {
+      label: t(`roles.${key}_label`),
+      summary: t(`roles.${key}_summary`),
+      can: perms.can.map((perm) => t(`roles.${perm}`)),
+      cannot: perms.cannot.map((perm) => t(`roles.${perm}`)),
+    };
+  }
   return {
-    label: roleName || "Rol",
-    summary: "Rol de la organización. Revisa con el administrador qué alcance tiene.",
-    can: SHARED_CONSULTATION,
-    cannot: ADMIN_ONLY,
+    label: roleName || t("roles.defaultLabel"),
+    summary: t("roles.defaultSummary"),
+    can: [
+      t("roles.perm_viewOrg"),
+      t("roles.perm_readDocs"),
+      t("roles.perm_useChat"),
+      t("roles.perm_viewEval"),
+    ],
+    cannot: [
+      t("roles.perm_adminOrg"),
+      t("roles.perm_manageMembers"),
+      t("roles.perm_manageDocs"),
+      t("roles.perm_orgSettings"),
+    ],
   };
 }

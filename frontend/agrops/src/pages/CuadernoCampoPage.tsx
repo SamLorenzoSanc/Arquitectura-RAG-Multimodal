@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useOrganization } from "@/context/OrganizationContext";
+import { useTranslation } from "@/i18n/I18nProvider";
 import {
   useCreateNotebookEntry,
   useDeleteNotebookEntry,
@@ -49,12 +50,12 @@ function parseISODate(value: string): Date {
   return new Date(y, (m || 1) - 1, d || 1);
 }
 
-function monthLabel(d: Date): string {
-  return d.toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+function monthLabel(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { month: "long", year: "numeric" });
 }
 
-function dayLabel(iso: string): string {
-  return parseISODate(iso).toLocaleDateString("es-ES", {
+function dayLabel(iso: string, locale: string): string {
+  return parseISODate(iso).toLocaleDateString(locale, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -74,9 +75,15 @@ function monthGrid(cursor: Date): Array<{ iso: string; inMonth: boolean }> {
   });
 }
 
-function categoryLabel(id: string): string {
-  return NOTEBOOK_CATEGORIES.find((c) => c.id === id)?.label ?? id;
-}
+const CATEGORY_I18N: Record<NotebookCategory, string> = {
+  riego: "cuaderno.catRiego",
+  plaga: "cuaderno.catPlaga",
+  fertilizacion: "cuaderno.catFertilizacion",
+  cosecha: "cuaderno.catCosecha",
+  clima: "cuaderno.catClima",
+  maquinaria: "cuaderno.catMaquinaria",
+  otro: "cuaderno.catOtro",
+};
 
 function reminderTime(value?: string | null): string {
   if (!value) return "";
@@ -85,7 +92,9 @@ function reminderTime(value?: string | null): string {
 }
 
 export default function CuadernoCampoPage() {
+  const { t, language } = useTranslation();
   const { selectedOrg } = useOrganization();
+  const locale = language === "en" ? "en-US" : "es-ES";
   const today = toISODate(new Date());
   const [cursor, setCursor] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(today);
@@ -144,7 +153,7 @@ export default function CuadernoCampoPage() {
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) {
-      setError("Pon un título a la anotación.");
+      setError(t("cuaderno.titleRequired"));
       return;
     }
     const payload = {
@@ -164,7 +173,7 @@ export default function CuadernoCampoPage() {
       }
       resetForm();
     } catch {
-      setError("No se pudo guardar la anotación.");
+      setError(t("cuaderno.saveFailed"));
     }
   };
 
@@ -173,7 +182,7 @@ export default function CuadernoCampoPage() {
       await deleteEntry.mutateAsync(id);
       if (editingId === id) resetForm();
     } catch {
-      setError("No se pudo borrar la anotación.");
+      setError(t("cuaderno.deleteFailed"));
     }
   };
 
@@ -182,17 +191,16 @@ export default function CuadernoCampoPage() {
       <header className="rounded-2xl border border-blue-100 bg-white p-6 shadow-sm">
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-800">
-            Trabajo diario
+            {t("cuaderno.badge")}
           </span>
-          <span className="text-xs font-medium text-slate-400">Agenda del agricultor</span>
+          <span className="text-xs font-medium text-slate-400">{t("cuaderno.subtitle")}</span>
         </div>
         <h1 className="mt-1 flex items-center gap-2 text-2xl font-black text-blue-950">
           <BookOpen size={22} />
-          Cuaderno de campo
+          {t("cuaderno.title")}
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-slate-600">
-          Anota riegos, plagas, cosecha o lo que veas en la finca. Elige un día
-          en el calendario, escribe y guarda. Puedes poner un recordatorio.
+          {t("cuaderno.intro")}
         </p>
       </header>
 
@@ -206,13 +214,13 @@ export default function CuadernoCampoPage() {
                   setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))
                 }
                 className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
-                aria-label="Mes anterior"
+                aria-label={t("cuaderno.prevMonthAria")}
               >
                 <ChevronLeft size={18} />
               </button>
               <p className="flex items-center gap-1.5 text-sm font-bold capitalize text-slate-800">
                 <CalendarDays size={15} />
-                {monthLabel(cursor)}
+                {monthLabel(cursor, locale)}
               </p>
               <button
                 type="button"
@@ -220,7 +228,7 @@ export default function CuadernoCampoPage() {
                   setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))
                 }
                 className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
-                aria-label="Mes siguiente"
+                aria-label={t("cuaderno.nextMonthAria")}
               >
                 <ChevronRight size={18} />
               </button>
@@ -277,7 +285,7 @@ export default function CuadernoCampoPage() {
               }}
               className="mt-3 w-full rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
-              Ir a hoy
+              {t("cuaderno.goToday")}
             </button>
           </div>
 
@@ -285,7 +293,7 @@ export default function CuadernoCampoPage() {
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
                 <Clock size={13} />
-                Próximos recordatorios
+                {t("cuaderno.remindersTitle")}
               </p>
               <ul className="space-y-2">
                 {upcoming.map((entry) => (
@@ -313,18 +321,20 @@ export default function CuadernoCampoPage() {
         <section className="space-y-4">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-black capitalize text-blue-950">
-              {dayLabel(selectedDate)}
+              {dayLabel(selectedDate, locale)}
             </h2>
             <p className="text-xs text-slate-500">
               {dayEntries.length === 0
-                ? "Aún no hay anotaciones este día."
-                : `${dayEntries.length} anotación${dayEntries.length === 1 ? "" : "es"}`}
+                ? t("cuaderno.noEntries")
+                : dayEntries.length === 1
+                  ? t("cuaderno.entryCountSingular", { count: dayEntries.length })
+                  : t("cuaderno.entryCountPlural", { count: dayEntries.length })}
             </p>
 
             {isLoading ? (
               <div className="flex items-center gap-2 py-8 text-sm text-slate-500">
                 <Loader2 size={16} className="animate-spin" />
-                Cargando cuaderno…
+                {t("cuaderno.loading")}
               </div>
             ) : (
               <ul className="mt-4 space-y-3">
@@ -338,7 +348,7 @@ export default function CuadernoCampoPage() {
                         <span
                           className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${CATEGORY_STYLE[entry.category]}`}
                         >
-                          {categoryLabel(entry.category)}
+                          {t(CATEGORY_I18N[entry.category])}
                         </span>
                         <h3 className="mt-1 text-sm font-bold text-slate-800">
                           {entry.title}
@@ -362,7 +372,7 @@ export default function CuadernoCampoPage() {
                           type="button"
                           onClick={() => fillForm(entry)}
                           className="rounded-lg p-1.5 text-slate-500 hover:bg-white"
-                          aria-label="Editar anotación"
+                          aria-label={t("cuaderno.editAria")}
                         >
                           <Pencil size={14} />
                         </button>
@@ -370,7 +380,7 @@ export default function CuadernoCampoPage() {
                           type="button"
                           onClick={() => void handleDelete(entry.id)}
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-white hover:text-red-600"
-                          aria-label="Borrar anotación"
+                          aria-label={t("cuaderno.deleteAria")}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -388,20 +398,20 @@ export default function CuadernoCampoPage() {
           >
             <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
               {editingId ? <Pencil size={15} /> : <Plus size={15} />}
-              {editingId ? "Editar anotación" : "Nueva anotación"}
+              {editingId ? t("cuaderno.editTitle") : t("cuaderno.newTitle")}
             </h3>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2 text-xs font-semibold text-slate-600">
-                Título
+                {t("cuaderno.titleLabel")}
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ej. Revisar goteros de la ladera"
+                  placeholder={t("cuaderno.titlePlaceholder")}
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:bg-white"
                 />
               </label>
               <label className="text-xs font-semibold text-slate-600">
-                Tipo
+                {t("cuaderno.typeLabel")}
                 <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as NotebookCategory)}
@@ -409,23 +419,23 @@ export default function CuadernoCampoPage() {
                 >
                   {NOTEBOOK_CATEGORIES.map((item) => (
                     <option key={item.id} value={item.id}>
-                      {item.label}
+                      {t(CATEGORY_I18N[item.id])}
                     </option>
                   ))}
                 </select>
               </label>
               <label className="sm:col-span-2 text-xs font-semibold text-slate-600">
-                Anotación
+                {t("cuaderno.noteLabel")}
                 <textarea
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   rows={4}
-                  placeholder="Qué viste, qué hiciste y qué queda pendiente…"
+                  placeholder={t("cuaderno.notePlaceholder")}
                   className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-400 focus:bg-white"
                 />
               </label>
               <label className="text-xs font-semibold text-slate-600">
-                Recordatorio (hora)
+                {t("cuaderno.reminderLabel")}
                 <input
                   type="time"
                   value={reminder}
@@ -442,7 +452,7 @@ export default function CuadernoCampoPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-[#0038A8] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                {editingId ? "Guardar cambios" : "Guardar anotación"}
+                {editingId ? t("cuaderno.saveChanges") : t("cuaderno.saveEntry")}
               </button>
               {editingId && (
                 <button
@@ -450,7 +460,7 @@ export default function CuadernoCampoPage() {
                   onClick={resetForm}
                   className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600"
                 >
-                  Cancelar
+                  {t("common.cancel")}
                 </button>
               )}
             </div>

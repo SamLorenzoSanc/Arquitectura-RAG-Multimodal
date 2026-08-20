@@ -1,33 +1,44 @@
-const CATEGORY_LABELS: Record<string, string> = {
-  direct_fact: "Hecho directo",
-  temporal: "Temporal",
-  relationship: "Relación",
-  spanning: "Transversal",
-  regulatory_compliance: "Cumplimiento normativo",
-  regulatory_fact: "Hecho normativo",
-  traceability: "Trazabilidad",
-  out_of_knowledge: "Fuera de conocimiento",
-  general: "General",
-  normativa: "Normativa",
-  parcelas: "Parcelas",
-  logistica: "Logística",
-  alucinaciones: "Alucinaciones",
-  cadena_frio: "Cadena de frío",
-  sat: "SAT",
-  sigpac: "SIGPAC",
-  fitosanitario: "Fitosanitario",
-  pac: "PAC",
-  bcam: "BCAM",
-  geografía: "Geografía",
-  geografia: "Geografía",
-};
+export const EVAL_CATEGORIES = [
+  "direct_fact",
+  "temporal",
+  "relationship",
+  "spanning",
+  "regulatory_compliance",
+  "regulatory_fact",
+  "traceability",
+] as const;
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: "Pendiente",
-  approved: "Aprobada",
-  rejected: "Rechazada",
-  corrected: "Corregida",
-};
+type TranslateFn = (key: string) => string;
+
+const CATEGORY_KEYS = [
+  "direct_fact",
+  "temporal",
+  "relationship",
+  "spanning",
+  "comparative",
+  "numerical",
+  "holistic",
+  "regulatory_compliance",
+  "regulatory_fact",
+  "traceability",
+  "out_of_knowledge",
+  "general",
+  "normativa",
+  "parcelas",
+  "logistica",
+  "alucinaciones",
+  "cadena_frio",
+  "sat",
+  "sigpac",
+  "fitosanitario",
+  "pac",
+  "posei",
+  "bcam",
+  "geografia",
+  "geography",
+] as const;
+
+const STATUS_KEYS = ["pending", "approved", "rejected", "corrected"] as const;
 
 function humanize(value: string): string {
   const cleaned = value.replace(/[_-]+/g, " ").trim();
@@ -35,13 +46,29 @@ function humanize(value: string): string {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
-export function categoryLabel(category?: string | null): string {
-  if (!category) return "General";
+export function categoryLabel(
+  t: TranslateFn,
+  category?: string | null,
+): string {
+  if (!category) return t("evaluationLabels.general");
   const key = category.trim();
-  return CATEGORY_LABELS[key] ?? CATEGORY_LABELS[key.toLowerCase()] ?? humanize(key);
+  const normalized = key === "geografía" ? "geografia" : key.toLowerCase();
+  if (CATEGORY_KEYS.includes(normalized as (typeof CATEGORY_KEYS)[number])) {
+    return t(`evaluationLabels.${normalized}`);
+  }
+  const translated = t(`evaluationLabels.${key}`);
+  if (translated !== `evaluationLabels.${key}`) return translated;
+  return humanize(key);
 }
 
-export function reviewStatusLabel(status?: string | null): string {
+export function reviewStatusLabel(
+  t: TranslateFn,
+  status?: string | null,
+): string {
   if (!status) return "";
-  return STATUS_LABELS[status] ?? STATUS_LABELS[status.toLowerCase()] ?? humanize(status);
+  const normalized = status.toLowerCase();
+  if (STATUS_KEYS.includes(normalized as (typeof STATUS_KEYS)[number])) {
+    return t(`evaluationLabels.${normalized}`);
+  }
+  return humanize(status);
 }

@@ -54,6 +54,8 @@ class KnowledgeBase(Base):
     # Descripción opcional o detallada de la base de conocimiento (tipo de texto largo).
     description: Mapped[str | None] = mapped_column(Text)
 
+    use_case: Mapped[str | None] = mapped_column(String(80))
+
     # Identificador único de la colección en la base de datos vectorial Chroma (ChromaDB).
     # - unique=True: Garantiza que no existan dos bases de conocimiento apuntando a la misma colección.
     chroma_collection: Mapped[str] = mapped_column(

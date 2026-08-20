@@ -10,7 +10,7 @@ from rag.domain.entities import RetrievalQuery, RetrievedChunk
 from rag.domain.ports import LlmPort
 from rag.domain.related import generate_related_questions
 
-CHUNK_CHAR_LIMIT = int(os.getenv("RAG_CHUNK_CHAR_LIMIT", "600"))
+CHUNK_CHAR_LIMIT = int(os.getenv("RAG_CHUNK_CHAR_LIMIT", "1400"))
 RELATED_QUESTIONS = max(1, int(os.getenv("RAG_RELATED_QUESTIONS", "5")))
 
 
@@ -52,6 +52,8 @@ class AnswerQuestion:
         use_reranking: bool = False,
         use_query_rewrite: bool = False,
         use_rag: bool = True,
+        retrieval_strategy: str = "hybrid_expansion_rrf",
+        temperature: float | None = None,
     ) -> dict[str, Any]:
         history = history or []
         active_model = model or self.default_model
@@ -61,7 +63,9 @@ class AnswerQuestion:
                 *history,
                 {"role": "user", "content": question},
             ]
-            answer = await self.llm.complete(active_model, messages)
+            answer = await self.llm.complete(
+                active_model, messages, temperature=temperature
+            )
             return {
                 "answer": answer,
                 "chunks": [],
@@ -79,12 +83,15 @@ class AnswerQuestion:
                 collections=collections,
                 use_reranking=use_reranking,
                 use_query_rewrite=use_query_rewrite,
+                retrieval_strategy=retrieval_strategy,
             )
         )
         chunks = bundle.chunks
         messages = build_prompt(question, history, chunks)
         t_gen = time.time()
-        answer = await self.llm.complete(active_model, messages)
+        answer = await self.llm.complete(
+            active_model, messages, temperature=temperature
+        )
         generation_latency_ms = (time.time() - t_gen) * 1000
         related = generate_related_questions(question, chunks, RELATED_QUESTIONS)
         bundle.retrieval.setdefault("timings_ms", {})["generation"] = (

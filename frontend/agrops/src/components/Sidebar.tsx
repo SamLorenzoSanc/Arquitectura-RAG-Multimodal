@@ -1,269 +1,242 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { NavLink } from "react-router-dom";
-import { useOrganization } from "@/context/OrganizationContext";
-import { useShell } from "@/context/ShellContext";
-import { NewOrgModal } from "./NewOrgModal";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
-  Building2,
   BookOpen,
-  Settings,
+  Boxes,
+  Building2,
   ChevronDown,
-  Wheat,
-  Tractor,
-  Plus,
-  Network,
-  BrainCircuit,
-  Layers3,
-  X,
+  ChevronLeft,
+  ClipboardCheck,
+  FileText,
+  GitFork,
+  LayoutDashboard,
   LifeBuoy,
-  BookMarked,
+  Plus,
+  Settings,
+  ShieldAlert,
+  X,
 } from "lucide-react";
 
-type NavGroupId = "work" | "admin" | "labs";
+import { BrandMark, CanaryFlag } from "@/components/BrandMark";
+import { NewOrgModal } from "@/components/NewOrgModal";
+import { useOrganization } from "@/context/OrganizationContext";
+import { useShell } from "@/context/ShellContext";
+import { useTranslation } from "@/i18n/I18nProvider";
 
-const NAV_GROUPS: Record<NavGroupId, string> = {
-  work: "Proyecto",
-  admin: "Administración",
-  labs: "Laboratorio",
+type NavItem = {
+  to: string;
+  labelKey: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
 };
 
-const NAV_ITEMS: Array<{
-  to: string;
-  label: string;
-  icon: React.ComponentType<{ size?: number; className?: string }>;
-  group: NavGroupId;
-}> = [
-  {
-    to: "/dashboard/cuaderno",
-    label: "Cuaderno de campo",
-    icon: BookOpen,
-    group: "work",
-  },
-  {
-    to: "/dashboard/datasets",
-    label: "Datasets",
-    icon: Layers3,
-    group: "work",
-  },
-  {
-    to: "/dashboard/evaluacion",
-    label: "Evaluación",
-    icon: BrainCircuit,
-    group: "work",
-  },
-  {
-    to: "/dashboard/organization",
-    label: "Organización",
-    icon: Building2,
-    group: "admin",
-  },
-  { to: "/dashboard/tenants", label: "Inquilinos", icon: Tractor, group: "admin" },
-  {
-    to: "/dashboard/knowledge-graph",
-    label: "Grafo de embeddings",
-    icon: Network,
-    group: "labs",
-  },
-];
+function navClass(active: boolean, collapsed: boolean) {
+  return [
+    "group flex items-center gap-3 rounded-lg text-sm font-medium transition",
+    collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
+    active
+      ? "bg-[color:var(--agro-primary)] text-white shadow-sm"
+      : "text-slate-600 hover:bg-[color:var(--agro-pill)] hover:text-[color:var(--agro-primary)]",
+  ].join(" ");
+}
 
 export default function Sidebar() {
-  const { organizations, selectedOrg, setSelectedOrg, addOrganization } =
-    useOrganization();
-  const { sidebarOpen, closeSidebar } = useShell();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showOrgDropdown, setShowOrgDropdown] = useState(false);
+  const { t } = useTranslation();
+  const { sidebarOpen, sidebarCollapsed, closeSidebar, toggleCollapsed } =
+    useShell();
+  const {
+    organizations,
+    selectedOrg,
+    setSelectedOrg,
+    addOrganization,
+  } = useOrganization();
+  const navigate = useNavigate();
+  const [orgMenuOpen, setOrgMenuOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const grouped = useMemo(() => {
-    const order: NavGroupId[] = ["work", "admin", "labs"];
-    return order
-      .map((group) => ({
-        group,
-        label: NAV_GROUPS[group],
-        items: NAV_ITEMS.filter((item) => item.group === group),
-      }))
-      .filter((g) => g.items.length > 0);
-  }, []);
+  const navSections = useMemo(
+    (): Array<{ id: string; labelKey: string; items: NavItem[] }> => [
+      {
+        id: "trabajo",
+        labelKey: "nav.work",
+        items: [
+          { to: "/dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard, end: true },
+          { to: "/dashboard/documentos", labelKey: "nav.documents", icon: FileText },
+          { to: "/dashboard/embeddings", labelKey: "nav.embeddings", icon: Boxes },
+          { to: "/dashboard/flujo-rag", labelKey: "nav.ragFlow", icon: GitFork },
+          { to: "/dashboard/organization", labelKey: "nav.organization", icon: Building2 },
+        ],
+      },
+      {
+        id: "guardrails",
+        labelKey: "nav.guardrails",
+        items: [
+          { to: "/dashboard/evaluacion", labelKey: "nav.evaluation", icon: ClipboardCheck },
+          { to: "/dashboard/validacion", labelKey: "nav.humanValidation", icon: ShieldAlert },
+        ],
+      },
+    ],
+    [],
+  );
+
+  const secondaryNav = useMemo(
+    (): NavItem[] => [
+      { to: "/dashboard/docs", labelKey: "common.docs", icon: BookOpen },
+      { to: "/dashboard/settings", labelKey: "common.settings", icon: Settings },
+      { to: "/dashboard/support", labelKey: "common.support", icon: LifeBuoy },
+    ],
+    [],
+  );
+
+  const collapsed = sidebarCollapsed;
 
   const panel = (
-    <aside className="flex h-full w-72 max-w-[85vw] flex-col border-r border-[color:var(--agro-border)] bg-[color:var(--agro-surface)] shadow-xl shadow-slate-900/5 lg:w-64">
-      <div className="flex items-center justify-between px-5 py-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[color:var(--agro-primary)] shadow-md shadow-blue-900/20">
-            <Wheat className="text-white" size={20} />
-          </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-slate-900">
-              AgroPS
-            </h1>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-[color:var(--agro-accent)]">
-              Agricultural RAG
-            </p>
-          </div>
-        </div>
+    <aside
+      className={`flex h-full flex-col border-r border-[color:var(--agro-border)] bg-white ${
+        collapsed ? "w-[72px]" : "w-72 max-w-[85vw] lg:w-60"
+      }`}
+    >
+      <div className={`flex items-center ${collapsed ? "justify-center px-2 py-4" : "justify-between px-4 py-4"}`}>
+        {collapsed ? (
+          <CanaryFlag className="h-7 w-10" />
+        ) : (
+          <BrandMark size="md" />
+        )}
         <button
           type="button"
           onClick={closeSidebar}
           className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:hidden"
-          aria-label="Cerrar menú"
+          aria-label={t("common.closeMenu")}
         >
           <X size={18} />
         </button>
       </div>
 
-      <div className="mx-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-
-      <div className="relative mt-4 px-4">
-        <p className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-widest text-slate-500">
-          <span>Organización</span>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="rounded-full p-0.5 text-[color:var(--agro-primary)] hover:bg-blue-50"
-            title="Nueva organización"
-          >
-            <Plus size={12} />
-          </button>
-        </p>
-
-        <button
-          type="button"
-          onClick={() => setShowOrgDropdown((v) => !v)}
-          className="flex w-full items-center justify-between rounded-xl border border-[color:var(--agro-border)] bg-white px-3.5 py-2.5 transition hover:border-blue-300"
-        >
-          <div className="min-w-0 flex-1 pr-2 text-left">
-            <p className="truncate text-sm font-semibold text-slate-800">
-              {selectedOrg ? selectedOrg.name : "Seleccionar espacio"}
-            </p>
-            <p className="truncate text-[11px] text-slate-500">
-              {selectedOrg?.description || "Ninguna seleccionada"}
-            </p>
-          </div>
-          <ChevronDown
-            size={16}
-            className={`text-slate-400 transition ${showOrgDropdown ? "rotate-180" : ""}`}
-          />
-        </button>
-
-        {showOrgDropdown && (
-          <div className="absolute left-4 right-4 z-50 mt-1.5 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-            {organizations.length === 0 ? (
-              <div className="p-3 text-center text-xs text-slate-400">
-                No hay organizaciones.
-              </div>
-            ) : (
-              organizations.map((org) => (
+      {!collapsed && (
+        <div className="space-y-2 px-3 pb-3">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setOrgMenuOpen((v) => !v)}
+              className="flex w-full items-center justify-between gap-2 rounded-lg border border-[color:var(--agro-border)] bg-[color:var(--agro-canvas)] px-3 py-2 text-left"
+            >
+              <span className="truncate text-xs font-semibold text-slate-700">
+                {selectedOrg?.name || t("common.selectOrganization")}
+              </span>
+              <ChevronDown size={14} className="shrink-0 text-slate-400" />
+            </button>
+            {orgMenuOpen && (
+              <div className="absolute inset-x-0 z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-[color:var(--agro-border)] bg-white py-1 shadow-lg">
+                {organizations.map((org) => (
+                  <button
+                    key={org.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedOrg(org);
+                      setOrgMenuOpen(false);
+                    }}
+                    className={`flex w-full px-3 py-2 text-left text-xs ${
+                      selectedOrg?.id === org.id
+                        ? "bg-[color:var(--agro-pill)] font-semibold text-[color:var(--agro-primary)]"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {org.name}
+                  </button>
+                ))}
                 <button
-                  key={org.id}
                   type="button"
                   onClick={() => {
-                    setSelectedOrg(org);
-                    setShowOrgDropdown(false);
-                    closeSidebar();
+                    setOrgMenuOpen(false);
+                    setCreateOpen(true);
                   }}
-                  className={`flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs transition ${
-                    selectedOrg?.id === org.id
-                      ? "bg-blue-50 font-semibold text-blue-900"
-                      : "text-slate-700 hover:bg-slate-50"
-                  }`}
+                  className="flex w-full items-center gap-2 border-t border-[color:var(--agro-border)] px-3 py-2 text-left text-xs font-semibold text-[color:var(--agro-primary)] hover:bg-slate-50"
                 >
-                  <Building2 size={14} className="shrink-0 text-blue-600" />
-                  <span className="min-w-0 flex-1 truncate">{org.name}</span>
-                  {(org.is_global ||
-                    org.name?.toLowerCase() === "agrotech") && (
-                    <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
-                      Global
-                    </span>
-                  )}
+                  <Plus size={12} /> {t("common.newOrganization")}
                 </button>
-              ))
+              </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      <div className="mx-4 my-4 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent" />
-
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
-        {grouped.map(({ group, label, items }) => (
-          <div key={group}>
-            <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              {label}
-            </p>
-            <div className="space-y-0.5">
-              {items.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    onClick={closeSidebar}
-                    className={({ isActive }) =>
-                      `group flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-medium transition ${
-                        isActive
-                          ? "bg-[color:var(--agro-primary)] text-white shadow-md shadow-blue-900/15"
-                          : "text-slate-600 hover:bg-white hover:text-[color:var(--agro-primary)] hover:shadow-sm"
-                      }`
-                    }
-                  >
-                    <Icon size={17} className="shrink-0 opacity-90" />
-                    <span className="truncate">{item.label}</span>
-                  </NavLink>
-                );
-              })}
-            </div>
+      <nav className="flex-1 space-y-3 overflow-y-auto px-2 py-2">
+        {navSections.map((section) => (
+          <div key={section.id} className="space-y-1">
+            {collapsed ? (
+              <div
+                className="mx-auto my-2 h-px w-8 bg-slate-200"
+                title={t(section.labelKey)}
+              />
+            ) : (
+              <p className="px-3 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {t(section.labelKey)}
+              </p>
+            )}
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const label = t(item.labelKey);
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  title={label}
+                  onClick={closeSidebar}
+                  className={({ isActive }) => navClass(isActive, collapsed)}
+                >
+                  <Icon size={17} className="shrink-0" />
+                  {!collapsed && <span className="truncate">{label}</span>}
+                </NavLink>
+              );
+            })}
           </div>
         ))}
       </nav>
 
-      <div className="border-t border-slate-200 px-3 py-3">
-        {[
-          { to: "/dashboard/help", label: "Docs", icon: BookMarked },
-          { to: "/dashboard/settings", label: "Ajustes", icon: Settings },
-          { to: "/dashboard/support", label: "Soporte", icon: LifeBuoy },
-        ].map((item) => {
+      <div className="space-y-1 border-t border-[color:var(--agro-border)] px-2 py-3">
+        {secondaryNav.map((item) => {
           const Icon = item.icon;
+          const label = t(item.labelKey);
           return (
             <NavLink
               key={item.to}
               to={item.to}
+              title={label}
               onClick={closeSidebar}
-              className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-xl px-3.5 py-2 text-xs font-medium transition ${
-                  isActive
-                    ? "bg-[color:var(--agro-primary)] text-white shadow-md shadow-blue-900/15"
-                    : "text-slate-600 hover:bg-white hover:text-[color:var(--agro-primary)]"
-                }`
-              }
+              className={({ isActive }) => navClass(isActive, collapsed)}
             >
-              <Icon size={16} className="shrink-0 opacity-90" />
-              <span>{item.label}</span>
+              <Icon size={16} className="shrink-0" />
+              {!collapsed && <span className="truncate">{label}</span>}
             </NavLink>
           );
         })}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          className="mt-1 hidden w-full items-center justify-center rounded-lg px-2 py-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700 lg:flex"
+          aria-label={collapsed ? t("common.expandMenu") : t("common.collapseMenu")}
+        >
+          <ChevronLeft
+            size={16}
+            className={collapsed ? "rotate-180" : ""}
+          />
+        </button>
       </div>
-
-      <NewOrgModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={async (name, description) => {
-          await addOrganization(name, description);
-          setIsModalOpen(false);
-        }}
-      />
     </aside>
   );
 
   return (
     <>
-      <div className="hidden h-screen shrink-0 lg:block">{panel}</div>
+      <div className="hidden h-full shrink-0 lg:block">{panel}</div>
       <div
         className={`fixed inset-0 z-50 lg:hidden ${sidebarOpen ? "pointer-events-auto" : "pointer-events-none"}`}
       >
         <button
           type="button"
-          aria-label="Cerrar menú"
+          aria-label={t("common.closeMenu")}
           onClick={closeSidebar}
           className={`absolute inset-0 bg-slate-950/40 transition ${
             sidebarOpen ? "opacity-100" : "opacity-0"
@@ -277,6 +250,14 @@ export default function Sidebar() {
           {panel}
         </div>
       </div>
+      <NewOrgModal
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onSave={async (name, description) => {
+          await addOrganization(name, description);
+          navigate("/dashboard/organization");
+        }}
+      />
     </>
   );
 }

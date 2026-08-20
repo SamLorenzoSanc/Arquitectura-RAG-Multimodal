@@ -1,42 +1,50 @@
 % -*- coding: utf-8 -*-
 \chapter{Marco teórico / Estado del arte}
+\label{ch:estado-arte}
 
 \section{Arquitectura Transformers y Grandes Modelos del Lenguaje}
 Los grandes modelos de lenguaje (LLMs, por sus siglas en inglés) constituyen una de las principales líneas de avance en el Procesamiento del Lenguaje Natural (PLN) debido a su capacidad para modelar dependencias complejas entre tokens y generar texto coherente en múltiples tareas de comprensión y razonamiento. Su desarrollo contemporáneo se fundamenta en la arquitectura Transformer, introducida por Vaswani et al. (2017), la cual desplazó a los modelos secuenciales previos al proponer un mecanismo de atención capaz de representar relaciones contextuales de forma altamente paralelizables.
 
-\begin{quote}Ilustración 1 Arquitectura Transformers\end{quote}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/transformer-vaswani.png}
+\caption{Arquitectura Transformer (codificador--decodificador) con atención multi-cabeza, conexiones residuales y normalización (Vaswani et al., 2017).}
+\label{fig:transformer}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.58\textwidth]{figures/evolucion-llm.png}
+\caption{Línea temporal de modelos de lenguaje, desde n-gramas y RNN/LSTM hasta Transformer, BERT, GPT y los LLM contemporáneos.}
+\label{fig:evolucion-llm}
+\end{figure}
+
 A diferencia de las Redes Neuronales Recurrentes (RNN) o las redes de Memoria a Corto y Largo Plazo (LSTM), que procesan la información de manera estrictamente secuencial y sufren de degradación de la señal en secuencias largas (el problema del desvanecimiento del gradiente), el Transformer permite ponderar simultáneamente la interacción entre todos los elementos de una secuencia. Esta arquitectura asume un rol fundacional en este trabajo, ya que constituye el motor inferencial generativo del sistema; sin embargo, comprender sus fundamentos matemáticos es indispensable para identificar por qué, estructuralmente, estos modelos son propensos a la alucinación factual en corpus normativos como la Política Agraria Común (PAC).
 
-\begin{quote}Tabla 1 Comparación de arquitecturas y enfoques NLP\end{quote}
-Arquitectura
+La Tabla~\ref{tab:nlp-arch} no trata RAG como una red neuronal equivalente a RNN, LSTM o Transformer: compara \emph{enfoques} de PLN. RNN, LSTM y Transformer son arquitecturas de red; RAG es un patrón de acceso a conocimiento externo que se monta \emph{sobre} un Transformer.
 
-Ventaja
+\begin{table}[htbp]
+\centering
+\caption{Comparación de arquitecturas y enfoques NLP.}
+\label{tab:nlp-arch}
+\begin{tabular}{p{3.2cm}p{5.4cm}p{5.4cm}}
+\toprule
+\textbf{Enfoque} & \textbf{Ventaja} & \textbf{Limitación} \\
+\midrule
+RNN & Memoria secuencial de tokens & Desvanecimiento del gradiente \\
+LSTM & Dependencias más largas que la RNN clásica & Lentitud y coste de entrenamiento \\
+Transformer & Paralelismo y ventana de contexto amplia & Alto coste computacional; alucinación paramétrica \\
+RAG (enfoque, no red) & Conocimiento actualizable y citable en inferencia & Depende de la calidad de la recuperación \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Limitación
-
-RNN
-
-Memoria Secuencial
-
-Gradiente
-
-LSTM
-
-Dependencias Largas
-
-Lentitud
-
-Transformers
-
-Paralelismo
-
-Alto Coste
-
-RAG
-
-Conocimiento Actualizado
-
-Recuperación Documentación
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/desvanecimiento-gradiente.png}
+\caption{Desvanecimiento del gradiente en retropropagación: la magnitud de la señal decae al alejarse del instante actual, limitando a las RNN clásicas.}
+\label{fig:gradiente}
+\end{figure}
 
 \subsection{Fundamentos Matemáticos de los Transformers y Mecanismos de Atención}
 Desde el punto de vista arquitectónico, el núcleo de un Transformer prescinde de la recurrencia y la convolución, basándose íntegramente en el mecanismo de Autoatención de Producto Escalar Escalado (Scaled Dot-Product Attention). La autoatención permite que cada token integre información procedente del resto de la secuencia, generando representaciones contextualizadas que dependen del entorno lingüístico dinámico y no solo de una incrustación léxica estática.
@@ -49,12 +57,29 @@ Esta ecuación explica matemáticamente por qué los LLMs pueden producir respue
 
 Durante la fase de inferencia de un modelo generativo (arquitecturas Decoder-only como la familia LLaMA o GPT, prevalentes en tareas de Q\&A), el modelo opera de forma autorregresiva. Esto implica que la predicción del token en el instante temporal  se condiciona a la probabilidad conjunta de todos los tokens generados hasta el instante :
 
-\begin{quote}Ilustración 2 Ilustración de los embeddings en 2D\end{quote}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.82\textwidth]{figures/matriz-atencion.png}
+\caption{Matriz de autoatención sobre la oración «El banco de madera estaba en el parque»: cada consulta pondera las claves del contexto. Ilustra por qué el sentido de un token depende de su entorno y no de un embedding estático.}
+\label{fig:atencion}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{figures/hiperplano-decision.png}
+\caption{Hiperplano de decisión lineal $W\cdot X+b=0$ en un espacio de dos atributos. Sirve de analogía geométrica a la separación de representaciones, previa a los espacios densos de los embeddings.}
+\label{fig:hiperplano}
+\end{figure}
+
 \subsection{Limitaciones Estructurales de los LLMs}
 La aplicación directa de Modelos de Lenguaje de Gran Escala aislados (standalone) para la consulta y gestión de documentación técnica o regulatoria presenta severas inconsistencias funcionales y metodológicas. Aunque los LLMs exhiben una notable capacidad para comprender el lenguaje natural, resumir textos complejos y generar respuestas gramaticalmente fluidas, su arquitectura subyacente impone barreras insuperables cuando se exige rigor jurídico, actualización documental estricta y trazabilidad en el ámbito agrario (por ejemplo, en la regulación de las ayudas de la Política Agraria Común ---PAC--- o el Programa de Opciones Específicas por la Lejanía y la Insularidad ---POSEI---).
 
-\begin{itemize}\item Memoria paramétrica frente a Memoria Paramétrica. La diferencia fundamental entre un sistema de información tradicional y un LLM standalone reside en la naturaleza de su almacenamiento de conocimiento:\end{itemize}
-\begin{itemize}\item Memoria Paramétrica: Todo el conocimiento de un LLM reside de forma distribuida e implícita en los pesos numéricos de sus capas de atención y redes feed-forward, ajustados durante la fase de preentrenamiento masivo. El modelo no "consulta" un documento en tiempo de inferencia; en su lugar, computa una distribución de probabilidad sobre el vocabulario\end{itemize}
+La diferencia fundamental entre un sistema de información documental y un LLM aislado reside en \emph{dónde} está el conocimiento:
+
+\begin{itemize}
+  \item \textbf{Memoria paramétrica.} Todo el conocimiento del LLM reside de forma distribuida e implícita en los pesos de atención y de las redes \emph{feed-forward}, fijados en el preentrenamiento. En inferencia el modelo no consulta un expediente: calcula una distribución sobre el vocabulario.
+  \item \textbf{Memoria no paramétrica.} El corpus externo (PDF, tablas, fragmentos indexados) no está en los pesos. RAG la usa en tiempo de consulta: recupera evidencia y la inyecta en el contexto.
+\end{itemize}
 \subsection{Taxonomía del Problema de las Alucinaciones en Dominios Normativos}
 Se define la alucinación en los LLMs como la generación de texto que es fácticamente incorrecto, desalineado del contexto o carente de sustento en la evidencia disponible (Huang et al., 2025; Ji et al., 2023). En el procesamiento de normativas agrícolas como la PAC o el POSEI, las alucinaciones se categorizan estructuralmente en dos tipos:
 
@@ -69,7 +94,14 @@ Un intento ingenuo de resolver la falta de conocimiento paramétrico en un LLM s
 
 Complejidad Computacional: El mecanismo de autoatención  escala de forma cuadrática  con respecto a la longitud de la secuencia , elevando exponencialmente la latencia y la demanda de memoria VRAM.
 
-Degradación del Posicionamiento Semántico (Lost in the Middle): Como demostraron Liu et al. (2023), los modelos basados en Transformer muestran una marcada asimetría en la capacidad de recuperación dentro del contexto de entrada. Los modelos son altamente eficaces identificando e integrando información situada al inicio (primacy effect) o al final (recency effect) del prompt, pero sufren un menoscabo drástico en el rendimiento cuando la información clave se halla inmersa en la zona central del texto inyectado. En normativas de gran volumen, los condicionantes técnicos clave suelen estar sepultados en anexos intermedios, quedando efectivamente "invisibilizados" para la atención del modelo.
+Degradación del Posicionamiento Semántico (Lost in the Middle): Como demostraron Liu et al. (2023), los modelos basados en Transformer muestran una marcada asimetría en la capacidad de recuperación dentro del contexto de entrada. Los modelos son altamente eficaces identificando e integrando información situada al inicio (primacy effect) o al final (recency effect) del prompt, pero sufren un menoscabo drástico en el rendimiento cuando la información clave se halla inmersa en la zona central del texto inyectado. En normativas de gran volumen, los condicionantes técnicos clave suelen estar sepultados en anexos intermedios, quedando efectivamente ``invisibilizados'' para la atención del modelo.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.82\textwidth]{figures/lost-in-the-middle.png}
+\caption{Fenómeno \emph{Lost in the Middle}: la retención de un dato clave cae en el centro del prompt y se recupera en los extremos (primacía y recencia).}
+\label{fig:lost-middle}
+\end{figure}
 
 \subsection{Volatilidad Normativa y Falta de Determinismo y Trazabilidad}
 Finalmente, la gestión de la normativa agraria exige resolver tres factores críticos incompatibles con los LLMs aislados:
@@ -81,14 +113,20 @@ Ausencia de Trazabilidad y Citación Granular: Un LLM aislado opera como una "ca
 Falta de Determinismo: Dado que el proceso de muestreo en la capa de salida (decoding) emplea parámetros como la temperatura () o el muestreo top-, la misma consulta formulada en momentos distintos puede derivar en interpretaciones contradictorias sobre un mismo marco regulatorio.
 
 \section{Arquitectura Retrieval-Augmented Generation (RAG)}
-La arquitectura Retrieval-Augmented Generation (RAG), introducida formalmente por Lewis et al. (2020), nace como un paradigma híbrido que desacopla el almacenamiento del conocimiento de la capacidad de razonamiento del modelo de lenguaje. En lugar de confiar exclusivamente en la memoria paramétrica interna del LLM, RAG integra un componente de recuperación semántica externa (Memoria Paramétrica) que extrae dinámicamente evidencia documental relevante desde una base de conocimiento en tiempo de inferencia, inyectándola directamente en el contexto de entrada del generador.
+La arquitectura Retrieval-Augmented Generation (RAG), introducida formalmente por Lewis et al. (2020), nace como un paradigma híbrido que desacopla el almacenamiento del conocimiento de la capacidad de razonamiento del modelo de lenguaje. En lugar de confiar exclusivamente en la \textbf{memoria paramétrica} (los pesos del LLM), RAG integra un almacén \textbf{no paramétrico}: un componente de recuperación semántica que extrae evidencia documental en tiempo de inferencia y la inyecta en el contexto del generador.
 
 En el ámbito de la documentación normativa agraria (PAC/POSEI), esta arquitectura no se concibe como un mero sustituto del LLM, sino como un mecanismo de anclaje estricto (Strict Grounding) que condiciona la probabilidad de generación del modelo a la evidencia recuperada, mitigando estructuralmente las alucinaciones extrínsecas y posibilitando la trazabilidad exacta de las respuestas.
 
 \subsection{Descomposición del Pipeline de RAG: Indexación, Recuperación y Generación}
 El funcionamiento de un sistema RAG en entornos regulados se divide operativamente en dos fases principales: Indexación Asíncrona (Ingesta) y Pipeline de Inferencia Síncrona (Recuperación y Generación).
 
-\begin{quote}Ilustración 3 Funcionamiento de la Pipeline de RAG\end{quote}
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/rag-pipeline-simple.png}
+\caption{Pipeline RAG: la pregunta dispara una consulta de recuperación; los textos recuperados se concatenan al prompt completo y el LLM genera la respuesta anclada.}
+\label{fig:rag-pipeline}
+\end{figure}
+
 En este trabajo, la arquitectura RAG no se interpreta como una solución automática al problema de las alucinaciones, sino como un mecanismo cuya eficacia debe ser evaluada empíricamente. La literatura reciente sobre RAGAS distingue explícitamente entre métricas de recuperación y métricas de generación, como context precision, context recall, faithfulness y answer relevancy, precisamente porque la utilidad de un sistema RAG no puede inferirse solo a partir de la fluidez de la respuesta. Por ello, el presente estudio adopta una visión cuantitativa en la que la recuperación semántica y la generación se analizan por separado y en conjunto.
 
 Fase de Indexación y Preparación Documental:
@@ -101,73 +139,70 @@ Incrustación Vectorial (Embedding): Cada fragmento  se pasa por un modelo codif
 
 Los vectores resultantes, junto con metadatos de gobernanza (tenant\_id, página, sección, checksum), se almacenan en un índice espacial.
 
-\begin{quote}Tabla 2 Modelos Embedding\end{quote}
-Modelo
+La calidad de esa proyección condiciona todo el retriever denso: si dos redacciones distintas de la misma norma (por ejemplo, ``ayuda al arranque de viñedo'' y ``prima por abandono de viña'') no quedan próximas en el espacio, el generador nunca verá el artículo correcto. Por ello conviene distinguir las familias de embeddings que hoy dominan la recuperación semántica y justificar cuál se instanció en el prototipo.
 
-Dimensión
+\textbf{Sentence Transformers.} Sentence Transformers es una familia de modelos basados en BERT que generan embeddings a nivel de oración o párrafo (Reimers y Gurevych, 2019). Frente al BERT original, que produce representaciones de token y no estaba entrenado para comparar frases con similitud coseno, estos modelos se afinan con aprendizaje siamés o tripletas de modo que la distancia entre vectores refleje similitud semántica. Variantes como \texttt{all-MiniLM-L6-v2} (384 dimensiones, muy ligera) o \texttt{paraphrase-multilingual-mpnet-base-v2} (768 dimensiones, mejor cobertura idiomática) se usaron de forma masiva como primer retriever denso en prototipos RAG. Su ventaja es la eficiencia y el ecosistema Hugging Face; su límite, en un corpus normativo en español, es que los checkpoints más citados están optimizados para parafraseo general o para inglés, y degradan cuando la consulta es una paráfrasis agraria y el documento es un artículo del POSEI con identificadores alfanuméricos.
 
-Ventajas
+\textbf{BGE (BAAI General Embeddings).} BGE, desarrollada por la Academia de Inteligencia Artificial de Pekín, reentrenó el paradigma de embedding para búsqueda: instrucciones de consulta, normalización L2 y evaluación sistemática en MTEB (Xiao et al., 2023). El modelo de referencia para escenarios no anglófonos no es un hipotético \texttt{bge-large-es} ---que no forma parte del catálogo oficial de BAAI--- sino \texttt{BAAI/bge-m3}: 1024 dimensiones, más de 100 idiomas, ventanas de hasta 8192 tokens y capacidad de devolver a la vez vector denso, pesos dispersos y multi-vector tipo ColBERT (Chen et al., 2024). En este trabajo BGE no se descartó: se reservó para la segunda etapa del pipeline, el Cross-Encoder \texttt{BAAI/bge-reranker-v2-m3}, que reordena los candidatos ya fusionados por RRF. Así se aprovecha la fortaleza de BGE en ranking fino sin duplicar el coste de reindexar todo el corpus con su encoder bi-encoders.
 
-BGE-M3
+\textbf{E5 (Embeddings from bidirEctional Encoder Representations).} E5, de Microsoft, introduce un entrenamiento débilmente supervisado y, sobre todo, una asimetría explícita entre consulta y documento (Wang et al., 2022). En inferencia se prefija \texttt{query:} o \texttt{passage:}, de modo que el espacio vectorial no trata la pregunta del inspector y el párrafo del boletín como el mismo tipo de objeto. \texttt{intfloat/multilingual-e5-large} (1024 dimensiones) ofrece un compromiso sólido en español y en recuperación asimétrica. El inconveniente operativo para este prototipo es que E5 vive de forma natural en Hugging Face Transformers, no en el runtime Ollama con el que se sirve el generador local; adoptar E5 habría partido la inferencia en dos stacks (Transformers para embedder y Ollama para LLM).
 
-1024
+\textbf{Nomic Embed (elección por defecto del prototipo).} El embedder servido en la demostración contenedorizada es \texttt{nomic-embed-text} (\texttt{RAG\_EMBEDDING\_MODEL} en \texttt{.env.example} y Docker Compose): un modelo de sentencia ligero, con vectores de 768 dimensiones, pensado para recuperación y servido por Ollama junto al generador. Esa elección privilegia reproducibilidad y coste de arranque (CPU o GPU modestas) frente a un embedder 8B. La familia Qwen3 Embedding permanece en el catálogo de contraste del laboratorio (\texttt{qwen3-embedding:latest}) para experimentos embedding $\times$ distancia; no es el valor por defecto de la demo. Los vectores Nomic se almacenan en una columna pgvector de 4096 dimensiones con relleno de ceros, restricción del esquema heredado.
 
-Multilingüe
+\begin{table}[htbp]
+\centering
+\caption{Justificación de \texttt{nomic-embed-text} (demo) frente a Sentence Transformers, BGE, E5 y Qwen3, y efecto esperado sobre la recuperación semántica.}
+\label{tab:embedding-eleccion}
+\small
+\begin{tabular}{p{3.1cm}p{6.2cm}p{5.5cm}}
+\toprule
+\textbf{Criterio} & \textbf{Por qué se eligió este modelo} & \textbf{Impacto en la recuperación semántica} \\
+\midrule
+Idioma del corpus & Español técnico PAC/POSEI. Nomic y Qwen3 cubren varios idiomas; MiniLM y \texttt{bge-large-en} están sesgados al inglés. & Acerca paráfrasis del agricultor o del gestor (``prima de arranque'') al tenor literal del boletín, elevando recall@k del retriever denso. \\
+\addlinespace
+Runtime del prototipo & Inferencia local unificada en Ollama, junto al LLM. E5 y Sentence Transformers exigirían un stack Hugging Face paralelo. Nomic arranca en CPU; Qwen3-8B exige más VRAM. & Misma API de embeddings y reindexado reproducible sin servicios cloud. \\
+\addlinespace
+Asimetría consulta/documento & Qwen3 y E5 son \emph{instruction-aware}; Nomic trata query y passage de forma más simétrica. & El ranking denso de la demo es más simple; el laboratorio permite contrastar Qwen3 cuando hay GPU. \\
+\addlinespace
+Dimensionalidad & Nomic: 768 dimensiones (columna pgvector de 4096 con padding). Qwen3 llega a 4096; MiniLM usa 384; E5/BGE-M3, 1024. & Espacio suficiente para la demo; el padding es una limitación de esquema, no una ganancia semántica. \\
+\addlinespace
+Ventana de contexto & Los chunks del prototipo son de 1400 caracteres con solape 120. MiniLM clásico se queda en 512 tokens. & El embedding del fragmento captura el artículo o la ficha, no un recorte a 512 tokens que parte tablas LMR. \\
+\addlinespace
+Papel de BGE en el sistema & BGE no se usa como embedder por defecto; el Cross-Encoder \texttt{bge-reranker-v2-m3} está cableado pero \texttt{RAG\_USE\_RERANKER=false} en la demo. & La recuperación semántica de la demostración es denso Nomic + BM25 + RRF, sin rerank. \\
+\addlinespace
+Complemento léxico & El denso no sustituye a BM25: los códigos (``Orden APA/102/2024'') siguen yendo al índice léxico. & Menos document-level mismatch: sinonimia (denso) + identificador exacto (BM25) + RRF. \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-E5
+\subsection{Recuperación híbrida: BM25, similitud densa, RRF y el problema del medio}
+Al recibir una consulta del usuario ---por ejemplo, ``¿Cuáles son los requisitos de elegibilidad para la ayuda al arranque de viñedo en el POSEI?''--- el sistema la proyecta al mismo espacio latente que los fragmentos indexados. El recuperador denso evalúa la similitud coseno entre el vector de la pregunta y los vectores de los chunks. Esa vía captura paráfrasis (``prima de arranque'' frente a ``ayuda al abandono de viña''), pero falla con identificadores alfanuméricos exactos (``Orden APA/102/2024'', códigos SIGPAC, números de anexo).
 
-768
+La vía léxica clásica, BM25 (Robertson y Zaragoza, 2009), puntúa coincidencia de términos con saturación de frecuencia y penalización por longitud del documento. En un corpus normativo es indispensable: el inspector busca a menudo un código, no un sinónimo. El prototipo mantiene un índice BM25 por tenant, reconstruido tras la ingesta, con el mismo universo de chunks que \texttt{pgvector}.
 
-Excelente recuperación
+Fusionar dos rankings no es promediar puntuaciones: las escalas de coseno y de BM25 no son comparables. Reciprocal Rank Fusion (Cormack, Clarke y Buettcher, 2009) asigna a cada documento $1/(k+r)$ en cada lista y suma, con $k=60$ en este trabajo. El efecto es que un fragmento mediocre en ambas listas puede superar a uno excelente en una sola, y que un código capturado solo por BM25 sigue teniendo oportunidad de entrar al contexto. El Cross-Encoder (\texttt{bge-reranker-v2-m3}) relee el par pregunta--fragmento y reordena; en la demostración está desactivado por latencia, decisión empírica que se documenta en la configuración experimental.
 
-Instructor XL
+Incluso con un top-$k$ correcto, el generador puede ignorar evidencia colocada en el centro del prompt (\emph{lost in the middle}; Liu et al., 2023). Por eso $k$ final no debe inflarse: más contexto no es más fidelidad si el modelo atiende sobre todo al principio y al final. El chat usa $k=8$; un $k=10$ de laboratorio es un compromiso, no una ley.
 
-768
+\subsection{Naive RAG, Graph RAG y RAG agéntico (literatura frente al prototipo)}
+La literatura distingue, de forma esquemática, tres familias. El RAG ingenuo recupera y genera en un solo paso. El Graph RAG modela entidades y relaciones y recorre el grafo en la consulta. El RAG agéntico planifica, llama a herramientas y verifica. En AgroPS el chat híbrido recupera siempre; el modo agéntico orquesta un grafo LangGraph que decide si buscar o responder, puntúa la relevancia del contexto y puede reescribir la pregunta. No se evalúa un Graph RAG operativo: la proyección UMAP es visualización. Presentar esas familias aquí sitúa el prototipo; las métricas del Capítulo~\ref{ch:evaluacion} miden el retriever híbrido, no una ablación del bucle de reescritura.
 
-Buen rendimiento
+Fase de generación condicionada: los $k$ fragmentos se ensamblan en una plantilla junto con la consulta y una instrucción de no invención. El modelo genera de forma autorregresiva, pero ahora la distribución de cada token está condicionada también al texto recuperado. Si ese texto es incompleto, el anclaje estricto produce abstención o respuesta parcial: mejor que una cifra inventada, insuficiente para un gestor que necesita el expediente completo.
 
-Jina Embeddings
-
-1024
-
-Muy rápido
-
-Fase de Inferencia: Recuperación Semántica (Retriever):
-
-Al recibir una consulta  del usuario (ej. "¿Cuáles son los requisitos de elegibilidad para la ayuda al arranque de viñedo en el POSEI?"), el sistema la proyecta al mismo espacio latente:
-
-El recuperador evalúa la similitud entre la consulta y los fragmentos indexados. La métrica habitual en espacios normativos es la similitud coseno:
-
-Búsqueda Híbrida y Re-Ranking: Dado que la búsqueda densa por similitud coseno puede fallar al buscar identificadores alfanuméricos exactos o códigos de ley (ej. "Orden APA/102/2024"), se implementa un esquema de Búsqueda Híbrida que combina la similitud semántica con un algoritmo léxico clásico (). Los top- fragmentos devueltos por ambos métodos se fusionan y reordenan mediante un modelo Cross-Encoder (Re-ranker) para maximizar la precisión del contexto inyectado.
-
-Fase de Generación Condicionada (Generator):
-
-Los  fragmentos con mayor relevancia semántica se ensamblan en un modelo de plantilla de prompt (Prompt Template) junto con la consulta original y una instrucción estricta de sistema (system prompt).
-
-\begin{quote}Tabla 3 Tipos de RAG\end{quote}
-Tipo
-
-Ventajas
-
-Casos de Uso
-
-Naive
-
-Simple
-
-Chatbots
-
-Graph
-
-Relaciones
-
-Jurídico
-
-Agentic Rag
-
-Planificación
-
-Investigación
+\begin{table}[htbp]
+\centering
+\caption{Familias de RAG en la literatura y su relación con el prototipo.}
+\label{tab:rag-tipos}
+\begin{tabular}{p{3.2cm}p{5.4cm}p{5.4cm}}
+\toprule
+\textbf{Tipo} & \textbf{Idea} & \textbf{En este TFM} \\
+\midrule
+Naive RAG & Recuperar y generar en un paso & Base del chat híbrido \\
+Graph RAG & Entidades y aristas; multi-salto & Solo visualización UMAP; no se usa en el chat \\
+Agentic RAG & Planificación y herramientas & Grafo LangGraph sobre el híbrido (recuperar o responder, grade, rewrite) \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 Modular RAG
 
@@ -187,8 +222,10 @@ La revisión de trabajos previos muestra diversas arquitecturas RAG especializad
 
 Ninguno de estos trabajos afirma que RAG elimine las alucinaciones; todos tratan la reducción de información incorrecta como hipótesis a validar. Los hallazgos disponibles indican mejoras sustanciales en métricas de fidelidad o exactitud, pero dependen del dominio y de la calidad de los componentes de RAG. En muchos casos se carece de métricas estandarizadas y de pruebas con documentos normativos agrícolas concretos. Por ejemplo, el corpus RAGTruth (Zhang et al., 2024) provee un dataset para medir alucinaciones en RAG con anotaciones detalladas, pero no está especializado en la documentación PAC/POSEI. En conclusión, la literatura sugiere que RAG puede aumentar la fidelidad de las respuestas, pero subraya la necesidad de evaluarlo rigurosamente en el contexto normativo agrícola mediante métricas cuantitativas.
 
-\section{Métricas de evaluación en sistemas RAG (definición formal de RAGAS: fidelidad, relevancia de respuesta, precisión y exhaustividad del contexto, tasa de alucinaciones, calidad de citación).}
-La evaluación de arquitecturas RAG requiere métricas que consideren tanto la recuperación documental como la generación de respuestas. El marco RAGAS (Retrieval-Augmented Generation Assessment) propone métricas específicas para sistemas RAG, basadas en la comprobación de la coherencia factual y la relevancia sin necesidad de respuestas de referencia. A continuación, se definen formalmente las métricas empleadas en este estudio, orientadas al dominio normativo agrícola (PAC/POSEI): Fidelidad (Faithfulness), Relevancia de la respuesta (Answer Relevancy), Precisión del contexto (Context Precision), Exhaustividad del contexto (Context Recall), Tasa de alucinaciones (Hallucination Rate) y Calidad de la citación. Cada métrica se calculará en un rango normalizado [0,1] y permitirá comparar cuantitativamente el modelo base (LLM sin RAG) con la arquitectura RAG propuesta.
+\section{Métricas de evaluación en sistemas RAG: definiciones de la literatura y lo que mide este prototipo}
+La evaluación de arquitecturas RAG requiere métricas que consideren tanto la recuperación documental como la generación. El marco RAGAS (Retrieval-Augmented Generation Assessment; Es et al., 2024) propone, en la literatura, métricas de coherencia factual y relevancia que pueden calcularse con un LLM juez y, en algunos casos, sin respuesta de referencia. \textbf{En este TFM esas definiciones se recogen como estado del arte}; las cifras del Capítulo~\ref{ch:evaluacion} no deben leerse como un informe RAGAS oficial. El prototipo implementa tres familias: funciones propias de IR, un LLM-as-a-Judge local (escala 1--5) y un adaptador RAGAS opcional con fallback heurístico.
+
+A continuación se recuerdan las definiciones habituales (fidelidad, relevancia de respuesta, precisión y exhaustividad del contexto, tasa de alucinaciones y calidad de citación), orientadas al dominio PAC/POSEI, para que el lector distinga qué se \emph{desea} medir y qué se \emph{calcula} realmente en el código.
 
 \begin{itemize}\item Fidelidad (Faithfulness): Mide la consistencia factual de la respuesta generada respecto al contexto recuperado. Se define como la proporción de afirmaciones en la respuesta que pueden inferirse de los fragmentos normativos recuperados. Formalmente, si (A) es la respuesta generada y se extraen de ella (|A|) afirmaciones, de las cuales (|A\_f|) están documentadas en el contexto, entonces.\end{itemize}
 \begin{itemize}\item Relevancia de la respuesta (Answer Relevancy): Evalúa cuán pertinente es la respuesta con respecto a la pregunta formulada. Se calcula generando (N) preguntas inversas () a partir de la respuesta producida, y midiendo la similitud semántica con la pregunta original. Formalmente, usando los vectores de embedding () de cada pregunta generada y (E\_o) de la pregunta original, se define:\end{itemize}

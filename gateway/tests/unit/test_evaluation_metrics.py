@@ -39,7 +39,22 @@ def test_citations_and_abstention_are_deterministic():
     assert abstention_score("La dosis es 3 ml.", True) == 0.0
 
 
-def test_fingerprint_is_stable_but_split_sensitive():
+def test_keyword_ir_metrics_are_shared_by_context_and_answer():
+    from services.evaluation_metrics import keyword_ir_metrics, split_answer_units
+
+    keywords = ["filtro", "gotero"]
+    context = [
+        "Revisa el filtro de malla.",
+        "Sustituye goteros ciegos.",
+        "El viento alisio parte hojas.",
+    ]
+    context_metrics = keyword_ir_metrics(keywords, context, k=3)
+    assert context_metrics["keywords_found"] == 2
+    assert context_metrics["mrr"] == pytest.approx(0.75)
+    answer = "Limpia el filtro y cambia el gotero ciego."
+    answer_metrics = keyword_ir_metrics(keywords, split_answer_units(answer), k=10)
+    assert answer_metrics["keyword_coverage"] == 100.0
+    assert answer_metrics["mrr"] == 1.0
     row = {
         "question": "¿Qué exige la BCAM 6?",
         "keywords": ["BCAM 6"],
@@ -49,3 +64,16 @@ def test_fingerprint_is_stable_but_split_sensitive():
     assert dataset_fingerprint([row]) == dataset_fingerprint([{**row, "question": "  ¿QUÉ exige la BCAM 6? "}])
     assert dataset_fingerprint([row]) != dataset_fingerprint([{**row, "split": "holdout"}])
     assert normalize_text("Árida  ") == "arida"
+
+
+def test_retrieval_eval_exposes_same_ir_and_five_scale_notes():
+    from rag.application.evaluate import ir_from_texts
+
+    result = ir_from_texts(
+        ["filtro", "gotero"],
+        ["Revisa el filtro de malla.", "Sustituye goteros ciegos."],
+        k=2,
+    )
+    assert result.keyword_coverage == 100.0
+    assert result.completeness == pytest.approx(5.0)
+    assert result.relevance == pytest.approx(round(1.0 + 4.0 * result.ndcg, 2))

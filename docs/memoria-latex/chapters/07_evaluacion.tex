@@ -1,163 +1,168 @@
 % -*- coding: utf-8 -*-
 \chapter{Evaluación, resultados y discusión}
+\label{ch:evaluacion}
 
-En el presente capítulo se exponen y discuten detalladamente los hallazgos empíricos obtenidos tras la ejecución del protocolo experimental diseñado para auditar el rendimiento del sistema AgroRAG. Se inicia con un análisis descriptivo de la muestra documental e instrumental utilizada en la investigación, para posteriormente presentar los resultados cuantitativos y cualitativos derivados tanto de las métricas automáticas de Procesamiento del Lenguaje Natural (PLN) y Recuperación de Información (IR) como de la evaluación ciega realizada por el panel de expertos. Finalmente, se aborda la discusión crítica de estos hallazgos, analizando el impacto de las variables independientes sobre la reducción de alucinaciones, la viabilidad de la solución en entornos de gestión oficial de la Política Agraria Común (PAC y POSEI) y sus implicaciones y líneas de trabajo futuro. Los posibles apartados a incluir son los siguientes.
+Las cifras de este capítulo salen de la corrida \texttt{run\_20260819T165515Z} ($N=35$, 35/35 sin error, 289{,}6\,s), persistida en \texttt{docs/evaluation\_runs/run\_20260819T165515Z/}. El banco de oro tiene cinco ítems por cada una de las siete categorías (\texttt{knowledge-base/gold\_tests.jsonl}). Misma pregunta \emph{sin} contexto y \emph{con} recuperador híbrido (denso + BM25 + RRF, \texttt{RAG\_USE\_RERANKER=false}, chunk 1400/120, $k{=}8$). RAGAS \textbf{no} se ejecutó. No se citan medias exploratorias (p.\ ej.\ MRR $0{,}7911$).
 
-\section{Análisis descriptivo de la muestra e instrumentalización Experimental}
-La muestra documental utilizada como base de conocimiento no paramétrica para la investigación estuvo compuesta por un corpus representativo de N = 20 documentos normativos y técnicos oficiales vigentes para el periodo 2023--2026, con una extensión total equivalente de P = 50 páginas en formato PDF de alta densidad técnica e iconográfica (incluyendo tablas de coeficientes de admisibilidad, diagramas de ecorregímenes y resoluciones de concesión del POSEI).  auditar el sistema de forma integral, se diseñó un dataset de evaluación de 150 pruebas (test cases) estructurado en siete categorías funcionales de consulta normativa, balanceadas para cubrir la complejidad real del dominio agrícola:
+\section{Configuración congelada}
+La tabla~\ref{tab:eval-config} copia \texttt{config.json} de esa corrida. En esta ejecución la temperatura \textbf{no se envió} en el payload (default de Ollama). El laboratorio React posterior sí la expone y la manda (\texttt{RAG\_TEMPERATURE}=0).
 
-\begin{itemize}\item Factores Directos (direct\_fact): Consultas directas de datos alfanuméricos estables (ej. plazos, porcentajes de ayuda).\end{itemize}
-\begin{itemize}\item Consultas Temporales (temporal): Preguntas sometidas a condicionantes de fechas de vigencia o transitoriedad.\end{itemize}
-\begin{itemize}\item Análisis Comparativo (comparative): Consultas que exigen contrastar requisitos entre dos campañas o ecorregímenes.\end{itemize}
-\begin{itemize}\item Cálculo Numérico (numerical): Consultas que requieren la combinación de fórmulas de superficie y coeficientes.\end{itemize}
-\begin{itemize}\item Relacionales (relationship): Preguntas sobre la interacción entre la normativa marco europea y los decretos de aplicación autonómica.\end{itemize}
-\begin{itemize}\item Amplitud Normativa (spanning): Consultas complejas que exigen recuperar fragmentos distribuidos en múltiples secciones del PDF.\end{itemize}
-\begin{itemize}\item Holísticas (holistic): Preguntas de síntesis global sobre la admisibilidad de una explotación agrícola completa.\end{itemize}
-\section{Resultados obtenidos}
-Los experimentos obtenidos se dividieron en dos bloques de auditoría: la evaluación del componente recuperador (IR) y la evaluación del componente generador y calidad de respuesta (PLN y Panel de Expertos).
+\begin{table}[htbp]
+\centering
+\caption{Configuración de \texttt{run\_20260819T165515Z} (\texttt{config.json}).}
+\label{tab:eval-config}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parámetro} & \textbf{Valor} \\
+\midrule
+\texttt{run\_id} & \texttt{run\_20260819T165515Z} \\
+Generador & \texttt{llama3.2:latest} (digest \texttt{a80c4f17acd55265\ldots}) \\
+Embedder & \texttt{nomic-embed-text:latest} (digest \texttt{0a109f422b47e3a3\ldots}) \\
+Chunk / solape & 1400 / 120 caracteres \\
+Retrieve & denso $k{=}10$ + BM25 $k{=}10$ + RRF ($k{=}60$), \texttt{final\_k}=8 \\
+Reranker & \texttt{false} \\
+Temperatura (esta corrida) & no enviada (default Ollama) \\
+Corpus & \texttt{knowledge-base/asesor-canarias/**/*.md} (1289 chunks) \\
+RAGAS & no ejecutado \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\section{Discusión y análisis de los resultados}
-La eficacia del recuperador hibrido (Dense Vector Search + BM25 + Cross-Encoder Re-ranking) se auditó sobre el total de las 150 pruebas. Los resultados globales de recuperación alcanzaron valores altamente competitivos:
+\section{Análisis descriptivo de la muestra}
+El corpus es el markdown de asesoría canaria (POSEI, GIP, cuarentena, dossiers de cultivo con usos MAPA). Cinco ítems por categoría (tabla~\ref{tab:categories}). La muestra humana ciega son 21 ítems fijados en \texttt{human\_sample\_item\_ids.json} \emph{antes} de mirar al juez; la plantilla está en \texttt{author\_scorecard.csv} de este \texttt{run\_id}.
 
-\begin{itemize}\item Mean Reciprocal Rank (MRR):\end{itemize}
-\begin{itemize}\item Normalized Discounted Cumulative Gain (nDCG):\end{itemize}
-\begin{itemize}\item Cobertura de Palabras Clave (Keyword Coverage):\end{itemize}
-El análisis desagregado del MRR medio por categoría revela un comportamiento fuertemente condicionado por la estructura de los documentos:
+\section{Resultados del recuperador}
+Métricas propias sobre palabras clave del ítem y los fragmentos recuperados (no RAGAS). El nDCG implementado en el harness produjo valores $>1$ en 21 de 35 filas: \textbf{no se cita} como nDCG canónico. Se informan MRR y cobertura de keywords.
 
-Tabla 1: Análisis del Desempeño del Recuperador por Categorías de Consulta
+\begin{itemize}
+  \item Mean Reciprocal Rank (MRR): $0{,}8108$
+  \item Cobertura de palabras clave: $0{,}9643$
+\end{itemize}
 
-Categoría de Consulta
+\begin{table}[htbp]
+\centering
+\caption{MRR del recuperador híbrido por categoría (\texttt{run\_20260819T165515Z}).}
+\label{tab:mrr-cat}
+\begin{tabular}{llr}
+\toprule
+\textbf{Categoría} & \textbf{N} & \textbf{MRR} \\
+\midrule
+\texttt{relationship} & 5 & 0{,}933 \\
+\texttt{temporal} & 5 & 0{,}900 \\
+\texttt{spanning} & 5 & 0{,}867 \\
+\texttt{regulatory\_fact} & 5 & 0{,}833 \\
+\texttt{regulatory\_compliance} & 5 & 0{,}747 \\
+\texttt{direct\_fact} & 5 & 0{,}729 \\
+\texttt{traceability} & 5 & 0{,}667 \\
+\midrule
+Global & 35 & 0{,}811 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-MRR Medio (MRR)
+La figura~\ref{fig:mrr-cat} es un esquema de barras por categoría; las cifras vinculantes son las de la Tabla~\ref{tab:mrr-cat}, no una corrida anterior.
 
-Rendimiento Relativo
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/metricas-mrr-categorias.png}
+\caption{Esquema de MRR por categoría. Valores numéricos: Tabla~\ref{tab:mrr-cat} (\texttt{run\_20260819T165515Z}).}
+\label{fig:mrr-cat}
+\end{figure}
 
-relationship
-
-Excelente (Identificación precisa de entidades)
-
-direct\_fact
-
-Muy Alto (Rescates exactos de datos alfanuméricos)
-
-temporal
-
-Alto (Alineación correcta con límites temporales)
-
-numerical
-
-Alto (Captura efectiva de tablas mediante BM25)
-
-comparative
-
-Aceptable (Desafío moderado al cruzar dos contextos)
-
-holistic
-
-Moderado (Pérdida de contexto en síntesis globales)
-
-spanning
-
-Bajo (Degradación por dispersión multidocumental)
-
-Máxima Eficiencia Recuperadora: Las categorías relationship (), direct\_fact () y temporal () registraron los rendimientos más elevados. Esto demuestra que el mecanismo de embedding denso en combinación con re-ranking identifica con precisión casi perfecta los fragmentos específicos cuando existe una entidad normativa o una fecha explícita en la consulta.
-
-Puntos de Degradación Crítica: Se observó una caída pronunciada en las consultas de tipo spanning () y holistic (). Este fenómeno confirma empíricamente los hallazgos de Reuter et al. (2025): cuando la información requerida para responder una consulta se encuentra dispersa en múltiples capítulos o anexos del PDF, el recuperador tiende a seleccionar fragmentos parciales, provocando un Retrieval Mismatch que afecta la completitud de la respuesta posterior.
-
-\begin{quote}Ilustración 4 Gráfica que Muestra las Métricas del Rag\end{quote}
-Evaluación de la calidad de generación (Answer Evaluation)
-
-La calidad de las respuestas generadas por el sistema se evaluó cuantitativamente sobre una escala Likert de 1 a 5 puntos, analizando tres dimensiones clave: Exactitud Factual (Accuracy), Exhaustividad (Completeness) y Relevancia (Relevance).
-
-Los resultados agregados ponderados reflejan las siguientes puntuaciones medias:
-
-Exactitud (Accuracy):
-
-Exhaustividad (Completeness):
-
-Relevancia (Relevance):
-
-El análisis del promedio de Exactitud (Average Accuracy) por categoría muestra un comportamiento directamente acoplado al rendimiento del recuperador:
-
-Alta Fidelidad Normativa (): Las respuestas relativas a hechos directos, requisitos temporales y consultas comparativas alcanzaron valores de exactitud entre  y . El anclaje estricto (Strict Grounding) impidió que el LLM introdujera fechas o porcentajes alucinados.
-
-Procesamiento de Consultas Complejas: Las consultas de carácter holístico o multidocumental registraron la menor exactitud media (). Esto demuestra empíricamente que cuando la recuperadora falla en aportar el contexto completo (), el generador, al estar restringido por instrucciones de no-alucinación, opta por emitir respuestas parciales o declarar falta de información, afectando negativamente la puntuación de exhaustividad y exactitud en esta categoría.
-
-\subsection{Discusión y Análisis de los Resultados}
-Los hallazgos empíricos obtenidos permiten validar la hipótesis central del Trabajo de Fin de Máster, al tiempo que ofrecen conclusiones críticas sobre la implantación de sistemas RAG en la administración pública agrícola:
-
-Los resultados cuantitativos presentados en la Sección 5.1 revelan una asimetría crítica en el comportamiento del sistema AgroRAG. Si bien las métricas globales sugieren un rendimiento idóneo ---con una Relevancia de  y un MRR de ---, un análisis de grano fino de las categorías complejas destapa la fragilidad latente de la arquitectura RAG cuando se enfrenta a corpus normativos fuertemente jerarquizados como la Política Agraria Común (PAC) y el programa POSEI. La premisa teórica del anclaje estricto (Strict Grounding) asume que el modelo generativo se comportará como un ejecutor determinista y deductivo si el contexto provisto es correcto. Sin embargo, los datos empíricos demuestran que el generador es extremadamente sensible al fenómeno de degradación por contexto incompleto. En la categoría de consultas holísticas (holistic), donde la Exactitud se desplomó a , el sistema exhibió una patología dual:
-
-\begin{itemize}\item Ablación por Abstención Excesiva: Ante la falta de fragmentos constitutivos del marco normativo completo (resultado de un ), el LLM, forzado por la instrucción del sistema de no alucinar, optó recurrentemente por declarar la inexistencia de información o emitir respuestas vacías. Si bien esto evita la alucinación extrínseca pura, representa un fallo funcional de disponibilidad, inútil para un técnico de la administración pública que requiere una interpretación coherente de la elegibilidad de una ayuda.Alucinación de Enlace (Intrínseca): Cuando el recuperador inyectó fragmentos parciales pertenecientes a diferentes normativas autonómicas o ejercicios anteriores, el mecanismo de autoatención del Transformer tendió a "fusionar" requisitos de ecorregímenes incompatibles entre sí para ofrecer una respuesta gramaticalmente fluida. Este comportamiento confirma que el LLM no "comprende" la jerarquía del derecho administrativo; simplemente minimiza la entropía de la secuencia de salida condicionado al prompt, priorizando la fluidez textual sobre la validez jurídica.\end{itemize}
-El dato más alarmante de la investigación radica en el rendimiento del recuperador en la categoría spanning, cuyo MRR de  delata la invalidez metodológica del chunking estático tradicional para la ingesta de documentos normativos extensos.
-
-El procesamiento de normativas agrícolas no sigue una estructura narrativa lineal. Un único criterio de subvencionabilidad para el pago complementario a jóvenes agricultores puede depender de:
-
-El cuerpo principal de un Decreto (definición de agricultor activo).
-
-Un Anexo técnico situado 30 páginas más adelante (tabla de Unidades de Trabajo Agrario ---UTA---).
-
-Una Disposición Transitoria modificada en una Orden posterior.
-
-La estrategia de segmentación por ventanas de caracteres o párrafos (chunking semántico o léxico) rompe de forma irreversible la red semántica de dependencias legales. Cuando el recuperador realiza la búsqueda vectorial mediante similitud coseno en el espacio euclídeo, recupera fragmentos aislados que carecen del contexto de orden superior. Este problema, definido por Reuter et al. (2025) como Document-Level Retrieval Mismatch, demuestra que el RAG vectorial ingenuo es incapaz de ejecutar razonamientos de tipo "multi-salto" (multi-hop reasoning).
-
-En consecuencia, el sistema falla sistemáticamente cuando se le exige integrar reglas de decisión que abarcan múltiples secciones del cuerpo legal, evidenciando que el uso exclusivo de embeddings densos es insuficiente para la alta complejidad del derecho agrario.
-
-Un aspecto metodológico que exige una revisión severa es la dependencia de métricas automáticas basadas en la técnica de LLM-as-a-Judge (como las empleadas en el marco RAGAS para evaluar Faithfulness o Answer Relevancy).Durante el protocolo experimental, se observó que los modelos evaluadores presentan sesgos sistemáticos que distorsionan la medición real del rendimiento:Sesgo de Verbocidad (Verbosity Bias): El evaluador tendió a calificar con mayor puntuación de Completeness a respuestas extensas y redactadas en tono burocrático, incluso cuando estas contenían redundancias o pequeñas imprecisiones en los coeficientes de admisibilidad de pastos.Incapacidad para Auditar Cálculos Ciegos: En las consultas de cálculo numérico (numerical), el modelo evaluador no verificó internamente las operaciones aritméticas de superficie; se limitó a contrastar si los números citados aparecían en el texto recuperado. Esto permitió que respuestas con errores en el resultado de la fórmula final obtuvieran puntuaciones de Accuracy artificialmente elevadas ), lo que evidencia una brecha entre la evaluación probabilística del NLP y la auditoría contable/legal real.
-
-En conclusión, los hallazgos empíricos obligan a refutar la afirmación de que la arquitectura RAG es una solución definitiva para la gestión de documentación normativa. RAG no elimina el riesgo de alucinación; lo desplaza de la memoria paramétrica del generador al componente de recuperación no paramétrico. Si la recuperadora entrega una visión sesgada o fragmentada de la ley, el LLM generará una alucinación contextual fundamentada en un texto incompleto. Para superar el techo de rendimiento hallado en esta investigación (limitado por el en consultas transversales), es imprescindible abandonar el paradigma de RAG vectorial plano y evolucionar hacia: GraphRAG / Arquitecturas Orientadas a Grafos de Conocimiento: Indexar la normativa no como fragmentos de texto, sino como un grafo dirigido de entidades legales, artículos, excepciones y jerarquías jurídicas. Agentic RAG / Enrutamiento Multi-Agente: Implementar agentes intermedios de verificación matemática y lógica formal que validen la consistencia de la respuesta antes de presentarla al usuario final.
-
+\section{Calidad de generación (LLM-as-a-Judge)}
+El juez ($1$--$5$) es el mismo modelo generador. Medias con RAG: exactitud $4{,}46$, exhaustividad $4{,}06$, relevancia $4{,}00$. No se mezclan con IR ni con RAGAS.
 
 \section{Comparación LLM sin RAG frente a LLM con RAG}
-Esta comparación es un objetivo específico. La tabla principal permanece pendiente de una ejecución reproducible sobre el banco de siete categorías (mismo modelo, prompt base y juez).
+Misma pregunta, mismo modelo (\texttt{llama3.2:latest}) y mismo juez. Sin RAG no hay fidelidad a un contexto recuperado; RAGAS no corre.
 
 \begin{table}[htbp]
 \centering
-\caption{Plantilla de comparación principal (pendiente de artefacto reproducible).}
+\caption{LLM autónomo frente a RAG híbrido ($N=35$, \texttt{run\_20260819T165515Z}).}
 \label{tab:rag-vs-norag}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Métrica} & \textbf{Sin RAG} & \textbf{Con RAG} & \textbf{Dif.} \\
+\midrule
+Exactitud (1--5) & 3{,}31 & 4{,}46 & $+1{,}14$ \\
+Exhaustividad (1--5) & 2{,}46 & 4{,}06 & $+1{,}60$ \\
+Relevancia (1--5) & 3{,}06 & 4{,}00 & $+0{,}94$ \\
+Faithfulness RAGAS & n/a & n/a & --- \\
+Tasa \texttt{is\_hallucination} (juez) & 0{,}314 & 0{,}086 & $-0{,}229$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/metricas-rag-vs-norag.png}
+\caption{Esquema visual de la comparación. Valores numéricos: Tabla~\ref{tab:rag-vs-norag}.}
+\label{fig:rag-vs-norag}
+\end{figure}
+
+En esta corrida RAG \textbf{gana}: la tasa binaria de alucinación del juez pasa de $0{,}314$ a $0{,}086$. No la elimina.
+
+\section{Resultados por categoría (juez y alucinación)}
+\begin{table}[htbp]
+\centering
+\caption{MRR, exactitud del juez y alucinación por categoría (misma corrida).}
+\label{tab:by-cat}
 \begin{tabular}{lrrrr}
 \toprule
-\textbf{Métrica} & \textbf{N} & \textbf{Sin RAG} & \textbf{Con RAG} & \textbf{Dif.} \\
+\textbf{Categoría} & \textbf{N} & \textbf{MRR} & \textbf{Acc.\ juez} & \textbf{Halluc.} \\
 \midrule
-Exactitud / groundedness & --- & PEND. & PEND. & PEND. \\
-Faithfulness (RAGAS o fallback) & --- & n/a & PEND. & --- \\
-Tasa \texttt{is\_hallucination} & --- & PEND. & PEND. & PEND. \\
+\texttt{direct\_fact} & 5 & 0{,}729 & 4{,}40 & 0{,}20 \\
+\texttt{temporal} & 5 & 0{,}900 & 4{,}00 & 0{,}20 \\
+\texttt{relationship} & 5 & 0{,}933 & 4{,}20 & 0{,}00 \\
+\texttt{spanning} & 5 & 0{,}867 & 5{,}00 & 0{,}00 \\
+\texttt{regulatory\_compliance} & 5 & 0{,}747 & 5{,}00 & 0{,}00 \\
+\texttt{regulatory\_fact} & 5 & 0{,}833 & 4{,}00 & 0{,}00 \\
+\texttt{traceability} & 5 & 0{,}667 & 4{,}60 & 0{,}20 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Existe un CSV exploratorio (\texttt{run\_9}) con solo cuatro filas y categorías no alineadas al banco; \textbf{no} se usa como resultado final.
+Ninguna categoría queda con $N=1$. En este banco el IR más débil no es \texttt{spanning} (MRR $0{,}867$, exactitud $5{,}00$) sino \texttt{traceability} (MRR $0{,}667$).
 
-\section{Resultados por categoría}
+\section{Origen de las métricas reportadas}
 \begin{table}[htbp]
 \centering
-\caption{Resultados por las siete categorías (pendientes de ejecución versionada).}
-\label{tab:by-cat}
-\begin{tabular}{lrrrrr}
+\caption{Origen de cada métrica citada en este capítulo.}
+\label{tab:origen-metricas}
+\begin{tabular}{p{4.4cm}p{4.0cm}p{5.4cm}}
 \toprule
-\textbf{Categoría} & \textbf{N} & \textbf{MRR} & \textbf{nDCG} & \textbf{Acc.\ juez} & \textbf{Halluc.} \\
+\textbf{Métrica} & \textbf{Origen} & \textbf{Dónde se calcula} \\
 \midrule
-\texttt{direct\_fact} & 6 & PEND. & PEND. & PEND. & PEND. \\
-\texttt{temporal} & 4 & PEND. & PEND. & PEND. & PEND. \\
-\texttt{relationship} & 3--5 & PEND. & PEND. & PEND. & PEND. \\
-\texttt{spanning} & 3 & PEND. & PEND. & PEND. & PEND. \\
-\texttt{regulatory\_compliance} & 1 & PEND. & PEND. & PEND. & PEND. \\
-\texttt{regulatory\_fact} & 1 & PEND. & PEND. & PEND. & PEND. \\
-\texttt{traceability} & 1 & PEND. & PEND. & PEND. & PEND. \\
+MRR y cobertura de keywords & Función propia & \texttt{results.csv} de \texttt{run\_20260819T165515Z} \\
+nDCG del harness & Función propia, \textbf{no citada} & 21/35 filas $>1$; no es nDCG canónico \\
+Exactitud, exhaustividad, relevancia 1--5, \texttt{is\_hallucination} & LLM-as-a-Judge & Mismo CSV; no es juicio humano \\
+RAGAS & No aplica & No se ejecutó \\
+Acuerdo autor--juez ($\pm 1$) & Pendiente de anotación & \texttt{author\_scorecard.csv} (21 ítems) \\
+$\kappa$ de Cohen & No aplica & Un solo anotador humano \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\section{Fallos en consultas holísticas}
-Se requieren dos ejemplos con pregunta, fragmentos recuperados, respuesta generada y causa. \textbf{No hay trazas versionadas} con chunks íntegros en el repositorio; los ejemplos se añadirán tras una corrida instrumentada. Plantilla:
+\section{Fallos de trazabilidad (dos casos del CSV)}
+Recortados de \texttt{failures.json} de la misma corrida (peores \texttt{traceability} por MRR).
 
 \begin{quote}
-\textbf{Fallo H1 (pendiente).} Pregunta holística / chunks / respuesta / causa raíz demostrada.\\
-\textbf{Fallo H2 (pendiente).} Misma estructura, causa distinta preferiblemente.
+\textbf{Fallo H1 (ítem 34, \texttt{traceability}, MRR $0{,}000$).}\\
+\textit{Pregunta:} ¿Cuál es el número de registro de AGROIL para araña roja en platanera?\\
+\textit{Referencia:} AGROIL figura con el n.º 22319 (\texttt{cultivos/platanera.md}).\\
+\textit{Fragmentos recuperados:} GIP/regfiweb, papaya, intro de platanera, berenjena, aguacate, forrajes, FAQ, olivo. El dossier de platanera entra en el top-$k$, pero el chunk con \texttt{22319} no.\\
+\textit{Respuesta RAG:} inventa el registro \texttt{ES-01744}.\\
+\textit{Causa:} fallo de recuperación sobre un identificador puntual en un dossier largo; el generador no se abstiene y alucina un código plausible. El juez asignó exactitud $5{,}00$ pese al error: hay \emph{leakage} del juez (ve la referencia y puntúa el tema, no el dígito).
+
+\textbf{Fallo H2 (ítem 35, \texttt{traceability}, MRR $0{,}333$).}\\
+\textit{Pregunta:} ¿Cuál es la URL del texto consolidado POSEI Canarias 2026 citada en el corpus?\\
+\textit{Referencia:} \ldots\texttt{POSEI-Canarias-texto-consolidado-2026-30-12-2025.pdf}.\\
+\textit{Fragmentos:} README, \texttt{02\_posei\_marco.md} (varias veces) e índice. El preview incluye también el PDF de \textbf{2025}.\\
+\textit{Respuesta RAG:} devuelve la URL de 2025, no la de 2026.\\
+\textit{Causa:} homonimia léxica (mismo path, distinto año). BM25/denso recuperan el marco; el generador elige el enlace equivocado.
 \end{quote}
 
 \section{Concordancia experto--juez}
-No se encontró tamaño de muestra revisada por expertos ni pares \texttt{score\_experto}/\texttt{score\_juez}. Se informará $N$, acuerdo porcentual y, si aplica, kappa o Spearman con IC cuando exista el registro de revisión.
+Protocolo: el autor puntúa a ciegas los 21 ítems de \texttt{author\_scorecard.csv} (rúbrica 1--5 de exactitud) \emph{sin} abrir las columnas del juez, y luego se calcula el acuerdo $\pm 1$ con \texttt{scripts/score\_human\_agreement.py}. No hay segundo anotador; por tanto \textbf{no hay $\kappa$}. Esa plantilla ya está generada a partir de este run; el porcentaje se añadirá cuando el autor rellene las notas.
 
-
-
+\section{Discusión}
+En \texttt{run\_20260819T165515Z} RAG mejora exactitud ($+1{,}14$) y reduce la marca binaria de alucinación ($0{,}314\rightarrow 0{,}086$) frente al mismo LLM sin contexto. El patrón no es ``el híbrido falla en spanning'': en este banco \texttt{spanning} es sólido. El hueco empírico es \textbf{trazabilidad} (número de registro, URL de un año concreto): el top-$k$ trae el documento o un vecino, no el identificador, y el generador completa con un código o un enlace verosímil. El juez 1--5 no es una auditoría legal: el caso H1 lo demuestra. RAG desplaza parte del riesgo de alucinación al retriever; no lo suprime. Graph RAG y visión end-to-end no forman parte de esta evaluación; el bucle LangGraph (grader y reescritura) orquesta el chat, pero la corrida congelada mide el retriever híbrido con top-$k$ fijo.

@@ -11,6 +11,9 @@ import {
   createOrganization,
   getOrganizations,
 } from "@/services/organization.service";
+import KnowledgeService, {
+  type KnowledgeBaseSummary,
+} from "@/services/knowledge.service";
 import type {
   Organization,
   Department,
@@ -21,6 +24,7 @@ import { queryKeys } from "@/lib/queryKeys";
 
 const GLOBAL_ORG_NAME = "AgroTech";
 const SELECTED_ORG_KEY = "agrops.selectedOrgId";
+const GENERAL_KB_NAME = "Base de Conocimiento General";
 
 const OrganizationContext = createContext<OrgContextType | undefined>(
   undefined,
@@ -77,15 +81,36 @@ function normalizeOrgs(data: unknown): Organization[] {
   return sortOrgs(orgs);
 }
 
+function pickGeneralKnowledgeBase(
+  items: KnowledgeBaseSummary[],
+): KnowledgeBaseSummary | null {
+  if (!items.length) return null;
+  const general = items.find((item) =>
+    (item.name || "").toLowerCase().includes("general"),
+  );
+  if (general) return general;
+  return [...items].sort((a, b) =>
+    String(a.created_at || "").localeCompare(String(b.created_at || "")),
+  )[0];
+}
+
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [selectedOrg, setSelectedOrgState] = useState<Organization | null>(
     null,
   );
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBaseSummary[]>(
+    [],
+  );
+  const [generalKnowledgeBase, setGeneralKnowledgeBase] =
+    useState<KnowledgeBaseSummary | null>(null);
 
   const setSelectedOrg = useCallback((org: Organization | null) => {
     setSelectedOrgState(org);
+    setSelectedDept(null);
+    setKnowledgeBases([]);
+    setGeneralKnowledgeBase(null);
     if (typeof window === "undefined") return;
     if (org?.id) {
       window.localStorage.setItem(SELECTED_ORG_KEY, org.id);
@@ -93,6 +118,31 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       window.localStorage.removeItem(SELECTED_ORG_KEY);
     }
   }, []);
+
+  const applyKnowledgeBases = useCallback((items: KnowledgeBaseSummary[]) => {
+    setKnowledgeBases(items);
+    setGeneralKnowledgeBase(pickGeneralKnowledgeBase(items));
+  }, []);
+
+  const reloadKnowledgeBases = useCallback(async () => {
+    if (!selectedOrg?.id) {
+      setKnowledgeBases([]);
+      setGeneralKnowledgeBase(null);
+      return [];
+    }
+    let items = await KnowledgeService.list(selectedOrg.id);
+    if (!items.length) {
+      const created = await KnowledgeService.create({
+        name: GENERAL_KB_NAME,
+        description:
+          "Repositorio compartido de la organización para todos los agricultores.",
+        organizationId: selectedOrg.id,
+      });
+      items = [created];
+    }
+    applyKnowledgeBases(items);
+    return items;
+  }, [applyKnowledgeBases, selectedOrg?.id]);
 
   const loadOrganizations = useCallback(async () => {
     try {
@@ -115,6 +165,38 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadOrganizations();
   }, [loadOrganizations]);
+
+  useEffect(() => {
+    if (!selectedOrg?.id) {
+      setKnowledgeBases([]);
+      setGeneralKnowledgeBase(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        let items = await KnowledgeService.list(selectedOrg.id);
+        if (!cancelled && !items.length) {
+          const created = await KnowledgeService.create({
+            name: GENERAL_KB_NAME,
+            description:
+              "Repositorio compartido de la organización para todos los agricultores.",
+            organizationId: selectedOrg.id,
+          });
+          items = [created];
+        }
+        if (!cancelled) applyKnowledgeBases(items);
+      } catch {
+        if (!cancelled) {
+          setKnowledgeBases([]);
+          setGeneralKnowledgeBase(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyKnowledgeBases, selectedOrg?.id]);
 
   const addOrganization = async (name: string, description: string) => {
     const created = await createOrganization({ name, description });
@@ -145,8 +227,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         organizations,
         selectedOrg,
         selectedDept,
+        knowledgeBases,
+        generalKnowledgeBase,
         setSelectedOrg,
         setSelectedDept,
+        reloadKnowledgeBases,
         addOrganization,
         setOrganizations,
       }}

@@ -4,22 +4,16 @@ import { useState, useRef, useMemo, useEffect, type FormEvent } from "react";
 import {
   Send,
   Database,
-  Layers,
   Loader2,
-  FileText,
   ChevronDown,
   Sparkles,
-  Building,
   Cpu,
 } from "lucide-react";
 import ChatService from "@/services/chat.service";
+import { useRagRuntimeConfig } from "@/components/evaluation/FrozenRagConfigBar";
 import { useOrganization } from "@/context/OrganizationContext";
-import AvatarPanel from "@/components/AvatarPanel";
-import type { DocumentItem } from "@/types/document";
-import {
-  useDocuments,
-  useKnowledgeBases,
-} from "@/hooks/useCachedApi";
+import { useTranslation } from "@/i18n/I18nProvider";
+import { CanaryFlag } from "@/components/BrandMark";
 import type {
   ChatContext,
   RetrievalInfo,
@@ -53,6 +47,7 @@ function takeRecentConversations(list: any[]) {
 }
 
 export default function ChatPage() {
+  const { t } = useTranslation();
   const { selectedOrg } = useOrganization();
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -78,18 +73,10 @@ export default function ChatPage() {
     { id: string; label: string; state: StepState; items?: any[] }[]
   >([]);
 
-  const [kbs, setKbs] = useState<any[]>([]);
-  const [knowledgeBaseId, setKnowledgeBaseId] = useState<string>("");
-
-  const { data: kbsCached } = useKnowledgeBases(selectedOrg?.id);
-  const { data: documentsCached } = useDocuments(
-    knowledgeBaseId || undefined,
-  );
-
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [conversations, setConversations] = useState<any[]>([]);
   const [useRag, setUseRag] = useState(true);
-  const [ragMode, setRagMode] = useState<RagMode>("compare");
+  const [ragMode, setRagMode] = useState<RagMode>("agentic");
+  const workspaceName = selectedOrg?.name ?? "AgroPS";
   const [comparison, setComparison] = useState<{
     hybrid?: ModeComparisonSide;
     agentic?: ModeComparisonSide;
@@ -109,21 +96,40 @@ export default function ChatPage() {
     rrf_k: number;
     candidate_k: number;
     final_k: number;
+    temperature: number;
+    use_reranking: boolean;
     reranker_model?: string;
     reranker_batch_size?: number;
   }
 
   const [ragParams, setRagParams] = useState<RagParams>({
-    embedding_model: "qwen3-embedding:latest",
+    embedding_model: "nomic-embed-text",
     distance_metric: "cosine",
-    retrieval_k: 10,
-    bm25_k: 10,
+    retrieval_k: 12,
+    bm25_k: 12,
     rrf_k: 60,
-    candidate_k: 15,
-    final_k: 5,
+    candidate_k: 20,
+    final_k: 8,
+    temperature: 0,
+    use_reranking: false,
     reranker_model: "BAAI/bge-reranker-v2-m3",
     reranker_batch_size: 16,
   });
+  const runtimeConfig = useRagRuntimeConfig();
+  useEffect(() => {
+    const cfg = runtimeConfig.data;
+    if (!cfg) return;
+    setRagParams((current) => ({
+      ...current,
+      embedding_model: cfg.embedding_model,
+      retrieval_k: cfg.retrieval_k,
+      bm25_k: cfg.bm25_k,
+      rrf_k: cfg.rrf_k,
+      final_k: cfg.final_k,
+      temperature: cfg.temperature,
+      use_reranking: cfg.use_reranker,
+    }));
+  }, [runtimeConfig.data]);
 
   const [showRagParams, setShowRagParams] = useState(false);
 
@@ -141,7 +147,7 @@ export default function ChatPage() {
     const noPdf = words.replace(/\.pdf/gi, "");
     const trimmed = noPdf.trim();
     if (!trimmed) return null;
-    return `¿Qué información hay sobre "${trimmed}"?`;
+    return t("chat.relatedQuestionTemplate", { topic: trimmed });
   };
 
   const getRelatedQuestions = (
@@ -207,28 +213,8 @@ export default function ChatPage() {
   };
 
   useEffect(() => {
-    if (selectedOrg?.id) {
-      createNewChat();
-      loadConversations();
-    }
-  }, [selectedOrg?.id]);
-
-  useEffect(() => {
-    if (kbsCached) {
-      setKbs(kbsCached);
-    }
-  }, [kbsCached]);
-
-  useEffect(() => {
-    setDocuments(documentsCached ?? []);
-  }, [documentsCached]);
-
-  useEffect(() => {
-    if (!selectedOrg?.id) {
-      setKbs([]);
-      setKnowledgeBaseId("");
-      setDocuments([]);
-    }
+    createNewChat();
+    loadConversations();
   }, [selectedOrg?.id]);
 
   useEffect(() => {
@@ -248,22 +234,10 @@ export default function ChatPage() {
     }
   };
 
-  const fetchDocumentsForKb = async (kbId: string) => {
-    if (!kbId) {
-      setDocuments([]);
-      return;
-    }
-    setKnowledgeBaseId(kbId);
-  };
-
-  const handleKbChange = (newKbId: string) => {
-    void fetchDocumentsForKb(newKbId);
-  };
-
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (!inputValue.trim() || isLoading || !selectedOrg?.id) return;
+    if (!inputValue.trim() || isLoading) return;
 
     const question = inputValue.trim();
 
@@ -283,12 +257,12 @@ export default function ChatPage() {
 
     setThinkingStep(
       !useRag
-        ? `Generando sin RAG con ${selectedModel}...`
+        ? t("chat.generatingNoRag", { model: selectedModel })
         : ragMode === "compare"
-          ? `Comparación Hybrid vs Agentic (${selectedModel})...`
-          : ragMode === "agentic"
-            ? `Agentic RAG · tools KB/clima/precios...`
-            : `Hybrid RAG · Dense+BM25+RRF...`,
+          ? t("chat.compareThinking", { model: selectedModel })
+          : ragMode === "hybrid"
+            ? t("chat.hybridThinking")
+            : t("chat.agenticThinking"),
     );
 
     try {
@@ -313,12 +287,16 @@ export default function ChatPage() {
         question,
         conversation_id: conversationId,
         history,
-        knowledge_base_id: useRag ? knowledgeBaseId || undefined : undefined,
         organization_id: selectedOrg?.id,
         organization_name: selectedOrg?.name,
         use_rag: useRag,
         rag_mode: useRag ? ragMode : "hybrid",
         model: selectedModel,
+        use_query_rewrite: false,
+        use_reranking: ragParams.use_reranking,
+        retrieval_k: ragParams.retrieval_k,
+        final_k: ragParams.final_k,
+        temperature: ragParams.temperature,
       })
         .then((response) => {
           if (response.conversation_id) {
@@ -425,17 +403,17 @@ export default function ChatPage() {
             content:
               response.comparison?.hybrid && response.comparison?.agentic
                 ? [
-                    "### Comparación controlada Hybrid vs Agentic",
+                    t("chat.comparisonTitle"),
                     "",
-                    `**Hybrid RAG** (${response.comparison.hybrid.architecture ?? "Dense+BM25+RRF"} · ${response.comparison.hybrid.latency_ms ?? "—"} ms)`,
+                    `**${t("chat.hybridRag")}** (${response.comparison.hybrid.architecture ?? "Dense+BM25+RRF"} · ${response.comparison.hybrid.latency_ms ?? "—"} ms)`,
                     "",
-                    response.comparison.hybrid.answer?.trim() || "(sin respuesta)",
+                    response.comparison.hybrid.answer?.trim() || t("chat.noAnswer"),
                     "",
                     "---",
                     "",
-                    `**Agentic RAG** (${response.comparison.agentic.architecture ?? "tools"} · ${response.comparison.agentic.latency_ms ?? "—"} ms)`,
+                    `**${t("chat.agenticRag")}** (${response.comparison.agentic.architecture ?? "tools"} · ${response.comparison.agentic.latency_ms ?? "—"} ms)`,
                     "",
-                    response.comparison.agentic.answer?.trim() || "(sin respuesta)",
+                    response.comparison.agentic.answer?.trim() || t("chat.noAnswer"),
                     "",
                     response.comparison.note
                       ? `_${response.comparison.note}_`
@@ -444,27 +422,33 @@ export default function ChatPage() {
                     .filter(Boolean)
                     .join("\n")
                 : response.answer?.trim() ||
-                  "El asistente no devolvió ninguna respuesta.",
+                  t("chat.emptyResponse"),
             timestamp: new Date(),
             sources: [],
             pendingReview: Boolean(response.review_id),
           };
 
           const rd = response.retrieval_details;
-          if (rd) {
-            const sources = (rd.candidates ?? rd.dense_original ?? [])
-              .slice(0, 4)
-              .map((c: any) => ({
-                source:
-                  c.metadata?.source ?? c.source ?? c.metadata?.document_id,
-                score:
-                  c.metadata?.distance ??
-                  c.metadata?.cross_encoder_score ??
-                  c.metadata?.bm25_score,
-                chunk_id: c.metadata?.chunk_id,
-                snippet: (c.page_content || "").substring(0, 200),
-              }));
-            assistantMessage.sources = sources;
+          const sourceChunks =
+            (response.context ?? []).length > 0
+              ? response.context
+              : (rd?.chunks ?? rd?.candidates ?? rd?.dense_original ?? []);
+          if (sourceChunks.length) {
+            assistantMessage.sources = sourceChunks.slice(0, 8).map((c: any) => ({
+              source:
+                c.metadata?.source ??
+                c.source ??
+                c.metadata?.title ??
+                c.metadata?.document_id,
+              score:
+                c.metadata?.score ??
+                c.metadata?.rrf_score ??
+                c.metadata?.distance ??
+                c.metadata?.cross_encoder_score ??
+                c.metadata?.bm25_score,
+              chunk_id: c.metadata?.chunk_id,
+              snippet: (c.page_content || "").substring(0, 220),
+            }));
           }
 
           setMessages((prev) => [...prev, assistantMessage]);
@@ -476,7 +460,7 @@ export default function ChatPage() {
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: "No se pudo obtener respuesta del asistente.",
+              content: t("chat.noResponse"),
               timestamp: new Date(),
             },
           ]);
@@ -493,7 +477,7 @@ export default function ChatPage() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "No se pudo obtener respuesta del asistente.",
+          content: t("chat.noResponse"),
           timestamp: new Date(),
         },
       ]);
@@ -504,92 +488,51 @@ export default function ChatPage() {
     }
   };
 
-  if (!selectedOrg) {
-    return (
-      <div className="flex h-full w-full flex-col items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">
-            Ningún Workspace seleccionado
-          </h2>
-          <p className="text-gray-500">
-            Por favor, selecciona una organización en el menú lateral para
-            acceder al chat.
-          </p>
-        </div>
-      </div>
-    );
-  }
   return (
-    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-gray-50">
-      <div className="shrink-0 border-b border-gray-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-xl border border-[color:var(--agro-border)] bg-[color:var(--agro-canvas)]">
+      <div className="shrink-0 border-b border-[color:var(--agro-border)] bg-white px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 3 2"
-              className="w-10 h-7 rounded-sm shadow-xs border border-slate-200 shrink-0"
-              aria-label="Bandera de Canarias"
-            >
-              <rect width="1" height="2" fill="#ffffff" />
-              <rect x="1" width="1" height="2" fill="#00355c" />
-              <rect x="2" width="1" height="2" fill="#fedf00" />
-            </svg>
+            <CanaryFlag className="h-7 w-10 shrink-0" />
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-600">
-                  CHAT MULTI-INQUILINO
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[color:var(--agro-primary)]">
+                  {t("chat.assistant")}
                 </h4>
-                <span className="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-200 flex items-center gap-1">
-                  <Building size={10} />
-                  Aislamiento Activo
+                <span className="rounded-full border border-[color:var(--agro-border)] bg-[color:var(--agro-pill)] px-2 py-0.5 text-[10px] font-bold text-[color:var(--agro-primary)]">
+                  {useRag
+                    ? ragMode === "hybrid"
+                      ? t("chat.hybridRag")
+                      : ragMode === "compare"
+                        ? t("chat.modeCompare")
+                        : t("chat.agenticRag")
+                    : t("chat.modeNoRag")}
                 </span>
                 {architectureLabel && (
-                  <span className="bg-emerald-50 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-200">
+                  <span className="rounded-full border border-yellow-200 bg-[#FFD100]/20 px-2 py-0.5 text-[10px] font-bold text-[color:var(--agro-accent-ink)]">
                     {architectureLabel}
                   </span>
                 )}
               </div>
               <h1 className="mt-1 text-2xl font-bold text-slate-900">
-                {selectedOrg.name}
+                {workspaceName}
               </h1>
             </div>
           </div>
 
-          {/* SELECTORES DE MODELO LLM Y KNOWLEDGE BASE */}
+          {/* SELECTOR DE MODELO LLM */}
           <div className="flex flex-wrap items-center gap-3">
-            {/* Arquitectura RAG: Hybrid / Agentic / Compare */}
-            <div className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50/80 p-1 shadow-xs">
-              {(
-                [
-                  ["hybrid", "Hybrid"],
-                  ["agentic", "Agentic"],
-                  ["compare", "Comparar"],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={!useRag}
-                  onClick={() => setRagMode(id)}
-                  className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${
-                    ragMode === id && useRag
-                      ? "bg-emerald-700 text-white shadow-sm"
-                      : "text-emerald-900/70 hover:bg-white/80"
-                  } disabled:opacity-40`}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+              {t("chat.allDocs", { org: workspaceName })}
             </div>
-
             {/* Selector de Modelos Ollama */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 shrink-0 shadow-xs">
-              <Cpu size={15} className="text-amber-600 shrink-0" />
+              <Cpu size={15} className="shrink-0 text-[color:var(--agro-accent-ink)]" />
               <label
                 htmlFor="model-select"
                 className="text-xs font-semibold text-slate-600 whitespace-nowrap"
               >
-                Modelo:
+                {t("chat.model")}
               </label>
               <select
                 id="model-select"
@@ -607,44 +550,51 @@ export default function ChatPage() {
             {/* RAG parameters quick view */}
             <div className="hidden sm:flex flex-col gap-1 rounded-md border border-slate-100 bg-white px-3 py-2 text-xs text-slate-700">
               <div className="flex items-center gap-2">
-                <span className="font-semibold">RAG</span>
+                <span className="font-semibold">{t("chat.ragLabel")}</span>
                 <button
                   onClick={() => setShowRagParams((v) => !v)}
                   className="ml-2 text-xs text-slate-500 hover:text-slate-700"
                 >
-                  {showRagParams ? "Ocultar" : "Mostrar"}
+                  {showRagParams ? t("chat.hide") : t("chat.show")}
                 </button>
               </div>
               {showRagParams && (
                 <div className="grid grid-cols-2 gap-2 text-[12px]">
-                  <div className="text-slate-500">Embedding</div>
+                  <div className="text-slate-500">{t("chat.embedding")}</div>
                   <div className="text-slate-700 truncate">
                     {ragParams.embedding_model}
                   </div>
 
-                  <div className="text-slate-500">Distance</div>
+                  <div className="text-slate-500">{t("chat.distance")}</div>
                   <div className="text-slate-700">
                     {ragParams.distance_metric}
                   </div>
 
-                  <div className="text-slate-500">Retrieval K</div>
+                  <div className="text-slate-500">{t("chat.retrievalK")}</div>
                   <div className="text-slate-700">{ragParams.retrieval_k}</div>
 
-                  <div className="text-slate-500">BM25 K</div>
+                  <div className="text-slate-500">{t("chat.bm25K")}</div>
                   <div className="text-slate-700">{ragParams.bm25_k}</div>
 
-                  <div className="text-slate-500">RRF K</div>
+                  <div className="text-slate-500">{t("chat.rrfK")}</div>
                   <div className="text-slate-700">{ragParams.rrf_k}</div>
 
-                  <div className="text-slate-500">Candidate K</div>
+                  <div className="text-slate-500">{t("chat.candidateK")}</div>
                   <div className="text-slate-700">{ragParams.candidate_k}</div>
 
-                  <div className="text-slate-500">Final K</div>
+                  <div className="text-slate-500">{t("chat.finalK")}</div>
                   <div className="text-slate-700">{ragParams.final_k}</div>
 
-                  <div className="text-slate-500">Reranker</div>
+                  <div className="text-slate-500">{t("chat.temperature")}</div>
+                  <div className="text-slate-700">
+                    {ragParams.temperature.toFixed(1)}
+                  </div>
+
+                  <div className="text-slate-500">{t("chat.reranker")}</div>
                   <div className="text-slate-700 truncate">
-                    {ragParams.reranker_model}
+                    {ragParams.use_reranking
+                      ? ragParams.reranker_model
+                      : t("chat.off")}
                   </div>
                 </div>
               )}
@@ -657,24 +607,24 @@ export default function ChatPage() {
         <aside className="w-[260px] shrink-0 border-r border-gray-200 bg-white p-4 flex flex-col min-h-0">
           <button
             onClick={createNewChat}
-            className="mb-4 flex items-center justify-center rounded-lg bg-amber-600 px-4 py-3 text-sm font-medium text-white hover:bg-amber-700 shrink-0 transition-colors cursor-pointer"
+            className="mb-4 flex shrink-0 cursor-pointer items-center justify-center rounded-lg bg-[color:var(--agro-primary)] px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-[color:var(--agro-primary-hover)]"
           >
-            + Nuevo chat
+            {t("chat.newChat")}
           </button>
 
           <h3 className="mb-3 text-xs font-semibold uppercase text-gray-400 shrink-0">
-            Conversaciones ({selectedOrg.name})
+            {t("chat.conversations")}
           </h3>
 
           <div className="min-h-0 flex-1 space-y-2 overflow-hidden pr-1">
             {conversations.length === 0 && (
-              <p className="text-sm text-gray-400">No hay chats todavía</p>
+              <p className="text-sm text-gray-400">{t("chat.noChats")}</p>
             )}
             {conversations.map((chat) => (
               <button
                 key={chat.id}
                 onClick={() => openConversation(chat.id)}
-                className={`w-full rounded-lg px-3 py-3 text-left hover:bg-gray-100 min-w-0 transition-colors cursor-pointer ${conversationId === chat.id ? "bg-amber-50 text-amber-700 font-semibold" : ""}`}
+                className={`min-w-0 w-full cursor-pointer rounded-lg px-3 py-3 text-left transition-colors hover:bg-slate-100 ${conversationId === chat.id ? "bg-[color:var(--agro-pill)] font-semibold text-[color:var(--agro-primary)]" : ""}`}
               >
                 <p className="truncate text-sm font-medium">{chat.title}</p>
                 <p className="text-xs text-gray-400 mt-1">
@@ -690,13 +640,10 @@ export default function ChatPage() {
               <div className="flex h-full items-center justify-center">
                 <div className="text-center max-w-md">
                   <h2 className="mb-3 text-2xl font-bold text-slate-900">
-                    Asistente de campo · {selectedOrg.name}
+                    {t("chat.assistant")}
                   </h2>
                   <p className="text-sm text-gray-500 leading-relaxed">
-                    Pregunta sobre normativa, manuales, datasets o el corpus
-                    documental de la organización. El asistente busca en todas
-                    las bases de conocimiento y datasets y responde citando
-                    fuentes.
+                    {t("chat.emptyHintExtended")}
                   </p>
                 </div>
               </div>
@@ -712,7 +659,7 @@ export default function ChatPage() {
                     <div
                       className={`max-w-2xl rounded-xl px-5 py-4 shadow-sm ${
                         message.role === "user"
-                          ? "bg-amber-600 text-white"
+                          ? "bg-[color:var(--agro-primary)] text-white"
                           : "border border-gray-200 bg-white text-gray-800"
                       }`}
                     >
@@ -722,14 +669,14 @@ export default function ChatPage() {
                             {message.content}
                           </p>
                           {message.role === "assistant" && message.pendingReview && (
-                            <p className="mt-2 text-[11px] font-semibold text-amber-700">
-                              En cola de validación humana
+                            <p className="mt-2 text-[11px] font-semibold text-[color:var(--agro-accent-ink)]">
+                              {t("chat.hitlQueue")}
                             </p>
                           )}
                           <p
                             className={`mt-3 text-[11px] ${
                               message.role === "user"
-                                ? "text-amber-100"
+                                ? "text-blue-100"
                                 : "text-gray-400"
                             }`}
                           >
@@ -741,10 +688,10 @@ export default function ChatPage() {
                         {message.role === "assistant" &&
                           message.sources &&
                           message.sources.length > 0 && (
-                            <div className="w-48 shrink-0">
+                            <div className="w-56 shrink-0">
                               <div className="rounded-md border bg-gray-50 p-2 text-xs">
                                 <div className="font-semibold text-slate-700 mb-2">
-                                  Fuentes
+                                  {t("chat.sources")}
                                 </div>
                                 <div className="space-y-2">
                                   {message.sources.map((s, i) => (
@@ -752,6 +699,11 @@ export default function ChatPage() {
                                       <div className="font-medium text-slate-800 truncate">
                                         {s.source}
                                       </div>
+                                      {s.snippet && (
+                                        <div className="text-gray-500 text-[11px] line-clamp-3 whitespace-normal">
+                                          {s.snippet}
+                                        </div>
+                                      )}
                                       <div className="text-gray-500 text-[11px] truncate">
                                         {s.score
                                           ? typeof s.score === "number"
@@ -781,9 +733,9 @@ export default function ChatPage() {
                         <div className="flex items-center gap-2">
                           <Sparkles
                             size={14}
-                            className="text-amber-600 animate-spin"
+                            className="animate-spin text-[color:var(--agro-primary)]"
                           />
-                          <span>Generando con {selectedModel}...</span>
+                          <span>{t("chat.generating", { model: selectedModel })}</span>
                         </div>
                         <ChevronDown
                           size={14}
@@ -797,10 +749,10 @@ export default function ChatPage() {
                         <div className="px-4 py-3 bg-white border-t border-slate-100 flex items-center gap-3 text-xs text-slate-500 font-mono">
                           <Loader2
                             size={13}
-                            className="animate-spin text-amber-600 shrink-0"
+                            className="shrink-0 animate-spin text-[color:var(--agro-primary)]"
                           />
                           <p className="animate-pulse truncate">
-                            {thinkingStep || "Procesando información..."}
+                            {thinkingStep || t("chat.processing")}
                           </p>
                         </div>
                       )}
@@ -810,16 +762,16 @@ export default function ChatPage() {
                 {/* Related questions (from retrievalDetails) */}
                 {comparison && (
                   <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-4">
+                    <div className="rounded-xl border border-[color:var(--agro-border)] bg-[color:var(--agro-pill)]/60 p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-bold text-emerald-900">
-                          Hybrid RAG
+                        <h3 className="text-sm font-bold text-[color:var(--agro-primary)]">
+                          {t("chat.hybridRag")}
                         </h3>
-                        <span className="text-[10px] font-semibold text-emerald-700">
+                        <span className="text-[10px] font-semibold text-[color:var(--agro-primary)]">
                           {comparison.hybrid?.latency_ms ?? "—"} ms
                         </span>
                       </div>
-                      <p className="mb-2 text-[11px] text-emerald-800/80">
+                      <p className="mb-2 text-[11px] text-slate-600">
                         {comparison.hybrid?.architecture ??
                           "hybrid_dense_bm25_rrf"}
                       </p>
@@ -830,14 +782,14 @@ export default function ChatPage() {
                     <div className="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <h3 className="text-sm font-bold text-indigo-900">
-                          Agentic RAG
+                          {t("chat.agenticRag")}
                         </h3>
                         <span className="text-[10px] font-semibold text-indigo-700">
                           {comparison.agentic?.latency_ms ?? "—"} ms
                         </span>
                       </div>
                       <p className="mb-2 text-[11px] text-indigo-800/80">
-                        {comparison.agentic?.architecture ?? "agentic_tool_rag"}
+                        {comparison.agentic?.architecture ?? "agentic_langgraph_rag"}
                       </p>
                       <p className="mb-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-800">
                         {comparison.agentic?.answer}
@@ -845,7 +797,7 @@ export default function ChatPage() {
                       {(comparison.agentic?.agent_trace?.length ?? 0) > 0 && (
                         <div className="space-y-1.5 border-t border-indigo-100 pt-2">
                           <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-700">
-                            Tools ejecutadas
+                            {t("chat.toolsExecuted")}
                           </p>
                           {comparison.agentic?.agent_trace?.map((step, idx) => (
                             <div
@@ -874,7 +826,7 @@ export default function ChatPage() {
                 {!comparison && agentTrace && agentTrace.length > 0 && (
                   <div className="rounded-xl border border-indigo-200 bg-white p-4">
                     <h3 className="mb-2 text-sm font-bold text-indigo-900">
-                      Traza Agentic
+                      {t("chat.agentTrace")}
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {agentTrace.map((step, idx) => (
@@ -892,7 +844,7 @@ export default function ChatPage() {
                 {relatedQuestions.length > 0 && (
                   <div className="mt-6 rounded-lg border bg-white p-4">
                     <h4 className="font-semibold mb-2">
-                      Preguntas relacionadas
+                      {t("chat.relatedQuestions")}
                     </h4>
                     <div className="flex flex-col gap-2 text-sm">
                       {relatedQuestions.map((q: string, idx: number) => (
@@ -928,18 +880,30 @@ export default function ChatPage() {
               onClick={() => setUseRag(!useRag)}
               title={
                 useRag
-                  ? "RAG Activo (Usa documentos)"
-                  : "RAG Desactivado (Solo modelo LLM)"
+                  ? t("chat.ragActive")
+                  : t("chat.ragOff")
               }
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
                 useRag
-                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  ? "border-[color:var(--agro-border)] bg-[color:var(--agro-pill)] text-[color:var(--agro-primary)]"
                   : "bg-gray-100 text-gray-500 border-gray-200"
               }`}
             >
               <Database size={15} />
-              <span>RAG: {useRag ? "ON" : "OFF"}</span>
+              <span>{t("chat.ragState", { state: useRag ? "ON" : "OFF" })}</span>
             </button>
+            {useRag && (
+              <select
+                value={ragMode}
+                onChange={(e) => setRagMode(e.target.value as RagMode)}
+                title={t("chat.howItWorks")}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700 outline-none"
+              >
+                <option value="agentic">{t("chat.modeAgentic")}</option>
+                <option value="hybrid">{t("chat.modeHybrid")}</option>
+                <option value="compare">{t("chat.modeCompare")}</option>
+              </select>
+            )}
           </div>
 
           <div className="relative flex-1">
@@ -947,16 +911,16 @@ export default function ChatPage() {
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ej. hojas amarillas, riego irregular, manchas en hoja…"
+              placeholder={t("chat.placeholder")}
               disabled={isLoading}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 text-sm text-slate-800 placeholder-gray-400 outline-none focus:border-amber-500 focus:bg-white transition-all shadow-xs pr-12"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50/50 px-4 py-3 pr-12 text-sm text-slate-800 shadow-xs outline-none transition-all placeholder-gray-400 focus:border-[color:var(--agro-primary)] focus:bg-white"
             />
           </div>
 
           <button
             type="submit"
             disabled={!inputValue.trim() || isLoading}
-            className="flex items-center justify-center rounded-xl bg-amber-600 px-5 py-3 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors shadow-sm shrink-0 cursor-pointer"
+            className="flex shrink-0 cursor-pointer items-center justify-center rounded-xl bg-[color:var(--agro-primary)] px-5 py-3 text-white shadow-sm transition-colors hover:bg-[color:var(--agro-primary-hover)] disabled:opacity-40"
           >
             {isLoading ? (
               <Loader2 size={18} className="animate-spin" />

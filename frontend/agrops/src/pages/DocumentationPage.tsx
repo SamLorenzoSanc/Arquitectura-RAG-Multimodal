@@ -11,7 +11,9 @@ import React, {
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import DocumentService from "@/services/document.service";
+import { DOCUMENT_ACCEPT, MAX_DOCUMENT_BYTES } from "@/lib/uploads";
 import { fetchDocumentQuestions, type DocumentQuestion } from "@/services/validation.service";
+import { useTranslation } from "@/i18n/I18nProvider";
 import { categoryLabel } from "@/components/evaluation/labels";
 import { useOrganization } from "@/context/OrganizationContext";
 import {
@@ -113,30 +115,25 @@ function formatBytes(bytes?: number) {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
-function processingLabel(status?: ProcessingStatus) {
+function processingLabel(status: ProcessingStatus | undefined, t: (key: string) => string) {
   switch (status) {
     case "uploaded":
-      return "Subida";
-
+      return t("ragDocs.procUploaded");
     case "pending":
-      return "Pendiente";
-
+      return t("ragDocs.procPending");
     case "running":
-      return "Procesando";
-
+      return t("ragDocs.procRunning");
     case "completed":
-      return "Completada";
-
+      return t("ragDocs.procCompleted");
     case "failed":
-      return "Fallida";
-
+      return t("ragDocs.procFailed");
     default:
       return "—";
   }
 }
 
-function statusLabel(status: DocumentStatus) {
-  return status === "active" ? "Activo" : "Inactivo";
+function statusLabel(status: DocumentStatus, t: (key: string) => string) {
+  return status === "active" ? t("ragDocs.statusActive") : t("ragDocs.statusInactive");
 }
 
 function statusTone(status: DocumentStatus) {
@@ -152,9 +149,11 @@ STATUS BADGE
 function StatusBadge({
   status,
   processingStatus,
+  t,
 }: {
   status: DocumentStatus;
   processingStatus?: ProcessingStatus;
+  t: (key: string) => string;
 }) {
   const isProcessing =
     processingStatus === "pending" || processingStatus === "running";
@@ -177,7 +176,7 @@ function StatusBadge({
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
       )}
 
-      {statusLabel(status)}
+      {statusLabel(status, t)}
     </span>
   );
 }
@@ -186,7 +185,13 @@ function StatusBadge({
 PROCESSING BADGE
 ============================================================ */
 
-function ProcessingBadge({ status }: { status?: ProcessingStatus }) {
+function ProcessingBadge({
+  status,
+  t,
+}: {
+  status?: ProcessingStatus;
+  t: (key: string) => string;
+}) {
   if (!status) {
     return null;
   }
@@ -213,7 +218,7 @@ function ProcessingBadge({ status }: { status?: ProcessingStatus }) {
         ${classes[status]}
       `}
     >
-      {processingLabel(status)}
+      {processingLabel(status, t)}
     </span>
   );
 }
@@ -265,6 +270,7 @@ MAIN PAGE
 ============================================================ */
 
 export default function RagDocumentationPage() {
+  const { t } = useTranslation();
   const { selectedOrg } = useOrganization();
   const queryClient = useQueryClient();
   const {
@@ -301,7 +307,11 @@ export default function RagDocumentationPage() {
   const handleUploadDocument = async (file?: File) => {
     const selected = file ?? docFileRef.current?.files?.[0];
     if (!selected || !knowledgeBaseId) {
-      setError("Selecciona una base de conocimiento y un archivo.");
+      setError(t("ragDocs.selectKbFile"));
+      return;
+    }
+    if (selected.size > MAX_DOCUMENT_BYTES) {
+      setError(t("documents.fileTooLarge"));
       return;
     }
     setUploadingDoc(true);
@@ -312,32 +322,23 @@ export default function RagDocumentationPage() {
         file: selected,
         title: selected.name,
       });
-      const questions = (result.questions ?? []).map((item, index) => ({
-        id: `${result.id}-${index}`,
-        document_id: result.id,
-        question: item.question,
-        rationale: item.rationale,
-        category: item.category,
-        keywords: item.keywords,
-        reference_answer: item.reference_answer,
-        status: "pending",
-      }));
-      setExtractedQuestions(questions);
+      setExtractedQuestions([]);
       if (result.processing_status === "failed" || result.status === "error") {
-        setError(result.error || result.message || "El documento se guardó con error.");
+        setError(result.error || result.message || t("ragDocs.savedWithError"));
         setMessage(null);
       } else {
         setMessage(
-          questions.length
-            ? `Documento subido. Se enviaron ${questions.length} preguntas de muestra a Validación humana.`
-            : result.message || "Documento subido.",
+          result.message ||
+            (result.chunks
+              ? t("ragDocs.ingested", { chunks: result.chunks })
+              : t("ragDocs.ingestedPartial")),
         );
       }
     } catch (err: any) {
       setError(
         err.response?.data?.detail ||
           err.message ||
-          "No se pudo subir el documento.",
+          t("ragDocs.uploadFailed"),
       );
     } finally {
       await invalidateDocuments(knowledgeBaseId);
@@ -464,13 +465,13 @@ export default function RagDocumentationPage() {
 
   const handleReindex = async (documentId: string) => {
     if (!knowledgeBaseId) {
-      setError("Selecciona una base de conocimiento.");
+      setError(t("ragDocs.selectKb"));
       return;
     }
     const model =
       rowEmbedding[documentId] || embeddingCatalog[0]?.id;
     if (!model) {
-      setError("Selecciona un modelo de embeddings.");
+      setError(t("ragDocs.selectEmbedding"));
       return;
     }
     setReindexingId(documentId);
@@ -485,7 +486,7 @@ export default function RagDocumentationPage() {
       if (!result.chunks) {
         setError(
           stats?.error ||
-            "No se generaron fragmentos. El documento no tiene texto extraíble o el fichero no está en disco.",
+            t("ragDocs.noChunks"),
         );
         setMessage(null);
       } else {
@@ -506,8 +507,14 @@ export default function RagDocumentationPage() {
         );
         setMessage(
           stats
-            ? `${documentId.slice(0, 8)}… reindexado con ${model}: ${stats.indexed} nuevos, ${stats.skipped} ya indexados${stats.failed ? `, ${stats.failed} fallos` : ""}.`
-            : `${result.chunks} chunks reindexados.`,
+            ? t("ragDocs.reindexed", {
+                id: documentId.slice(0, 8),
+                model,
+                indexed: stats.indexed,
+                skipped: stats.skipped,
+                failed: stats.failed ? `, ${stats.failed}` : "",
+              })
+            : t("ragDocs.reindexedChunks", { count: result.chunks }),
         );
       }
       await invalidateDocuments(knowledgeBaseId);
@@ -515,7 +522,7 @@ export default function RagDocumentationPage() {
       setError(
         err.response?.data?.detail ||
           err.message ||
-          "No se pudo reindexar con ese embedding.",
+          t("ragDocs.reindexFailed"),
       );
     } finally {
       setReindexingId(null);
@@ -525,7 +532,7 @@ export default function RagDocumentationPage() {
   const handleDelete = async (document: RagDocument) => {
     if (!knowledgeBaseId) return;
     const confirmed = window.confirm(
-      `¿Borrar «${document.name}» y sus embeddings? Esta acción no se puede deshacer.`,
+      t("ragDocs.deleteConfirm", { name: document.name }),
     );
     if (!confirmed) return;
     setDeletingId(document.id);
@@ -535,13 +542,13 @@ export default function RagDocumentationPage() {
         knowledgeBaseId,
         documentId: document.id,
       });
-      setMessage(`Documento «${document.name}» eliminado.`);
+      setMessage(t("ragDocs.deleted", { name: document.name }));
       await invalidateDocuments(knowledgeBaseId);
     } catch (err: any) {
       setError(
         err.response?.data?.detail ||
           err.message ||
-          "No se pudo borrar el documento.",
+          t("ragDocs.deleteFailed"),
       );
     } finally {
       setDeletingId(null);
@@ -585,11 +592,11 @@ export default function RagDocumentationPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold tracking-tight text-slate-800">
-                RAG
+                {t("ragDocs.title")}
               </h1>
 
               <p className="mt-1 text-xs text-slate-400">
-                Estado de indexación de documentos del RAG
+                {t("ragDocs.subtitle")}
               </p>
             </div>
 
@@ -599,7 +606,7 @@ export default function RagDocumentationPage() {
               disabled={!knowledgeBaseId || loading}
               className="text-xs font-medium text-slate-600 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {loading ? "Actualizando..." : "Actualizar"}
+              {loading ? t("ragDocs.updating") : t("ragDocs.refresh")}
             </button>
           </div>
         </div>
@@ -621,10 +628,10 @@ export default function RagDocumentationPage() {
             {message}{" "}
             {extractedQuestions.length > 0 && (
               <Link
-                to="/dashboard/evaluacion?tab=validacion"
+                to="/dashboard/evaluacion"
                 className="font-bold underline underline-offset-2"
               >
-                Ir a Validación humana
+                {t("ragDocs.goToEval")}
               </Link>
             )}
           </div>
@@ -637,21 +644,19 @@ export default function RagDocumentationPage() {
         <>
             <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-1">
-                <StatCard value={stats.total} label="Total" active />
+                <StatCard value={stats.total} label={t("ragDocs.statTotal")} active />
 
-                <StatCard value={stats.active} label="Activos" />
+                <StatCard value={stats.active} label={t("ragDocs.statActive")} />
 
-                <StatCard value={stats.inactive} label="Inactivos" />
+                <StatCard value={stats.inactive} label={t("ragDocs.statInactive")} />
 
-                <StatCard value={stats.processing} label="Procesando" />
+                <StatCard value={stats.processing} label={t("ragDocs.statProcessing")} />
 
-                <StatCard value={stats.failed} label="Fallidos" />
+                <StatCard value={stats.failed} label={t("ragDocs.statFailed")} />
               </div>
 
               <p className="text-xs text-slate-400">
-                Al subir un documento se extraen preguntas de muestra y se
-                envían a Validación humana. Solo las aprobadas entran en el
-                banco de métricas.
+                {t("evalExtended.ragDocsIndexHintFull")}
               </p>
             </div>
 
@@ -662,7 +667,7 @@ export default function RagDocumentationPage() {
                 className="h-9 max-w-[220px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700"
               >
                 {kbs.length === 0 ? (
-                  <option value="">Sin bases de conocimiento</option>
+                  <option value="">{t("ragDocs.noKb")}</option>
                 ) : (
                   kbs.map((kb) => (
                     <option key={kb.id} value={kb.id}>
@@ -675,7 +680,7 @@ export default function RagDocumentationPage() {
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Buscar documento por título..."
+                  placeholder={t("ragDocs.searchPlaceholder")}
                   className="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs text-slate-700 outline-none placeholder:text-slate-300 focus:border-slate-300"
                 />
               </div>
@@ -683,7 +688,7 @@ export default function RagDocumentationPage() {
                 ref={docFileRef}
                 type="file"
                 className="hidden"
-                accept=".pdf,.txt,.md,.csv,.docx"
+                accept={DOCUMENT_ACCEPT}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void handleUploadDocument(file);
@@ -695,7 +700,7 @@ export default function RagDocumentationPage() {
                 onClick={() => docFileRef.current?.click()}
                 className="h-9 rounded-md bg-[#0038A8] px-3 text-xs font-bold text-white disabled:opacity-50"
               >
-                {uploadingDoc ? "Subiendo…" : "Subir documento"}
+                {uploadingDoc ? t("ragDocs.uploading") : t("ragDocs.upload")}
               </button>
             </div>
 
@@ -704,35 +709,35 @@ export default function RagDocumentationPage() {
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/50">
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Documento
+                      {t("ragDocs.colDocument")}
                     </th>
 
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Embedding
+                      {t("ragDocs.colEmbedding")}
                     </th>
 
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Generación
+                      {t("ragDocs.colGeneration")}
                     </th>
 
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Estado
+                      {t("ragDocs.colStatus")}
                     </th>
 
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Chunks
+                      {t("ragDocs.colChunks")}
                     </th>
 
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Intentos
+                      {t("ragDocs.colAttempts")}
                     </th>
 
                     <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Actualización
+                      {t("ragDocs.colUpdated")}
                     </th>
 
                     <th className="px-4 py-3 text-right text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                      Acción
+                      {t("ragDocs.colAction")}
                     </th>
                   </tr>
                 </thead>
@@ -744,18 +749,18 @@ export default function RagDocumentationPage() {
                         colSpan={8}
                         className="px-4 py-14 text-center text-xs text-slate-400"
                       >
-                        Cargando documentos...
+                        {t("ragDocs.loading")}
                       </td>
                     </tr>
                   ) : filteredDocuments.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-4 py-14 text-center">
                         <p className="text-sm font-medium text-slate-600">
-                          No hay documentos
+                          {t("ragDocs.emptyTitle")}
                         </p>
 
                         <p className="mt-1 text-xs text-slate-400">
-                          No hay metadatos documentales históricos en esta base.
+                          {t("ragDocs.emptyBody")}
                         </p>
                       </td>
                     </tr>
@@ -778,7 +783,7 @@ export default function RagDocumentationPage() {
                             <p className="mt-1 text-[10px] text-slate-400">
                               {document.content_type ??
                                 document.mime_type ??
-                                "documento"}
+                                t("evalExtended.ragDocsDefaultDocType")}
 
                               {document.size
                                 ? ` · ${formatBytes(document.size)}`
@@ -789,6 +794,7 @@ export default function RagDocumentationPage() {
                                 <div className="mt-1.5">
                                   <ProcessingBadge
                                     status={document.processing_status}
+                                    t={t}
                                   />
                                 </div>
                               )}
@@ -818,6 +824,7 @@ export default function RagDocumentationPage() {
                           <StatusBadge
                             status={document.status}
                             processingStatus={document.processing_status}
+                            t={t}
                           />
                         </td>
 
@@ -848,7 +855,7 @@ export default function RagDocumentationPage() {
                                 rowEmbedding[document.id] ||
                                 document.embedding_model ||
                                 embeddingCatalog[0]?.id ||
-                                "qwen3-embedding:latest"
+                                "nomic-embed-text"
                               }
                               onChange={(event) =>
                                 setRowEmbedding((current) => ({
@@ -860,7 +867,7 @@ export default function RagDocumentationPage() {
                             >
                               {(embeddingCatalog.length
                                 ? embeddingCatalog
-                                : [{ id: "qwen3-embedding:latest", label: "Qwen3" }]
+                                : [{ id: "nomic-embed-text", label: "Nomic" }]
                               ).map((item) => (
                                 <option key={item.id} value={item.id}>
                                   {item.label}
@@ -878,7 +885,7 @@ export default function RagDocumentationPage() {
                               onClick={() => void handleReindex(document.id)}
                               className="h-8 rounded-md bg-slate-900 px-2 text-[10px] font-bold text-white disabled:opacity-50"
                             >
-                              {reindexingId === document.id ? "Reindexando…" : "Reindexar"}
+                              {reindexingId === document.id ? t("ragDocs.reindexing") : t("ragDocs.reindex")}
                             </button>
                             <button
                               type="button"
@@ -886,7 +893,7 @@ export default function RagDocumentationPage() {
                               onClick={() => void handleDelete(document)}
                               className="h-8 rounded-md border border-red-200 px-2 text-[10px] font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
                             >
-                              {deletingId === document.id ? "Borrando…" : "Borrar"}
+                              {deletingId === document.id ? t("ragDocs.deleting") : t("ragDocs.delete")}
                             </button>
                           </div>
                         </td>
@@ -900,17 +907,15 @@ export default function RagDocumentationPage() {
             {extractedQuestions.length > 0 && (
               <div className="mt-5 rounded-xl border border-emerald-100 bg-white p-5 shadow-sm">
                 <h3 className="text-sm font-bold text-slate-800">
-                  Preguntas de muestra extraídas ({extractedQuestions.length})
+                  {t("ragDocs.extractedTitle", { count: extractedQuestions.length })}
                 </h3>
                 <p className="mt-1 text-xs text-slate-500">
-                  Van a Evaluación RAG → Validación humana. Un experto las
-                  aprueba, rechaza o corrige; solo entonces entran en el banco
-                  de métricas.{" "}
+                  {t("ragDocs.extractedIntroRetrieval")}{" "}
                   <Link
-                    to="/dashboard/evaluacion?tab=validacion"
+                    to="/dashboard/evaluacion"
                     className="font-semibold text-emerald-700 underline underline-offset-2"
                   >
-                    Abrir cola HITL
+                    {t("ragDocs.openEval")}
                   </Link>
                 </p>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -920,7 +925,7 @@ export default function RagDocumentationPage() {
                       className="rounded-lg border border-slate-100 bg-slate-50/80 p-3"
                     >
                       <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-                        {categoryLabel(category)} · {items.length}
+                        {categoryLabel(t,category)} · {items.length}
                       </p>
                       <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">
                         {items.map((item) => (

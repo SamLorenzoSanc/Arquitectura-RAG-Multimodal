@@ -8,7 +8,6 @@ import {
   MoreVertical,
   Pencil,
   PlayCircle,
-  Plus,
   ScrollText,
   Search,
   Sparkles,
@@ -20,6 +19,7 @@ import {
 
 import DatasetWizard from "@/components/datasets/DatasetWizard";
 import DatasetWorkspace from "@/components/datasets/DatasetWorkspace";
+import { useTranslation } from "@/i18n/I18nProvider";
 import { useOrganization } from "@/context/OrganizationContext";
 import { queryKeys } from "@/lib/queryKeys";
 import DatasetService from "@/services/dataset.service";
@@ -29,11 +29,11 @@ import type { KnowledgeBaseSummary } from "@/services/knowledge.service";
 import type { Department } from "@/services/department.service";
 import type { DatasetSource, RagDataset } from "@/types/dataset";
 
-const SOURCE_LABEL: Record<DatasetSource, string> = {
-  file: "Documento",
-  logs: "Logs",
-  synthetic: "Sintético",
-  demo: "Demo",
+const SOURCE_LABEL_KEYS: Record<DatasetSource, string> = {
+  file: "datasets.sourceFile",
+  logs: "datasets.sourceLogs",
+  synthetic: "datasets.sourceSynthetic",
+  demo: "datasets.sourceDemo",
 };
 
 const STATUS_STYLE = {
@@ -44,61 +44,63 @@ const STATUS_STYLE = {
   failed: "bg-red-50 text-red-700",
 };
 
-function formatDate(value?: string) {
-  if (!value) return "Sin fecha";
-  return new Intl.DateTimeFormat("es-ES", {
+function formatDate(value: string | undefined, locale: string, noDate: string) {
+  if (!value) return noDate;
+  return new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "short",
     year: "numeric",
   }).format(new Date(value));
 }
 
-function errorMessage(error: unknown) {
+function errorMessage(error: unknown, fallback: string) {
   const candidate = error as {
     response?: { data?: { detail?: string } };
     message?: string;
   };
-  return candidate.response?.data?.detail || candidate.message || "Error inesperado.";
+  return candidate.response?.data?.detail || candidate.message || fallback;
 }
 
-const ACTIONS: Array<{
+const ACTION_KEYS: Array<{
   source: DatasetSource;
-  title: string;
-  description: string;
+  titleKey: string;
+  descKey: string;
   icon: typeof UploadCloud;
   tone: string;
 }> = [
   {
     source: "file",
-    title: "Subir documento",
-    description: "JSON, CSV, Excel, PDF, DOCX, PowerPoint o vídeo para el RAG del departamento.",
+    titleKey: "datasets.sourceFileTitle",
+    descKey: "datasets.sourceFileDesc",
     icon: FileText,
     tone: "bg-blue-50 text-blue-700",
   },
   {
     source: "logs",
-    title: "Importar logs",
-    description: "Carga un conjunto filtrado de inferencias registradas.",
+    titleKey: "datasets.sourceLogsTitle",
+    descKey: "datasets.sourceLogsDescShort",
     icon: ScrollText,
     tone: "bg-slate-100 text-slate-700",
   },
   {
     source: "synthetic",
-    title: "Datos sintéticos",
-    description: "Genera ejemplos a partir de tu contexto o documentos.",
+    titleKey: "datasets.sourceSyntheticTitle",
+    descKey: "datasets.sourceSyntheticDescShort",
     icon: Sparkles,
     tone: "bg-purple-50 text-purple-700",
   },
   {
     source: "demo",
-    title: "Datasets demo",
-    description: "Empieza con un conjunto agrícola de ejemplo (POSEI, riego…).",
+    titleKey: "datasets.sourceDemoTitle",
+    descKey: "datasets.sourceDemoDesc",
     icon: PlayCircle,
     tone: "bg-amber-50 text-amber-700",
   },
 ];
 
 export default function DatasetsPage() {
+  const { t, language } = useTranslation();
+  const dateLocale = language === "en" ? "en-US" : "es-ES";
   const { selectedOrg } = useOrganization();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -185,49 +187,39 @@ export default function DatasetsPage() {
       [
         dataset.name,
         dataset.knowledge_base_name,
-        SOURCE_LABEL[dataset.source],
+        t(SOURCE_LABEL_KEYS[dataset.source]),
         ...(dataset.departments?.map((department) => department.name) ?? []),
       ].some((value) => value?.toLowerCase().includes(query)),
     );
-  }, [datasetsQuery.data, search]);
+  }, [datasetsQuery.data, search, t]);
 
   const departments = departmentsQuery.data ?? [];
 
   return (
     <div className="min-h-full bg-[#f8fafc]">
+      {!openDatasetId && (
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-[1500px] px-6 py-7">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-[#0038A8]">
                 <Layers3 size={15} />
-                Proyectos › Datasets
+                {t("datasets.breadcrumb")}
               </div>
               <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
-                Datasets
+                {t("datasets.title")}
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
-                Gestión de datasets al estilo Catalyst: schema mapping, filas,
-                evaluación y ampliación del conjunto ya ingestado.
-              </p>
+              <p className="mt-1 text-sm text-slate-500">{t("datasets.intro")}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setWizardSource("file")}
-              disabled={!organizationId}
-              className="flex items-center gap-2 rounded-lg bg-[#0038A8] px-4 py-2.5 text-sm font-bold text-white shadow-sm disabled:opacity-50"
-            >
-              <Plus size={17} />
-              Nuevo dataset
-            </button>
           </div>
         </div>
       </header>
+      )}
 
       <main className="mx-auto max-w-[1500px] space-y-8 px-6 py-7">
         {!organizationId && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-            Selecciona una organización para gestionar datasets.
+            {t("datasets.noOrg")}
           </div>
         )}
 
@@ -242,7 +234,7 @@ export default function DatasetsPage() {
         ) : (
           <>
         <section>
-          <h2 className="text-sm font-bold text-slate-800">Departamento</h2>
+          <h2 className="text-sm font-bold text-slate-800">{t("datasets.department")}</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -253,7 +245,7 @@ export default function DatasetsPage() {
                   : "border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
-              Todos
+              {t("datasets.allDepts")}
             </button>
             {departments.map((department) => (
               <button
@@ -270,17 +262,15 @@ export default function DatasetsPage() {
               </button>
             ))}
             {departments.length === 0 && organizationId && (
-              <span className="text-xs text-slate-400">
-                Crea departamentos en Organización para aislar los datasets.
-              </span>
+              <span className="text-xs text-slate-400">{t("datasets.noDeptsHint")}</span>
             )}
           </div>
         </section>
 
         <section>
-          <h2 className="text-sm font-bold text-slate-800">Añadir datos</h2>
+          <h2 className="text-sm font-bold text-slate-800">{t("datasets.addData")}</h2>
           <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {ACTIONS.map((action) => {
+            {ACTION_KEYS.map((action) => {
               const Icon = action.icon;
               return (
                 <button
@@ -297,10 +287,10 @@ export default function DatasetsPage() {
                   </span>
                   <span>
                     <span className="block text-sm font-bold text-slate-900">
-                      {action.title}
+                      {t(action.titleKey)}
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">
-                      {action.description}
+                      {t(action.descKey)}
                     </span>
                   </span>
                 </button>
@@ -312,10 +302,11 @@ export default function DatasetsPage() {
         <section>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-bold text-slate-800">Catálogo</h2>
+              <h2 className="text-sm font-bold text-slate-800">{t("datasets.catalog")}</h2>
               <p className="mt-1 text-xs text-slate-500">
-                {datasetsQuery.data?.length ?? 0} datasets
-                {departmentId ? " en este departamento" : " en esta organización"}
+                {departmentId
+                  ? t("datasets.countDept", { count: datasetsQuery.data?.length ?? 0 })
+                  : t("datasets.countOrg", { count: datasetsQuery.data?.length ?? 0 })}
               </p>
             </div>
             <label className="relative block w-full sm:w-72">
@@ -326,7 +317,7 @@ export default function DatasetsPage() {
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Buscar dataset"
+                placeholder={t("datasets.searchPlaceholder")}
                 className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-xs outline-none focus:border-blue-400"
               />
             </label>
@@ -334,7 +325,7 @@ export default function DatasetsPage() {
 
           {datasetsQuery.isError && (
             <div className="mt-4 rounded-xl border border-red-100 bg-red-50 p-4 text-sm text-red-700">
-              {errorMessage(datasetsQuery.error)}
+              {errorMessage(datasetsQuery.error, t("datasets.unexpectedError"))}
             </div>
           )}
 
@@ -365,11 +356,9 @@ export default function DatasetsPage() {
             <div className="mt-4 flex flex-col items-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
               <FileSpreadsheet size={30} className="text-slate-300" />
               <p className="mt-3 text-sm font-bold text-slate-700">
-                {search ? "No hay coincidencias" : "Aún no hay datasets"}
+                {search ? t("datasets.noMatch") : t("datasets.none")}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Empieza subiendo un documento, importando logs o eligiendo un demo.
-              </p>
+              <p className="mt-1 text-xs text-slate-500">{t("datasets.emptyHint")}</p>
             </div>
           )}
         </section>
@@ -442,6 +431,8 @@ function DatasetCard({
   onOpen: () => void;
   onChanged: () => void;
 }) {
+  const { t, language } = useTranslation();
+  const dateLocale = language === "en" ? "en-US" : "es-ES";
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -477,7 +468,7 @@ function DatasetCard({
       setConfirmDelete(false);
       onChanged();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, t("datasets.unexpectedError")));
     } finally {
       setBusy(false);
     }
@@ -500,7 +491,7 @@ function DatasetCard({
           <div ref={menuRef} className="relative">
             <button
               type="button"
-              aria-label="Acciones del dataset"
+              aria-label={t("datasets.actionsAria")}
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((open) => !open)}
@@ -523,7 +514,7 @@ function DatasetCard({
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
                   <Pencil size={14} />
-                  Actualizar campos
+                  {t("datasets.updateFields")}
                 </button>
                 <button
                   type="button"
@@ -535,7 +526,7 @@ function DatasetCard({
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50"
                 >
                   <Trash2 size={14} />
-                  Eliminar dataset
+                  {t("datasets.deleteDataset")}
                 </button>
               </div>
             )}
@@ -567,14 +558,14 @@ function DatasetCard({
             </span>
           ))
         ) : (
-          <span className="text-xs text-slate-400">Sin departamento</span>
+          <span className="text-xs text-slate-400">{t("datasets.noDepartment")}</span>
         )}
       </div>
       <div className="mt-3 space-y-2 text-xs text-slate-500">
         <p className="flex items-center gap-2">
           <Layers3 size={14} className="text-blue-600" />
           <span className="font-semibold text-slate-700">
-            {dataset.knowledge_base_name || dataset.knowledge_base_id || "Sin KB"}
+            {dataset.knowledge_base_name || dataset.knowledge_base_id || t("datasets.noKb")}
           </span>
         </p>
         <p className="flex items-start gap-2">
@@ -582,15 +573,21 @@ function DatasetCard({
           <span>
             {departmentNames.length > 0
               ? departmentNames.join(", ")
-              : "Toda la organización"}
+              : t("datasets.wholeOrg")}
           </span>
         </p>
       </div>
       <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-[11px] text-slate-400">
-        <span>{SOURCE_LABEL[dataset.source] ?? dataset.source}</span>
+        <span>{t(SOURCE_LABEL_KEYS[dataset.source]) ?? dataset.source}</span>
         <span>
-          {dataset.row_count?.toLocaleString("es-ES") ?? 0} filas ·{" "}
-          {formatDate(dataset.updated_at ?? dataset.created_at)}
+          {t("datasets.rows", {
+            count: Number(dataset.row_count ?? 0),
+            date: formatDate(
+              dataset.updated_at ?? dataset.created_at,
+              dateLocale,
+              t("datasets.noDate"),
+            ),
+          })}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2">
@@ -600,7 +597,7 @@ function DatasetCard({
           className="flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
         >
           <Layers3 size={14} />
-          Abrir
+          {t("datasets.open")}
         </button>
         <button
           type="button"
@@ -609,7 +606,7 @@ function DatasetCard({
           }
           className="flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100"
         >
-          Evaluar
+          {t("datasets.evaluate")}
         </button>
       </div>
 
@@ -639,11 +636,10 @@ function DatasetCard({
               id={`delete-dataset-${dataset.id}`}
               className="font-bold text-slate-900"
             >
-              Eliminar dataset
+              {t("datasets.deleteTitle")}
             </h3>
             <p className="mt-2 text-sm text-slate-600">
-              Se borrará «{dataset.name}» y todas las filas ingestadas. Esta acción
-              no se puede deshacer.
+              {t("datasets.deleteBody", { name: dataset.name })}
             </p>
             {error && (
               <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -657,7 +653,7 @@ function DatasetCard({
                 onClick={() => setConfirmDelete(false)}
                 className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
               >
-                Cancelar
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -665,7 +661,7 @@ function DatasetCard({
                 onClick={() => void removeDataset()}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
               >
-                {busy ? "Eliminando…" : "Eliminar"}
+                {busy ? t("datasets.deleting") : t("datasets.delete")}
               </button>
             </div>
           </div>
@@ -690,6 +686,7 @@ function DatasetEditDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(dataset.name);
   const [description, setDescription] = useState(dataset.description ?? "");
   const [knowledgeBaseId, setKnowledgeBaseId] = useState(
@@ -705,7 +702,7 @@ function DatasetEditDialog({
 
   const save = async () => {
     if (!name.trim()) {
-      setError("Indica un nombre.");
+      setError(t("datasets.nameRequired"));
       return;
     }
     setBusy(true);
@@ -719,7 +716,7 @@ function DatasetEditDialog({
       });
       onSaved();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, t("datasets.unexpectedError")));
     } finally {
       setBusy(false);
     }
@@ -738,13 +735,13 @@ function DatasetEditDialog({
             id={`edit-dataset-${dataset.id}`}
             className="font-bold text-slate-900"
           >
-            Actualizar campos
+            {t("datasets.editTitle")}
           </h3>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
-            aria-label="Cerrar"
+            aria-label={t("datasets.closeAria")}
           >
             <X size={18} />
           </button>
@@ -756,7 +753,7 @@ function DatasetEditDialog({
             </p>
           )}
           <label className="block text-sm font-semibold text-slate-700">
-            Nombre
+            {t("datasets.name")}
             <input
               value={name}
               onChange={(event) => setName(event.target.value)}
@@ -764,7 +761,7 @@ function DatasetEditDialog({
             />
           </label>
           <label className="block text-sm font-semibold text-slate-700">
-            Descripción
+            {t("datasets.description")}
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
@@ -773,13 +770,13 @@ function DatasetEditDialog({
             />
           </label>
           <label className="block text-sm font-semibold text-slate-700">
-            Base de conocimiento
+            {t("datasets.kb")}
             <select
               value={knowledgeBaseId}
               onChange={(event) => setKnowledgeBaseId(event.target.value)}
               className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 font-normal outline-none focus:border-blue-400"
             >
-              <option value="">Sin KB</option>
+              <option value="">{t("datasets.noKb")}</option>
               {knowledgeBases.map((kb) => (
                 <option key={kb.id} value={kb.id}>
                   {kb.name}
@@ -789,7 +786,7 @@ function DatasetEditDialog({
           </label>
           <fieldset>
             <legend className="text-sm font-semibold text-slate-700">
-              Departamentos
+              {t("datasets.departments")}
             </legend>
             <div className="mt-2 flex flex-wrap gap-2">
               {departments.map((department) => {
@@ -816,7 +813,7 @@ function DatasetEditDialog({
                 );
               })}
               {departments.length === 0 && (
-                <span className="text-xs text-slate-400">No hay departamentos.</span>
+                <span className="text-xs text-slate-400">{t("datasets.noDepartments")}</span>
               )}
             </div>
           </fieldset>
@@ -828,7 +825,7 @@ function DatasetEditDialog({
             onClick={onClose}
             className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-white"
           >
-            Cancelar
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -836,7 +833,7 @@ function DatasetEditDialog({
             onClick={() => void save()}
             className="rounded-lg bg-[#0038A8] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
           >
-            {busy ? "Guardando…" : "Guardar cambios"}
+            {busy ? t("common.saving") : t("datasets.saveChanges")}
           </button>
         </footer>
       </div>
@@ -855,6 +852,7 @@ function WorkspaceDeleteDialog({
   onClose: () => void;
   onDeleted: () => void;
 }) {
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -865,7 +863,7 @@ function WorkspaceDeleteDialog({
       await DatasetService.remove(dataset.id, organizationId);
       onDeleted();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, t("datasets.unexpectedError")));
     } finally {
       setBusy(false);
     }
@@ -874,9 +872,9 @@ function WorkspaceDeleteDialog({
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
       <div role="dialog" aria-modal="true" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <h3 className="font-bold text-slate-900">Eliminar dataset</h3>
+        <h3 className="font-bold text-slate-900">{t("datasets.deleteTitle")}</h3>
         <p className="mt-2 text-sm text-slate-600">
-          Se borrará «{dataset.name}» y todas las filas ingestadas.
+          {t("datasets.deleteBody", { name: dataset.name })}
         </p>
         {error && (
           <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>
@@ -888,7 +886,7 @@ function WorkspaceDeleteDialog({
             onClick={onClose}
             className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           >
-            Cancelar
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -896,7 +894,7 @@ function WorkspaceDeleteDialog({
             onClick={() => void remove()}
             className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
           >
-            {busy ? "Eliminando…" : "Eliminar"}
+            {busy ? t("datasets.deleting") : t("datasets.delete")}
           </button>
         </div>
       </div>

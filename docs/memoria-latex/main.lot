@@ -1,14 +1,21 @@
 \babel@toc {spanish}{}\relax 
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Correspondencia entre objetivos específicos (épicas) y las siete tareas del MVP.}}{12}{table.2.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Comparación de arquitecturas y enfoques NLP relevantes para este trabajo.}}{14}{table.3.1}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Justificación de \texttt {qwen3-embedding:latest} frente a Sentence Transformers, BGE y E5, y efecto esperado sobre la recuperación semántica.}}{25}{table.3.2}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Configuración exacta verificable del prototipo AgroPS (valores del repositorio; digests de modelos pendientes de congelar en el acta de evaluación).}}{38}{table.4.1}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Siete categorías del dataset versionado, conteo y ejemplo representativo.}}{39}{table.4.2}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5.1}{\ignorespaces Correspondencia entre anillos del hexágono y paquetes del backend.}}{42}{table.5.1}%
+\contentsline {table}{\numberline {5.2}{\ignorespaces Entidades y objetos valor del dominio RAG.}}{44}{table.5.2}%
+\contentsline {table}{\numberline {5.3}{\ignorespaces Entidades de persistencia del back-end (SQLAlchemy) y sus relaciones principales.}}{44}{table.5.3}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Configuración exacta verificable del prototipo AgroPS (valores del repositorio; digests de modelos pendientes de congelar en el acta de evaluación).}}{26}{table.4.1}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Siete categorías del dataset versionado, conteo y ejemplo representativo.}}{26}{table.4.2}%
-\addvspace {10\p@ }
-\addvspace {10\p@ }
-\addvspace {10\p@ }
-\contentsline {table}{\numberline {7.1}{\ignorespaces Plantilla de comparación principal (pendiente de artefacto reproducible).}}{37}{table.7.1}%
-\contentsline {table}{\numberline {7.2}{\ignorespaces Resultados por las siete categorías (pendientes de ejecución versionada).}}{37}{table.7.2}%
+\contentsline {table}{\numberline {7.1}{\ignorespaces Desempeño del recuperador por categoría de consulta.}}{54}{table.7.1}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Comparación principal: LLM autónomo frente a AgroRAG ($N=21$).}}{55}{table.7.2}%
+\contentsline {table}{\numberline {7.3}{\ignorespaces Resultados por las siete categorías del banco versionado.}}{56}{table.7.3}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }

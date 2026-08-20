@@ -1,0 +1,66 @@
+{
+  "run_id": "run_20260819T165515Z",
+  "n_total": 35,
+  "n_ok": 35,
+  "elapsed_s": 289.6,
+  "global": {
+    "mrr": 0.8107514285714286,
+    "ndcg": 1.0393285714285714,
+    "coverage": 0.9642857142857143,
+    "rag_accuracy": 4.457142857142857,
+    "vanilla_accuracy": 3.3142857142857145,
+    "rag_hallucination_rate": 0.08571428571428572,
+    "vanilla_hallucination_rate": 0.3142857142857143
+  },
+  "by_category": {
+    "direct_fact": {
+      "n": 5,
+      "mrr": 0.72858,
+      "rag_accuracy": 4.4,
+      "vanilla_accuracy": 3.2,
+      "rag_hallucination_rate": 0.2
+    },
+    "regulatory_compliance": {
+      "n": 5,
+      "mrr": 0.74666,
+      "rag_accuracy": 5.0,
+      "vanilla_accuracy": 4.0,
+      "rag_hallucination_rate": 0.0
+    },
+    "regulatory_fact": {
+      "n": 5,
+      "mrr": 0.83334,
+      "rag_accuracy": 4.0,
+      "vanilla_accuracy": 3.8,
+      "rag_hallucination_rate": 0.0
+    },
+    "relationship": {
+      "n": 5,
+      "mrr": 0.93334,
+      "rag_accuracy": 4.2,
+      "vanilla_accuracy": 3.2,
+      "rag_hallucination_rate": 0.0
+    },
+    "spanning": {
+      "n": 5,
+      "mrr": 0.86668,
+      "rag_accuracy": 5.0,
+      "vanilla_accuracy": 3.4,
+      "rag_hallucination_rate": 0.0
+    },
+    "temporal": {
+      "n": 5,
+      "mrr": 0.9,
+      "rag_accuracy": 4.0,
+      "vanilla_accuracy": 2.4,
+      "rag_hallucination_rate": 0.2
+    },
+    "traceability": {
+      "n": 5,
+      "mrr": 0.66666,
+      "rag_accuracy": 4.6,
+      "vanilla_accuracy": 3.2,
+      "rag_hallucination_rate": 0.2
+    }
+  }
+}

@@ -101,6 +101,9 @@ def test_document_preview_exposes_chunks(monkeypatch):
         "metadata": "metadata",
     }
     assert info["chunks"][0]["chunk_index"] == 0
+    assert info["chunks"][0]["title"] == "manual.pdf"
+    assert info["chunks"][0]["filename"] == "manual.pdf"
+    assert "filename" in info["chunks"][0]["metadata"]
 
 
 def test_invalid_json_is_422():

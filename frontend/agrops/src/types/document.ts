@@ -1,3 +1,15 @@
+export interface IngestProgress {
+    document_id?: string;
+    stage?: string;
+    percent?: number;
+    status?: string;
+    message?: string;
+    chunks?: number;
+    embedded?: number;
+    total?: number;
+    error?: string | null;
+}
+
 export interface DocumentItem {
     id: string;
     filename: string;
@@ -18,4 +30,29 @@ export interface DocumentItem {
     chunks?: number;
     attempts?: number;
     error?: string | null;
+    progress?: IngestProgress | null;
+    knowledge_base_id?: string;
+    knowledge_base_name?: string;
+}
+
+export interface DocumentChunk {
+    id: string;
+    position: number;
+    headline: string;
+    summary: string;
+    content: string;
+    char_count: number;
+    overlap_prev: number;
+    embedding_models: string[];
+}
+
+export interface DocumentChunksResponse {
+    id: string;
+    filename: string;
+    title: string;
+    mime_type?: string;
+    size?: number;
+    knowledge_base_id: string;
+    chunk_count: number;
+    chunks: DocumentChunk[];
 }

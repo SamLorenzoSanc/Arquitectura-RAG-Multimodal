@@ -1,14 +1,17 @@
 "use client";
 
-import { LogOut, Menu, ChevronRight } from "lucide-react";
+import { Bell, ChevronRight, LogOut, Menu } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
+import { UserAvatar } from "@/components/UserAvatar";
 import { useAuth } from "@/context/AuthContext";
 import { useShell } from "@/context/ShellContext";
-import { useState } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { UserAvatar } from "@/components/UserAvatar";
-import { ROUTE_LABELS, settingsTabLabel } from "@/lib/nav";
+import { useTranslation } from "@/i18n/I18nProvider";
+import { routeLabel, settingsTabLabel } from "@/lib/nav";
 
 export default function Header() {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const { toggleSidebar } = useShell();
   const navigate = useNavigate();
@@ -16,22 +19,29 @@ export default function Header() {
   const [searchParams] = useSearchParams();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const crumbs = (() => {
+  const crumbs = useMemo(() => {
     const items: Array<{ label: string; to?: string }> = [
-      { label: "Panel", to: "/dashboard/datasets" },
+      { label: t("nav.dashboard"), to: "/dashboard" },
     ];
-    const current = ROUTE_LABELS[pathname] || "Sección";
+    if (pathname === "/dashboard") {
+      return items;
+    }
+    const current = routeLabel(pathname, t);
     if (pathname === "/dashboard/settings") {
-      items.push({ label: "Ajustes", to: "/dashboard/settings" });
-      const tab = settingsTabLabel(searchParams.get("tab") || "profile");
+      items.push({ label: t("common.settings"), to: "/dashboard/settings" });
+      const tab = settingsTabLabel(searchParams.get("tab") || "profile", t);
       if (tab) items.push({ label: tab });
-    } else if (pathname !== "/dashboard" && pathname !== "/dashboard/datasets") {
+    } else if (
+      pathname === "/dashboard/evaluacion" ||
+      pathname === "/dashboard/validacion"
+    ) {
+      items.push({ label: t("nav.guardrails"), to: "/dashboard/evaluacion" });
       items.push({ label: current });
     } else {
       items.push({ label: current });
     }
     return items;
-  })();
+  }, [pathname, searchParams, t]);
 
   const handleLogout = () => {
     logout();
@@ -39,17 +49,17 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-11 items-center justify-between gap-3 border-b border-[color:var(--agro-border)] bg-white/95 px-3 backdrop-blur-md sm:h-12 sm:px-5 lg:px-6">
+    <header className="sticky top-0 z-40 flex h-12 items-center justify-between gap-3 border-b border-[color:var(--agro-border)] bg-white px-3 sm:px-5 lg:px-6">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <button
           type="button"
           onClick={toggleSidebar}
           className="rounded-lg border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 lg:hidden"
-          aria-label="Abrir menú"
+          aria-label={t("common.openMenu")}
         >
           <Menu size={16} />
         </button>
-        <nav aria-label="Ruta de navegación" className="flex min-w-0 items-center gap-1 text-xs">
+        <nav aria-label={t("common.breadcrumb")} className="flex min-w-0 items-center gap-1 text-xs">
           {crumbs.map((crumb, index) => {
             const last = index === crumbs.length - 1;
             return (
@@ -80,23 +90,30 @@ export default function Header() {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
+        <button
+          type="button"
+          className="rounded-full p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-700"
+          aria-label={t("common.notifications")}
+        >
+          <Bell size={16} />
+        </button>
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowUserMenu((v) => !v)}
             className={`flex h-8 w-8 items-center justify-center overflow-hidden rounded-full ${
-              showUserMenu ? "ring-2 ring-blue-200" : "hover:opacity-90"
+              showUserMenu ? "ring-2 ring-[color:var(--agro-accent)]" : "hover:opacity-90"
             }`}
-            aria-label="Cuenta"
+            aria-label={t("common.account")}
           >
             <UserAvatar src={user?.avatarUrl} name={user?.name} size={32} />
           </button>
 
           {showUserMenu && (
-            <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-xl">
+            <div className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-[color:var(--agro-border)] bg-white shadow-xl">
               <div className="border-b border-slate-100 bg-slate-50/50 p-3 text-left">
                 <p className="truncate text-sm font-bold text-slate-800">
-                  {user?.name || "Usuario"}
+                  {user?.name || t("common.user")}
                 </p>
                 {user?.jobTitle && (
                   <p className="truncate text-[11px] text-slate-500">{user.jobTitle}</p>
@@ -109,16 +126,16 @@ export default function Header() {
                 <Link
                   to="/dashboard/settings?tab=profile"
                   onClick={() => setShowUserMenu(false)}
-                  className="block rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  className="block rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  Ajustes
+                  {t("common.settings")}
                 </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="group flex w-full items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--agro-danger)] hover:bg-red-50"
+                  className="group flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-[color:var(--agro-danger)] hover:bg-red-50"
                 >
-                  <span>Cerrar sesión</span>
+                  <span>{t("common.logout")}</span>
                   <LogOut size={16} />
                 </button>
               </div>

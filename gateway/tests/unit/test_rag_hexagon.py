@@ -51,9 +51,11 @@ class FakeLexical:
     def __init__(self):
         self.invalidated: list[str | None] = []
         self.rebuilt: list[str] = []
+        self.calls: list[str] = []
 
     async def retrieve(self, question, tenant_id, collections, *, k):
-        return []
+        self.calls.append(question)
+        return [_chunk("lexical", question, "bm25")]
 
     async def rebuild(self, tenant_id: str) -> None:
         self.rebuilt.append(tenant_id)
@@ -68,8 +70,8 @@ class FakeLlm:
         self.complete_calls = []
         self.parse_calls = []
 
-    async def complete(self, model, messages):
-        self.complete_calls.append((model, messages))
+    async def complete(self, model, messages, temperature=None):
+        self.complete_calls.append((model, messages, temperature))
         return self.answer
 
     async def parse(self, model, messages, response_format):
@@ -138,6 +140,40 @@ async def test_hybrid_retrieve_and_answer_use_fake_ports_without_io():
     assert result["answer"] == "Diagnóstico: riego."
     assert llm.complete_calls
     assert result["chunks"][0].page_content == "riego-kb-a"
+
+
+@pytest.mark.asyncio
+async def test_retrieval_strategies_isolate_dense_and_bm25():
+    chunks = FakeChunks()
+    lexical = FakeLexical()
+    retrieve = HybridRetrieve(
+        chunks, lexical, FakeLlm(), IdentityReranker(), final_k=5
+    )
+
+    dense = await retrieve.execute(
+        RetrievalQuery(
+            question="Orden APA/102/2024",
+            tenant_id="t1",
+            retrieval_strategy="dense",
+            evaluation_mode=True,
+        )
+    )
+    assert dense.retrieval["strategy"] == "dense"
+    assert chunks.calls
+    assert lexical.calls == []
+
+    chunks.calls.clear()
+    lexical_result = await retrieve.execute(
+        RetrievalQuery(
+            question="Orden APA/102/2024",
+            tenant_id="t1",
+            retrieval_strategy="bm25",
+            evaluation_mode=True,
+        )
+    )
+    assert lexical_result.retrieval["strategy"] == "bm25"
+    assert lexical.calls == ["Orden APA/102/2024"]
+    assert chunks.calls == []
 
 
 @pytest.mark.asyncio
@@ -212,6 +248,7 @@ async def test_judge_receives_reference_context_and_overrides_deterministic_scor
         "Según [posei.pdf], 1.200 €.",
         [Result(page_content="La ayuda es 1.200 €.", metadata={"source": "posei.pdf"})],
         reference_answer="La ayuda es 1.200 €.",
+        keywords=["1.200"],
     )
     assert "Respuesta de referencia" in captured["prompt"]
     assert "Contexto recuperado" in captured["prompt"]

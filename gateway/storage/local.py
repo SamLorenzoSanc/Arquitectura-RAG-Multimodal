@@ -18,7 +18,8 @@ DEFAULT_ROOT = Path(
 
 class LocalFileStorage(FileStorage):
     def __init__(self, root: str | Path | None = None):
-        self.root = Path(root) if root else DEFAULT_ROOT
+        configured = os.getenv("DOCUMENT_STORAGE_ROOT")
+        self.root = Path(root) if root else Path(configured) if configured else DEFAULT_ROOT
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _target_dir(self, tenant_id, knowledge_base_id) -> Path:

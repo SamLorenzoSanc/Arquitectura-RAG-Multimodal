@@ -1,0 +1,236 @@
+PARCHE DE TEXTO PARA TFM_Samuel_Lorenzo_Sanchez.docx
+=====================================================
+Copia cada bloque "PONER ESTO" encima del párrafo que empieza como "BUSCAR".
+No toques encabezados de capítulo. Actualiza el índice (Referencias > Actualizar tabla) al final.
+
+
+1) PORTADA — título (aparece dos veces)
+---------------------------------------
+BUSCAR:
+Impacto de las Alucinaciones de los LLMs
+
+PONER ESTO:
+Impacto de la Arquitectura RAG en las Alucinaciones de los LLMs
+
+
+2) RESUMEN (español)
+--------------------
+BUSCAR el párrafo que empieza:
+"El presente Trabajo de Fin de Máster evalúa cuantitativamente..."
+
+PONER ESTO:
+El presente Trabajo de Fin de Máster evalúa la capacidad de la arquitectura Generación Aumentada por Recuperación (RAG) para mitigar la tasa de alucinaciones y mejorar la exactitud factual en Modelos de Lenguaje de Gran Escala (LLM) aplicados a documentación normativa y técnica del sector agrícola (PAC y POSEI). Se implementa un MVP contenedorizado de asistente documental: el usuario inicia sesión, sube documentos e interroga un RAG agéntico que decide cuándo consultar la base de conocimiento y responde con citas. El núcleo se construye con arquitectura hexagonal en FastAPI, PostgreSQL/pgvector, Ollama (Llama 3.2 y nomic-embed-text) y un front-end en React, Vite y Tailwind CSS. El banco de evaluación versionado contiene 21 ítems (19 preguntas únicas) en siete categorías. Los resultados exploratorios se resumen así: MRR global de 0,7911, exactitud media del juez de 4,21 sobre 5 y tasa de alucinación binaria de 0,19 con RAG frente a 0,62 sin recuperación. RAG mitiga las alucinaciones extrínsecas en consultas directas y temporales; en consultas transversales (spanning) el MRR cae a 0,4700 y se requiere evolucionar hacia grafos de conocimiento y verificación agéntica.
+
+
+3) PALABRAS CLAVE
+-----------------
+BUSCAR:
+Generación Aumentada por Recuperación (RAG), Alucinaciones de AI, Procesamiento de Lenguaje Natural (NLP), Grandes Modelos del Lenguaje (LLM), Inteligencia Artificial Generativa (IAG), IA Explicable
+
+PONER ESTO:
+Generación Aumentada por Recuperación (RAG), RAG agéntico, Alucinaciones, LLM, PostgreSQL/pgvector, Arquitectura hexagonal
+
+
+4) ABSTRACT (inglés)
+--------------------
+BUSCAR el párrafo que empieza:
+"This Master's Thesis quantitatively evaluates..."
+
+PONER ESTO:
+This Master's Thesis evaluates Retrieval-Augmented Generation (RAG) for mitigating factual hallucinations in LLMs applied to agricultural regulatory documentation (CAP/POSEI). The artefact is a containerized MVP: login, document ingest and an agentic RAG assistant with citations. The hexagonal backend uses FastAPI, PostgreSQL/pgvector and Ollama (Llama 3.2 and nomic-embed-text); the frontend uses React, Vite and Tailwind CSS. The versioned evaluation bank contains 21 items (19 unique questions). Exploratory scores include global MRR 0.7911, judge accuracy 4.21/5 and binary hallucination 0.19 with RAG versus 0.62 without retrieval. RAG does not eliminate hallucinations; it reduces extrinsic errors on direct queries and degrades on holistic spanning questions.
+
+
+5) KEYWORDS
+-----------
+BUSCAR:
+Retrieval-Augmented Generation (RAG), AI Hallucinations, Natural Language Processing (NLP), Large Language Models (LLM), Generative Artificial Intelligence, Vector Databases.
+
+PONER ESTO:
+Retrieval-Augmented Generation (RAG), Agentic RAG, AI Hallucinations, LLM, PostgreSQL/pgvector, Hexagonal architecture.
+
+
+6) CAPÍTULO 1 — estructura del documento
+----------------------------------------
+6a) BUSCAR:
+"El Capítulo 2: Objetivos del TFM ... Zpara su realización."
+
+PONER ESTO:
+El Capítulo 2: Objetivos y planificación establece el objetivo general (diseñar, implementar y evaluar un MVP de asistente documental basado en RAG agéntico) y seis objetivos específicos, tratados como épicas Scrum y descompuestos en siete tareas sobre el prototipo real: FastAPI hexagonal, PostgreSQL/pgvector, Ollama (Llama 3.2), React/Vite y Tailwind CSS.
+
+6b) BUSCAR:
+"El Capítulo 4: Diseño de la Solución y Arquitectura ... Django, LangChain, Ollama y ChromaDB..."
+
+PONER ESTO:
+El Capítulo 4: Marco metodológico y arquitectura describe el método hexagonal (puertos y adaptadores) aplicado al bounded context RAG, los flujos del MVP (registro, login, documentos y chat) y el diseño experimental desacoplado entre recuperador y generador.
+
+6c) BUSCAR:
+"El Capítulo 5: Desarrollo e Implementación ... ChromaDB ... backend (Django)."
+
+PONER ESTO:
+El Capítulo 5: Arquitectura e implementación documenta el prototipo: dominio en gateway/rag, casos de uso AnswerQuestion, HybridRetrieve e IngestDocument, adaptadores PostgreSQL/pgvector, BM25 y Ollama, y la interfaz React/Vite/Tailwind con autenticación, catálogo documental y chat con fuentes. El despliegue se realiza con Docker Compose.
+
+
+7) CAPÍTULO 2 — objetivo general
+--------------------------------
+BUSCAR:
+Diseñar, implementar y evaluar un asistente inteligente para el sector agrícola basado en una arquitectura RAG agéntica que mejore la precisión, la relevancia y la trazabilidad de las respuestas generadas por modelos de lenguaje en un contexto normativo y técnico regulado.
+
+PONER ESTO:
+Diseñar, implementar y evaluar un MVP de asistente documental basado en RAG agéntico que mejore la precisión, la relevancia y la trazabilidad de las respuestas generadas por un LLM local sobre un corpus agrícola y normativo.
+
+BUSCAR el párrafo siguiente ("Este objetivo engloba..."):
+PONER ESTO:
+Este objetivo engloba la finalidad última del proyecto: un prototipo mínimo usable —autenticación, ingesta de documentos y chat con citas— con el que medir si anclar la generación a evidencia recuperada reduce las alucinaciones frente a un LLM sin recuperación.
+
+
+8) CAPÍTULO 2 — objetivos específicos (los 6 párrafos)
+------------------------------------------------------
+OE1. BUSCAR: "...desarrollado en el Capítulo 2 del TFM."
+PONER ESTO:
+Analizar el estado del arte en arquitecturas RAG, sistemas agénticos y aplicaciones de inteligencia artificial en el sector agrario, identificando las limitaciones de las soluciones existentes y las oportunidades de mejora. Este objetivo se corresponde con el marco teórico y el estado del arte desarrollado en el Capítulo 3.
+
+OE2. BUSCAR: "...se desarrolla en el Capítulo 3..."
+PONER ESTO:
+Diseñar la arquitectura del sistema, definiendo los componentes de ingestación de datos, recuperación semántica, orquestación agéntica, generación de respuestas y presentación de la información. Este objetivo se desarrolla en el Capítulo 5, donde se describen las decisiones de arquitectura y los componentes del sistema.
+
+OE3. BUSCAR: "...PostgresDB ... LangChain ... Django..."
+PONER ESTO:
+Implementar el prototipo funcional, integrando la base de datos vectorial (PostgreSQL/pgvector), el modelo de lenguaje (Llama 3.2 a través de Ollama), el núcleo RAG en FastAPI con arquitectura hexagonal y la interfaz de usuario desarrollada con React, Vite y Tailwind CSS. Este objetivo se aborda en los Capítulos 5 y 6 (implementación y despliegue).
+
+OE4. (citas) — se puede dejar; opcionalmente añadir al final:
+Las citas se muestran en el chat junto a cada respuesta. La página de origen se propaga cuando el parser la extrae; no se garantiza en todos los formatos.
+
+OE5. BUSCAR: "...se cumple en el Capítulo 5..."
+PONER ESTO:
+Evaluar el rendimiento del sistema en términos de fidelidad, relevancia, latencia y uso de recursos, utilizando métricas propias de recuperación, un LLM-as-a-judge, un adaptador RAGAS y pruebas en hardware local. Este objetivo se cumple en el capítulo de evaluación.
+
+OE6. Documentar... — se puede dejar.
+
+
+9) CAPÍTULO 2 — tareas (sustituir las 7 líneas)
+-----------------------------------------------
+BUSCAR:
+"Cada objetivo específico queda como tarea. Para el desarrollo del MVP..."
+
+PONER ESTO:
+Cada objetivo específico se gestiona como una épica Scrum. El trabajo se reduce a siete tareas, ordenadas por dependencia. El prototipo del MVP usa FastAPI hexagonal, PostgreSQL/pgvector, Ollama (Llama 3.2), React/Vite y Tailwind CSS.
+
+Tarea 1. Documentación e investigación (OE1): revisar LLMs, alucinaciones, RAG y sistemas agénticos; comparar LangChain, LlamaIndex, Haystack y una implementación hexagonal propia; redactar el estado del arte.
+
+Tarea 2. Diseño del prototipo, entidades y dominio (OE2): definir los flujos del MVP (registro, login, documentos y chat); delimitar el hexágono RAG; modelar RetrievedChunk, RetrievalQuery y RetrievalBundle y los puertos ChunkRepository y LlmPort, sin dependencia de FastAPI ni SQLAlchemy.
+
+Tarea 3. Back-end (OE3): implementar gateway/rag/domain; casos de uso AnswerQuestion, HybridRetrieve, IngestDocument, EvaluateRetrieval y EvaluateAnswer; adaptadores pgvector, BM25, Ollama y Cross-Encoder; controladores FastAPI de autenticación, documentos y chat; fachada AgenticRAGService y composition root build_rag_container.
+
+Tarea 4. Front-end (OE3): autenticación y panel con dos vistas del MVP: documentos (subida, listado y borrado) y asistente conversacional con RAG agéntico y visualización de fuentes.
+
+Tarea 5. Trazabilidad y citación (OE4): enriquecer fragmentos con documento de origen; mostrar fuentes en el chat; registrar traces de pregunta, contexto y respuesta; declarar falta de evidencia en lugar de inventar.
+
+Tarea 6. Evaluación (OE5): banco de pruebas del dominio agrario (21 ítems versionados, 19 preguntas únicas); métricas de recuperación, LLM-as-a-judge, adaptador RAGAS, comparación con y sin RAG, y latencia en local.
+
+Tarea 7. Memoria y presentación final (OE6): redactar la memoria, la guía de arranque con Docker Compose y la defensa (problema, hexágono, demostración del asistente y resultados).
+
+Añadir un párrafo al final del capítulo 2:
+Quedan fuera de alcance de esta edición el razonamiento visual end-to-end, la certificación industrial del despliegue, el reentrenamiento del LLM, y los módulos de organización, cuaderno de campo, OpenData y laboratorio de evaluación en la interfaz. Si aparecen en capturas, se presentan como extensión del prototipo, no como requisito del MVP.
+
+
+10) MÉTODO — RAGAS y ChromaDB / 150 pruebas / panel PAC
+-------------------------------------------------------
+10a) BUSCAR:
+"Se implementó el framework especializado RAGAS para calcular algorítmicamente las métricas de fidelidad, relevancia y precisión en una escala continua de  a ."
+
+PONER ESTO:
+La evaluación automática combina tres familias que no deben mezclarse: (1) métricas propias de recuperación (Recall@K, Precision@K, MRR, nDCG); (2) un LLM-as-a-judge local (exactitud, exhaustividad y relevancia en escala 1–5); (3) un adaptador RAGAS (faithfulness, answer relevancy, context precision, context recall) con marca binaria de alucinación. Si la librería RAGAS no está operativa en el entorno, el adaptador aplica un fallback heurístico etiquetado como tal; esas puntuaciones no se presentan como métricas RAGAS oficiales.
+
+10b) BUSCAR:
+"se constituyó un panel de evaluación formado por técnicos gestores e inspectores de la Política Agraria Común (PAC)..."
+
+PONER ESTO:
+No se incluye en esta edición un panel de inspectores PAC ni un coeficiente de acuerdo interanotador. La validación humana queda como trabajo futuro; los resultados numéricos proceden del juez automático y de las métricas de recuperación sobre el banco versionado.
+
+10c) BUSCAR:
+"...indexación densa en la base de datos vectorial ChromaDB utilizando el modelo de embeddings qwen3-embedding:latest."
+
+PONER ESTO:
+El corpus se fragmenta y se indexa de forma densa en PostgreSQL/pgvector, con un índice léxico BM25 por tenant. El modelo de embeddings de la demo contenedorizada es nomic-embed-text; la generación usa Llama 3.2 a través de Ollama.
+
+10d) BUSCAR cualquier "150 casos" / "150 pruebas" / "dataset sintético compuesto por 150":
+PONER ESTO (usar en todos):
+El banco versionado contiene 21 ítems (19 preguntas únicas) en siete categorías: direct_fact (6), temporal (4), relationship (5), spanning (3), regulatory_compliance (1), regulatory_fact (1) y traceability (1). No se aporta en el repositorio un dataset congelado de 150 preguntas.
+
+
+11) CONCLUSIONES — sustituir los 6 párrafos de "100%"
+----------------------------------------------------
+BUSCAR el bloque desde:
+"Tras la ejecución del protocolo experimental, se ha alcanzado la consecución plena..."
+hasta el párrafo de Exactitud Factual con huecos.
+
+PONER ESTO:
+
+Tras la ejecución del protocolo experimental sobre el prototipo contenedorizado, se cubren los seis objetivos específicos del Capítulo 2 en el alcance de un MVP: estado del arte, diseño hexagonal, implementación FastAPI/React, citación de fuentes, evaluación exploratoria y documentación.
+
+OE1 (estado del arte) se cumple con el capítulo de marco teórico, que sitúa RAG, alucinaciones y alternativas de orquestación, y justifica una implementación hexagonal propia frente a LangChain o LlamaIndex.
+
+OE2 y OE3 (diseño e implementación) se cumplen con el MVP: autenticación, ingesta documental e índice híbrido (pgvector + BM25 + RRF), generación local con Llama 3.2 y chat con fuentes. El corpus de demostración ronda 20 documentos PAC/POSEI (~50 páginas equivalentes).
+
+OE4 (trazabilidad) se cumple al mostrar las fuentes recuperadas junto a cada respuesta. La citación por página depende de los metadatos extraídos en la ingesta y no está garantizada en todos los formatos.
+
+OE5 (evaluación) se cumple de forma exploratoria, no como auditoría legal. Sobre 21 ítems (19 preguntas únicas) el recuperador obtuvo MRR 0,7911 y nDCG@10 0,8244. El juez automático asignó exactitud 4,21, exhaustividad 3,94 y relevancia 4,38 sobre 5. La tasa binaria de alucinación pasó de 0,62 sin RAG a 0,19 con recuperación. Estos valores no deben atribuirse a un dataset de 150 pruebas ni a un cómputo RAGAS oficial sin corrida versionada.
+
+OE6 se cumple con esta memoria, el repositorio y la guía de arranque con Docker Compose.
+
+El objetivo general se alcanza en el sentido del MVP: hay un prototipo usable que ancla la generación a evidencia recuperada y permite comparar el LLM con y sin RAG. No se afirma que RAG elimine las alucinaciones.
+
+
+12) PROSPECTIVA — agente ya existe
+----------------------------------
+BUSCAR:
+"se contempla la evolución del sistema hacia un esquema de RAG Agéntico (Agentic RAG), en el cual diversos agentes..."
+
+PONER ESTO:
+El MVP ya incorpora un orquestador agéntico con la herramienta search_knowledge_base. El trabajo futuro consiste en especializar agentes de ruteo, cálculo numérico y verificación jurídica, y en explorar GraphRAG para consultas transversales. También se propone ampliar el corpus a boletines autonómicos y reglamentos de la Unión Europea.
+
+
+13) DESPLIEGUE DOCKER
+---------------------
+BUSCAR:
+"...demostrar la eficacia de la solución propuesta en la erradicación de alucinaciones factuales..."
+
+PONER ESTO:
+Con el propósito de validar de forma práctica los hallazgos y demostrar el MVP, se contenedorizó AgroPS con Docker Compose. El entorno de demo orquesta frontend (Nginx/React), API FastAPI, PostgreSQL/pgvector y Ollama. El arranque local se describe en docs/DOCKER.md y scripts/demo_up.ps1. El sistema mitiga alucinaciones en los casos evaluados; no las erradica.
+
+
+14) GLOSARIO
+------------
+ChromaDB: dejar la definición genérica, pero añadir una frase:
+"En este prototipo la base vectorial operativa es PostgreSQL con la extensión pgvector, no ChromaDB."
+
+Si aparece LangChain como tecnología del sistema, aclarar:
+"LangChain se revisó en el estado del arte; el prototipo no lo usa como orquestador. El núcleo RAG es propio (gateway/rag)."
+
+
+15) FIGURAS / PIE DE FOTO
+-------------------------
+Si hay capturas de Organización, Grafo o laboratorio de evaluación:
+añadir bajo el pie: "Extensión del prototipo; queda fuera del alcance del MVP de esta edición."
+
+Tablas con "Error! Marcador no definido.": clic derecho en el campo > Actualizar campo, o reescribe el título a mano (Tabla 1 Comparación de arquitecturas NLP, etc.).
+
+
+16) ANEXO REPOSITORIO
+---------------------
+BUSCAR el párrafo del GitHub.
+PONER ESTO:
+Todo el código fuente desarrollado durante este Trabajo Fin de Máster, incluyendo la implementación hexagonal del RAG, la indexación documental, el procesamiento de PDFs, la generación de embeddings, el adaptador de evaluación y los scripts de despliegue Docker, se encuentra en: https://github.com/SamLorenzoSanc/Arquitectura-RAG-Multimodal
+
+
+CONTROL RÁPIDO (Ctrl+U en Word)
+-------------------------------
+Buscar y sustituir en todo el documento:
+- LangChain para la orquestación  ->  núcleo RAG hexagonal propio
+- Django  ->  FastAPI          (salvo si citas Django como trabajo relacionado)
+- ChromaDB  ->  PostgreSQL/pgvector   (salvo la entrada del glosario)
+- 150 pruebas / 150 casos / 150 test  ->  21 ítems (19 preguntas únicas)
+- erradica / elimina por completo / erradicación  ->  mitiga / reduce en los casos evaluados
+- entorno productivo real  ->  prototipo funcional contenedorizado
+- cumplido al 100%  ->  cubierto en el alcance del MVP
+- Memoria No Paramétrica  ->  Memoria Paramétrica   (si aparece en p. 26)

@@ -1,20 +1,27 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Sequence
 
 from pydantic import BaseModel, Field
 
 from rag.application.retrieve import HybridRetrieve
-from rag.domain.entities import RetrievalQuery, RetrievedChunk
+from rag.domain.entities import RetrievalQuery
 from rag.domain.ports import LlmPort
 from schemas.evaluation import AnswerEvaluation
 from services.evaluation_metrics import (
     abstention_score,
     citation_accuracy,
+    keyword_hit_rank,
+    keyword_ir_metrics,
     normalize_text,
     numeric_match,
+    split_answer_units,
 )
+
+
+def _to_five(unit: float) -> float:
+    return round(1.0 + 4.0 * max(0.0, min(1.0, float(unit))), 2)
 
 
 class RetrievalEval(BaseModel):
@@ -24,10 +31,18 @@ class RetrievalEval(BaseModel):
     total_keywords: int = Field(description="Número total de keywords")
     keyword_coverage: float = Field(description="Cobertura porcentual de keywords")
     accuracy: float = Field(description="Acierto globales de la búsqueda")
+    completeness: float = Field(
+        default=1.0,
+        description="Cobertura de palabras clave, en escala 1-5",
+    )
+    relevance: float = Field(
+        default=1.0,
+        description="Calidad del ranking (nDCG), en escala 1-5",
+    )
 
 
 def _doc_text(doc: Any) -> str:
-    return normalize_text(
+    return (
         getattr(doc, "page_content", None)
         or (doc.get("page_content") if isinstance(doc, dict) else "")
         or str(doc)
@@ -35,13 +50,7 @@ def _doc_text(doc: Any) -> str:
 
 
 def calculate_mrr(keyword: str, retrieved_docs: list) -> float:
-    needle = normalize_text(keyword)
-    if not needle:
-        return 0.0
-    for rank, doc in enumerate(retrieved_docs, start=1):
-        if needle in _doc_text(doc):
-            return 1.0 / rank
-    return 0.0
+    return keyword_hit_rank(keyword, [_doc_text(doc) for doc in retrieved_docs])
 
 
 def calculate_dcg(relevances: list[int], k: int) -> float:
@@ -52,13 +61,57 @@ def calculate_dcg(relevances: list[int], k: int) -> float:
 
 
 def calculate_ndcg(keyword: str, retrieved_docs: list, k: int = 10) -> float:
-    needle = normalize_text(keyword)
-    relevances = [
-        1 if needle and needle in _doc_text(doc) else 0 for doc in retrieved_docs[:k]
-    ]
-    dcg = calculate_dcg(relevances, k)
-    idcg = calculate_dcg(sorted(relevances, reverse=True), k)
-    return dcg / idcg if idcg > 0 else 0.0
+    from services.evaluation_metrics import keyword_ndcg
+
+    return keyword_ndcg(keyword, [_doc_text(doc) for doc in retrieved_docs], k)
+
+
+def retrieval_eval_from_values(
+    *,
+    mrr: float,
+    ndcg: float,
+    keywords_found: int,
+    total_keywords: int,
+    keyword_coverage: float,
+    accuracy: float,
+) -> RetrievalEval:
+    return RetrievalEval(
+        mrr=float(mrr),
+        ndcg=float(ndcg),
+        keywords_found=int(keywords_found),
+        total_keywords=int(total_keywords),
+        keyword_coverage=float(keyword_coverage),
+        accuracy=float(accuracy),
+        completeness=_to_five(float(keyword_coverage) / 100.0),
+        relevance=_to_five(float(ndcg)),
+    )
+
+
+def ir_from_texts(keywords: Sequence[str], texts: Sequence[str], k: int = 10) -> RetrievalEval:
+    metrics = keyword_ir_metrics(keywords, texts, k)
+    return retrieval_eval_from_values(
+        mrr=float(metrics["mrr"]),
+        ndcg=float(metrics["ndcg"]),
+        keywords_found=int(metrics["keywords_found"]),
+        total_keywords=int(metrics["total_keywords"]),
+        keyword_coverage=float(metrics["keyword_coverage"]),
+        accuracy=float(metrics["accuracy"]),
+    )
+
+
+def apply_ir_to_answer(
+    evaluation: AnswerEvaluation,
+    keywords: Sequence[str],
+    generated_answer: str,
+    k: int = 10,
+) -> AnswerEvaluation:
+    metrics = keyword_ir_metrics(keywords, split_answer_units(generated_answer), k)
+    evaluation.mrr = float(metrics["mrr"])
+    evaluation.ndcg = float(metrics["ndcg"])
+    evaluation.keywords_found = int(metrics["keywords_found"])
+    evaluation.total_keywords = int(metrics["total_keywords"])
+    evaluation.keyword_coverage = float(metrics["keyword_coverage"])
+    return evaluation
 
 
 class EvaluateRetrieval:
@@ -76,28 +129,10 @@ class EvaluateRetrieval:
                 evaluation_mode=True,
             )
         )
-        retrieved_docs = bundle.chunks
-        top_k = retrieved_docs[:k]
-        mrr_scores = [calculate_mrr(kw, retrieved_docs) for kw in test.keywords]
-        ndcg_scores = [calculate_ndcg(kw, retrieved_docs, k) for kw in test.keywords]
-        avg_mrr = sum(mrr_scores) / len(mrr_scores) if mrr_scores else 0.0
-        avg_ndcg = sum(ndcg_scores) / len(ndcg_scores) if ndcg_scores else 0.0
-        keywords_found = sum(1 for score in mrr_scores if score > 0)
-        total_keywords = len(test.keywords)
-        coverage = (keywords_found / total_keywords * 100) if total_keywords else 0.0
-        relevant = 0
-        for doc in top_k:
-            text = getattr(doc, "page_content", str(doc))
-            if any(keyword.lower() in text.lower() for keyword in test.keywords):
-                relevant += 1
-        accuracy = (relevant / len(top_k) * 100) if top_k else 0.0
-        return RetrievalEval(
-            mrr=avg_mrr,
-            ndcg=avg_ndcg,
-            keywords_found=keywords_found,
-            total_keywords=total_keywords,
-            keyword_coverage=coverage,
-            accuracy=accuracy,
+        return ir_from_texts(
+            test.keywords or [],
+            [_doc_text(doc) for doc in bundle.chunks],
+            k,
         )
 
 
@@ -113,12 +148,13 @@ class EvaluateAnswer:
         retrieved_docs: list,
         reference_answer: str | None = None,
         out_of_knowledge: bool = False,
+        keywords: Sequence[str] | None = None,
     ) -> tuple[AnswerEvaluation, str, list]:
-        context = "\n\n".join(
-            getattr(doc, "page_content", str(doc)) for doc in retrieved_docs
-        )
+        context = "\n\n".join(_doc_text(doc) for doc in retrieved_docs)
         sources = [
-            str(getattr(doc, "metadata", {}).get("source", ""))
+            str((getattr(doc, "metadata", None) or {}).get("source", ""))
+            if not isinstance(doc, dict)
+            else str((doc.get("metadata") or {}).get("source", ""))
             for doc in retrieved_docs
         ]
         prompt = f"""
@@ -127,9 +163,13 @@ class EvaluateAnswer:
         Respuesta Generada: {generated_answer}
         Contexto recuperado: {context or "Sin contexto"}
         Fuera de conocimiento: {out_of_knowledge}
+        Palabras clave esperadas: {", ".join(keywords or []) or "ninguna"}
         Puntúa accuracy, precision, completeness, relevance, faithfulness y groundedness de 1 a 5.
+        Usa la misma vara que en recuperación: coverage (¿están las palabras clave?),
+        ranking (¿lo importante va primero?) y fidelidad al contexto.
         precision mide si la respuesta va al grano, sin relleno ni invención.
         citation_accuracy, numeric_match y abstention deben estar entre 0 y 1.
+        No rellenes mrr, ndcg ni keyword_coverage: se calculan aparte.
         La referencia mide corrección; el contexto mide fidelidad. No premies afirmaciones
         correctas que no estén respaldadas por el contexto cuando se evalúe groundedness.
         """
@@ -149,4 +189,5 @@ class EvaluateAnswer:
         eval_result.numeric_match = numeric_match(reference_answer, generated_answer)
         eval_result.citation_accuracy = citation_accuracy(generated_answer, sources)
         eval_result.abstention = abstention_score(generated_answer, out_of_knowledge)
+        apply_ir_to_answer(eval_result, keywords or [], generated_answer)
         return eval_result, generated_answer, retrieved_docs

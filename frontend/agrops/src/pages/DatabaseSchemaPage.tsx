@@ -4,6 +4,7 @@ import ForceGraph2D from "react-force-graph-2d";
 import { Database, KeyRound, RefreshCw, Search } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "@/i18n/I18nProvider";
 import { getDatabaseSchema } from "@/services/database.service";
 import type { DatabaseTable } from "@/types/database";
 
@@ -18,6 +19,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function DatabaseSchemaPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const graphRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -92,10 +94,11 @@ export default function DatabaseSchemaPage() {
       <div className="flex min-h-[420px] items-center justify-center p-8">
         <div className="max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-8 text-center">
           <KeyRound className="mx-auto mb-4 text-amber-600" size={34} />
-          <h1 className="text-lg font-bold text-slate-900">Acceso restringido</h1>
+          <h1 className="text-lg font-bold text-slate-900">
+            {t("databaseSchema.restrictedTitle")}
+          </h1>
           <p className="mt-2 text-sm text-slate-600">
-            La representación del esquema PostgreSQL solo está disponible para
-            administradores.
+            {t("databaseSchema.restrictedBody")}
           </p>
         </div>
       </div>
@@ -105,7 +108,7 @@ export default function DatabaseSchemaPage() {
   if (schemaQuery.isLoading) {
     return (
       <div className="flex min-h-[420px] items-center justify-center text-sm text-slate-500">
-        Consultando el esquema actual de PostgreSQL...
+        {t("databaseSchema.loading")}
       </div>
     );
   }
@@ -113,8 +116,7 @@ export default function DatabaseSchemaPage() {
   if (schemaQuery.isError || !schemaQuery.data) {
     return (
       <div className="m-8 rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-        No se pudo consultar el esquema. Comprueba que tu cuenta mantiene un rol
-        administrativo y que PostgreSQL está disponible.
+        {t("databaseSchema.errorFull")}
       </div>
     );
   }
@@ -124,6 +126,16 @@ export default function DatabaseSchemaPage() {
     0,
   );
 
+  const statCards = [
+    [t("databaseSchema.tables"), schemaQuery.data.tables.length],
+    [t("databaseSchema.relations"), schemaQuery.data.relations.length],
+    [
+      t("databaseSchema.columns"),
+      schemaQuery.data.tables.reduce((sum, table) => sum + table.columns.length, 0),
+    ],
+    [t("databaseSchema.size"), formatBytes(totalBytes)],
+  ] as const;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
       <header className="border-b border-slate-200 bg-white px-6 py-5">
@@ -132,7 +144,7 @@ export default function DatabaseSchemaPage() {
             <div className="flex items-center gap-2">
               <Database className="text-blue-700" size={22} />
               <h1 className="text-xl font-bold text-slate-900">
-                Esquema PostgreSQL
+                {t("databaseSchema.title")}
               </h1>
             </div>
             <p className="mt-1 text-xs text-slate-500">
@@ -150,17 +162,12 @@ export default function DatabaseSchemaPage() {
               size={14}
               className={schemaQuery.isFetching ? "animate-spin" : ""}
             />
-            Actualizar esquema
+            {t("databaseSchema.refresh")}
           </button>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[
-            ["Tablas", schemaQuery.data.tables.length],
-            ["Relaciones", schemaQuery.data.relations.length],
-            ["Columnas", schemaQuery.data.tables.reduce((sum, table) => sum + table.columns.length, 0)],
-            ["Tamaño", formatBytes(totalBytes)],
-          ].map(([label, value]) => (
+          {statCards.map(([label, value]) => (
             <div key={label} className="rounded-xl border border-slate-200 px-4 py-3">
               <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {label}
@@ -178,11 +185,11 @@ export default function DatabaseSchemaPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar tabla o columna..."
+              placeholder={t("databaseSchema.searchPlaceholder")}
               className="w-full text-xs text-slate-700 outline-none placeholder:text-slate-400"
             />
             <span className="shrink-0 text-[11px] text-slate-400">
-              {visibleTables.length} visibles
+              {t("databaseSchema.visibleCount", { count: visibleTables.length })}
             </span>
           </div>
           <div ref={containerRef} className="min-h-[500px] flex-1 bg-slate-950">
@@ -198,7 +205,10 @@ export default function DatabaseSchemaPage() {
                 linkDirectionalArrowRelPos={1}
                 linkLabel="label"
                 nodeLabel={(node: any) =>
-                  `${node.id} · ${node.table.columns.length} columnas`
+                  t("databaseSchema.nodeLabel", {
+                    id: node.id,
+                    count: node.table.columns.length,
+                  })
                 }
                 nodeCanvasObject={(node: any, context, globalScale) => {
                   const radius = Math.max(5, node.val / 2);
@@ -230,13 +240,15 @@ export default function DatabaseSchemaPage() {
                   {selectedTable.name}
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
-                  ≈ {selectedTable.estimated_rows.toLocaleString()} filas ·{" "}
-                  {formatBytes(selectedTable.total_bytes)}
+                  {t("databaseSchema.approxRows", {
+                    count: selectedTable.estimated_rows,
+                    size: formatBytes(selectedTable.total_bytes),
+                  })}
                 </p>
               </div>
 
               <h3 className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-slate-500">
-                Columnas
+                {t("databaseSchema.detailColumns")}
               </h3>
               <div className="space-y-2">
                 {selectedTable.columns.map((column) => (
@@ -254,7 +266,9 @@ export default function DatabaseSchemaPage() {
                       </span>
                     </div>
                     <p className="mt-1 truncate text-[10px] text-slate-400">
-                      {column.nullable ? "NULL permitido" : "NOT NULL"}
+                      {column.nullable
+                        ? t("databaseSchema.nullable")
+                        : t("databaseSchema.notNull")}
                       {column.default ? ` · ${column.default}` : ""}
                     </p>
                   </div>
@@ -262,7 +276,7 @@ export default function DatabaseSchemaPage() {
               </div>
 
               <h3 className="mb-2 mt-5 text-xs font-bold uppercase tracking-wider text-slate-500">
-                Índices ({selectedTable.indexes.length})
+                {t("databaseSchema.indexes", { count: selectedTable.indexes.length })}
               </h3>
               <div className="space-y-2">
                 {selectedTable.indexes.map((index) => (
@@ -281,10 +295,10 @@ export default function DatabaseSchemaPage() {
             <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
               <Database className="mb-3 text-slate-300" size={34} />
               <p className="text-sm font-semibold text-slate-600">
-                Selecciona una tabla
+                {t("databaseSchema.selectTable")}
               </p>
               <p className="mt-1 max-w-[250px] text-xs text-slate-400">
-                Pulsa un nodo para inspeccionar sus columnas, claves e índices.
+                {t("databaseSchema.selectTableHint")}
               </p>
             </div>
           )}

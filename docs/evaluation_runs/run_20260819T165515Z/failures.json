@@ -1,0 +1,26 @@
+[
+  {
+    "item_id": 34,
+    "category": "traceability",
+    "question": "¿Cuál es el número de registro de AGROIL para araña roja en platanera?",
+    "retrieved_sources": "knowledge-base/asesor-canarias/05_gip_y_fitosanitarios.md | knowledge-base/asesor-canarias/cultivos/papaya.md | knowledge-base/asesor-canarias/cultivos/platanera.md | knowledge-base/asesor-canarias/cultivos/berenjena.md | knowledge-base/asesor-canarias/cultivos/aguacate.md | knowledge-base/asesor-canarias/cultivos/forrajes.md | knowledge-base/asesor-canarias/13_preguntas_frecuentes.md | knowledge-base/asesor-canarias/cultivos/olivo.md",
+    "retrieved_preview": "inilla, con mejor eficacia hacia 20–25 °C (límites orientativos 15–35 °C), suelta en focos desde inicios de primavera y en verano. No sustituye a la ficha comercial ni a las dosis de suelta del proveedor. ## Registro MAPA: la única lista qu || # Dossier de asesoría: Papaya ## Qué necesita el agricultor Papaya bajo invernadero o abrigo. Acción I.1 (frutas). Ácaros, mosca blanca, virus y manejo de riego/CE. Confirmar productos MAPA: el cultivo tiene menos fichas que tomate o platan || # Dossier de asesoría: Platanera (plátano IGP) ## Qué necesita el agricultor El plátano IGP es el cultivo de referencia de Canarias (Medida II del POSEI). El asesor debe cubrir: ayudas por producción, GIP (trips, cochinilla, mosca blanca, n",
+    "rag_answer": "No tengo información sobre un producto con ese nombre, pero si estás buscando el producto \"Agroil\" para controlar la araña roja (Dinotpera binotata), según el Registro Oficial de Productos Fitosanitarios, su número de registro es ES-01744.",
+    "reference_answer": "AGROIL figura con el n.º 22319.",
+    "mrr": "0.0000",
+    "rag_accuracy": 5.0,
+    "cause_hint": "recuperación débil"
+  },
+  {
+    "item_id": 35,
+    "category": "traceability",
+    "question": "¿Cuál es la URL del texto consolidado POSEI Canarias 2026 citada en el corpus?",
+    "retrieved_sources": "knowledge-base/asesor-canarias/README.md | knowledge-base/asesor-canarias/02_posei_marco.md | knowledge-base/asesor-canarias/02_posei_marco.md | knowledge-base/asesor-canarias/00_indice.md | knowledge-base/asesor-canarias/03_posei_medidas.md | knowledge-base/asesor-canarias/05_gip_y_fitosanitarios.md | knowledge-base/asesor-canarias/02_posei_marco.md | knowledge-base/asesor-canarias/cultivos/platanera.md",
+    "retrieved_preview": "# Corpus de asesoría agraria canaria Textos originales de marco (POSEI, sanidad, GIP, riego, cuaderno) más dossiers de cultivo generados desde el Registro Oficial de Productos Fitosanitarios del MAPA (`knowledge-base/Vademecum/vademecum_can || xto-consolidado-2026-30-12-2025.pdf El de 2025 permanece como referencia histórica: https://www.gobiernodecanarias.org/cmsgob2/export/sites/agpsa/viceconsejeria/galerias/doc/posei/POSEI-Canarias-texto-consolidado-21-01-2025-copy.pdf Portal: || # POSEI Canarias: marco para el agricultor El POSEI (Programa de Opciones Específicas por el Alejamiento y la Insularidad) adapta la PAC a las regiones ultraperiféricas. Canarias lo comparte, a nivel europeo, con los departamentos franceses",
+    "rag_answer": "https://www.gobiernodecanarias.org/cmsgob2/export/sites/agpsa/viceconsejeria/galerias/doc/posei/POSEI-Canarias-texto-consolidado-21-01-2025-copy.pdf",
+    "reference_answer": "https://www.gobiernodecanarias.org/cmsgob2/export/sites/agpsa/viceconsejeria/galerias/doc/posei/POSEI-Canarias-texto-consolidado-2026-30-12-2025.pdf",
+    "mrr": "0.3333",
+    "rag_accuracy": 3.0,
+    "cause_hint": "recuperación débil"
+  }
+]

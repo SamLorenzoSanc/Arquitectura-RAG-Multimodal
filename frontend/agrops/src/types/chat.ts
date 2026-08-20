@@ -3,11 +3,17 @@ export interface ChatRequest {
     conversation_id?: string | null;
     history?: Array<{ role: string; content: string }>;
     knowledge_base_id?: string;
+    department_id?: string;
     use_rag?: boolean;
     organization_id?: string;
     organization_name?: string;
     model?: string;
     rag_mode?: "hybrid" | "agentic" | "compare";
+    use_query_rewrite?: boolean;
+    use_reranking?: boolean;
+    retrieval_k?: number;
+    final_k?: number;
+    temperature?: number;
 }
 
 export interface AgentTraceStep {
@@ -97,6 +103,10 @@ export interface RetrievalInfo {
     retrieval_k: number;
     final_k: number;
     reranking: boolean;
+    architecture?: string | null;
+    agent_tools?: string[] | null;
+    intent?: string | null;
+    strategy?: string | null;
 }
 
 

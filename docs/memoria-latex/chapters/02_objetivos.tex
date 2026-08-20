@@ -1,16 +1,139 @@
 % -*- coding: utf-8 -*-
-\chapter{Objetivos}
+\chapter{Objetivos y planificación}
+\label{ch:objetivos}
 
-En este capítulo se definen las metas que marca la línea del desarrollo del proyecto. Se establece un objetivo general que engloba la finalidad última del asistente inteligente y un conjunto de objetivos específicos diseñados como metas tangibles, que garantizan el cumplimiento íntegro del proyecto, en base a las normativas vigentes.
+El presente capítulo tiene como finalidad establecer de forma clara y precisa los objetivos que guían el desarrollo del Trabajo de Fin de Máster. En primer lugar se define el objetivo general, que representa la meta principal que se pretende alcanzar con la realización del proyecto. En segundo lugar se desglosan los objetivos específicos, que constituyen las partes en las que se subdivide el trabajo para completar el objetivo general. Cada objetivo se ha redactado en infinitivo y se ha diseñado para ser medible y alcanzable al finalizar el proyecto. Finalmente, cada objetivo específico se trata como una épica Scrum y se descompone en una lista de tareas ejecutables sobre el prototipo real: FastAPI con arquitectura hexagonal, PostgreSQL/\texttt{pgvector}, Ollama (Llama~3.2), React/Vite y Tailwind CSS.
 
 \section{Objetivo general}
-\begin{itemize}\item Diseñar, implementar y evaluar una plataforma de gestión de documentación para el sector agrícola basado en una arquitectura RAG multimodal, con el fin de analizar su impacto en la precisión, la relevancia, la trazabilidad y la reducción de alucinaciones en respuestas generadas sobre documentación agrícola y normativa. (Li, 2025)\end{itemize}
+
+El objetivo general de este Trabajo de Fin de Máster es:
+
+\begin{itemize}
+  \item Diseñar, implementar y evaluar un MVP de asistente documental basado en RAG agéntico que mejore la precisión, la relevancia y la trazabilidad de las respuestas generadas por un LLM local sobre un corpus agrícola y normativo. (Li, 2025)
+\end{itemize}
+
+Este objetivo engloba la finalidad última del proyecto: un prototipo mínimo usable ---autenticación, ingesta de documentos y chat con citas--- con el que medir si anclar la generación a evidencia recuperada reduce las alucinaciones frente a un LLM sin recuperación.
+
 \section{Objetivos específicos}
-\begin{itemize}\item Analizar el estado del arte sobre LLMs, RAG y alucinaciones en contexto regulados.\end{itemize}
-\begin{itemize}\item Definir la arquitectura técnica del sistema y sus componentes principales.\end{itemize}
-\begin{itemize}\item Construir una base de conocimiento vectorial a partir de documentación agrícola y normativa.\end{itemize}
-\begin{itemize}\item Implementar un proceso de ingestación, fragmentación e indexación semántica del corpus documental.\end{itemize}
-\begin{itemize}\item Evaluar el sistema mediante métricas de recuperación y generación.\end{itemize}
-\begin{itemize}\item Comparar el rendimiento del LLM sin RAG frente al sistema propuesto con RAG.\end{itemize}
 
+Para alcanzar el objetivo general, el trabajo se ha subdividido en los siguientes objetivos específicos, cada uno de los cuales representa una épica que contribuye al cumplimiento del objetivo final:
 
+\begin{enumerate}[label=\textbf{OE\arabic*.}, leftmargin=*, itemsep=0.55em]
+  \item Analizar el estado del arte en arquitecturas RAG, sistemas agénticos y aplicaciones de inteligencia artificial en el sector agrario, identificando las limitaciones de las soluciones existentes y las oportunidades de mejora.
+        Este objetivo se corresponde con el marco teórico y el estado del arte desarrollado en el Capítulo~\ref{ch:estado-arte}.
+
+  \item Diseñar la arquitectura del sistema, definiendo los componentes de ingestación de datos, recuperación semántica, orquestación agéntica, generación de respuestas y presentación de la información.
+        Este objetivo se desarrolla en el Capítulo~\ref{ch:implementacion}, donde se describen las decisiones de arquitectura y los componentes del sistema.
+
+  \item Implementar el prototipo funcional, integrando la base de datos vectorial (PostgreSQL/\texttt{pgvector}), el modelo de lenguaje (Llama~3.2 a través de Ollama), el núcleo RAG en FastAPI con arquitectura hexagonal y la interfaz de usuario desarrollada con React, Vite y Tailwind CSS.
+        Este objetivo se aborda en los Capítulos~\ref{ch:implementacion} y~\ref{ch:despliegue}.
+
+  \item Desarrollar el módulo de trazabilidad y citación automática, garantizando que cada respuesta incluya la referencia exacta al documento y la página de donde se extrajo la información. Este módulo es fundamental para reducir las alucinaciones y facilitar la verificación por parte del técnico.
+
+  \item Evaluar el rendimiento del sistema en términos de fidelidad, relevancia, latencia y uso de recursos, utilizando \textbf{métricas propias de recuperación}, un \textbf{LLM-as-a-judge} local y, de forma opcional, un adaptador RAGAS (con fallback heurístico si la librería no está operativa), así como comparar el LLM sin RAG frente al prototipo con RAG.
+        Este objetivo se cumple en el Capítulo~\ref{ch:evaluacion}.
+
+  \item Documentar el proceso de desarrollo, las decisiones de diseño y los resultados obtenidos, proporcionando un prototipo funcional y una guía de implementación que pueda servir como referencia para futuros trabajos en el ámbito de la inteligencia artificial aplicada al sector agrario.
+        Este objetivo se refleja en la estructura completa del TFM y en los anexos del documento.
+\end{enumerate}
+
+\section{Planificación Scrum y lista de tareas}
+
+Cada objetivo específico se gestiona como una épica Scrum (Schwaber y Sutherland, 2020). El equipo es unipersonal: el autor prioriza el backlog, implementa el incremento y presenta la revisión al tutor. El trabajo se reduce a siete tareas, redactadas en infinitivo y ordenadas por dependencia: investigación, diseño, backend, frontend, trazabilidad, evaluación y cierre documental.
+
+\subsection{Tarea 1. Documentación, investigación y análisis del estado del arte}
+\textit{Épica OE1.}
+
+\begin{itemize}
+  \item Revisar la literatura sobre LLMs, alucinaciones, RAG y sistemas agénticos.
+  \item Comparar enfoques de orquestación (LangChain, LlamaIndex, Haystack e implementación hexagonal propia) y justificar la elección del prototipo.
+  \item Identificar limitaciones de los LLM autónomos en normativa agrícola (PAC, POSEI, sanidad vegetal).
+  \item Extraer requisitos de diseño: anclaje documental, citación, evaluación desacoplada y despliegue local.
+  \item Redactar el Capítulo~\ref{ch:estado-arte}.
+\end{itemize}
+
+\subsection{Tarea 2. Diseño del prototipo, las entidades y el dominio}
+\textit{Épica OE2.}
+
+\begin{itemize}
+  \item Definir los flujos de usuario del MVP (registro, login, documentos y chat) y el stack: FastAPI, PostgreSQL/\texttt{pgvector}, Ollama (Llama~3.2), React/Vite y Tailwind CSS.
+  \item Diseñar la arquitectura lógica: ingesta documental, recuperación, orquestación agéntica, generación y presentación.
+  \item Delimitar el \emph{bounded context} RAG y elaborar el diagrama hexagonal de puertos y adaptadores (Cockburn, 2005).
+  \item Modelar las entidades de dominio (\texttt{RetrievedChunk}, \texttt{RetrievalQuery}, \texttt{RetrievalBundle}) y los puertos de salida, sin dependencia de FastAPI ni SQLAlchemy.
+\end{itemize}
+
+\subsection{Tarea 3. Diseño y creación del back-end}
+\textit{Épica OE3.}
+
+\begin{itemize}
+  \item Implementar la capa de dominio en \texttt{gateway/rag/domain}.
+  \item Crear los casos de uso: \texttt{AnswerQuestion}, \texttt{HybridRetrieve}, \texttt{IngestDocument}, \texttt{EvaluateRetrieval} y \texttt{EvaluateAnswer}.
+  \item Crear los adaptadores de salida: PostgreSQL/\texttt{pgvector}, BM25, Ollama y Cross-Encoder.
+  \item Crear los controladores FastAPI del MVP (autenticación, documentos, bases de conocimiento y chat) y la fachada \texttt{AgenticRAGService}.
+  \item Implementar el composition root \texttt{build\_rag\_container}.
+\end{itemize}
+
+\subsection{Tarea 4. Diseño y creación del front-end}
+\textit{Épica OE3.}
+
+\begin{itemize}
+  \item Implementar autenticación y el panel con dos vistas: documentos y asistente.
+  \item Crear la vista de documentos: subida, listado y borrado del corpus.
+  \item Crear la vista del asistente conversacional, con RAG agéntico y visualización de fuentes.
+\end{itemize}
+
+\subsection{Tarea 5. Módulo de trazabilidad y citación automática}
+\textit{Épica OE4.}
+
+\begin{itemize}
+  \item Enriquecer cada fragmento en la ingesta con documento, sección y página de origen.
+  \item Propagar las citas desde la recuperación hasta la respuesta y la interfaz de chat.
+  \item Registrar traces (pregunta, contexto, respuesta y fuentes) para auditoría.
+  \item Aplicar guardrails de ámbito, no invención, cifras no soportadas y detección de PII.
+  \item Garantizar que, si no hay evidencia recuperada, el sistema declare la carencia en lugar de alucinar.
+\end{itemize}
+
+\subsection{Tarea 6. Evaluación del rendimiento y de la adopción}
+\textit{Épica OE5.}
+
+\begin{itemize}
+  \item Construir el banco de pruebas del dominio agrario (fuera de la interfaz del MVP).
+  \item Medir recuperación con métricas propias (MRR, nDCG, Recall@$K$) y calidad de respuesta con LLM-as-a-judge; no atribuir a RAGAS lo que no ejecute esa librería.
+  \item Comparar el LLM sin RAG frente al prototipo con RAG en las mismas preguntas.
+  \item Medir latencia y uso de recursos en hardware local.
+\end{itemize}
+
+\subsection{Tarea 7. Redacción de la memoria y presentación final}
+\textit{Épica OE6.}
+
+\begin{itemize}
+  \item Redactar los capítulos de la memoria, la guía de arranque con Docker Compose, el glosario y la bibliografía.
+  \item Preparar la defensa: problema, arquitectura hexagonal, demostración del asistente y resultados de evaluación.
+  \item Seleccionar casos de consulta normativa con citas verificables.
+  \item Exponer limitaciones (consultas holísticas, OCR, alcance textual de la evaluación) y líneas futuras.
+\end{itemize}
+
+\section{Correspondencia entre objetivos y tareas}
+
+La tabla~\ref{tab:objetivos-tareas} hace explícito que cada épica queda cubierta por al menos una tarea, y que el objetivo general solo se considera alcanzado cuando las siete tareas están cerradas.
+
+\begin{table}[htbp]
+\centering
+\caption{Correspondencia entre objetivos específicos (épicas) y las siete tareas del MVP.}
+\label{tab:objetivos-tareas}
+\small
+\begin{tabular}{@{}clp{8.4cm}@{}}
+\toprule
+\textbf{Épica} & \textbf{Tarea} & \textbf{Entregable de cierre} \\
+\midrule
+OE1 & Tarea 1 & Capítulo~\ref{ch:estado-arte} \\
+OE2 & Tarea 2 & Arquitectura, entidades y dominio hexagonal \\
+OE3 & Tareas 3 y 4 & Prototipo backend + frontend contenedorizado \\
+OE4 & Tarea 5 & Citas por documento y página; traces auditables \\
+OE5 & Tarea 6 & Capítulo~\ref{ch:evaluacion} (IR propia, juez, comparación con/sin RAG) \\
+OE6 & Tarea 7 & Memoria, anexos y defensa \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Quedan fuera de alcance de esta edición el razonamiento visual end-to-end, la certificación industrial del despliegue, el reentrenamiento del LLM, y los módulos de organización, cuaderno de campo, OpenData y laboratorio de evaluación en la interfaz.

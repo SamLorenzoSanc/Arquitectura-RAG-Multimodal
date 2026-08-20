@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from core.test import load_tests, merge_test_banks, TestQuestion
+from core.test import load_tests, merge_test_banks, TestQuestion, upsert_test_question_jsonl
 from schemas.evaluation import SimulatorSaveRequest
 from services.evaluation_dataset import CREATE_EXPERIMENT_RUNS_SQL
 
@@ -42,22 +42,29 @@ def test_loader_accepts_jsonl_deduplicates_and_assigns_splits(tmp_path):
     ]
 
 
-def test_canonical_dataset_has_no_duplicate_questions_and_has_holdout():
+def test_default_question_bank_has_gold_schema():
     tests = load_tests()
-    assert len(tests) > 0
-    assert len({test.question.casefold().strip() for test in tests}) == len(tests)
-    assert {"dev", "holdout"}.issubset({test.split for test in tests})
-
-
-def test_canonical_dataset_includes_current_and_previous_questions():
-    tests = load_tests()
-    blob = " ".join(item.question for item in tests).casefold()
-    assert "alejandro castro" in blob
-    assert "salario" in blob
-    assert "alicia lancaster" in blob
-    assert any("sigpac" in item.question.casefold() for item in tests)
-    assert any("sociedad agraria" in item.question.casefold() for item in tests)
-    assert any(item.out_of_knowledge for item in tests)
+    assert len(tests) >= 21
+    categories = {item.category for item in tests}
+    # Taxonomía del banco amplio versionado en gateway/core/tests.jsonl
+    required = {
+        "direct_fact",
+        "temporal",
+        "relationship",
+        "spanning",
+        "comparative",
+        "numerical",
+        "holistic",
+    }
+    assert required <= categories
+    from collections import Counter
+    counts = Counter(item.category for item in tests if item.category in required)
+    assert all(n >= 3 for n in counts.values()), counts
+    for item in tests:
+        assert item.question.strip()
+        assert item.keywords
+        assert item.reference_answer.strip()
+        assert item.category.strip()
 
 
 def test_merge_test_banks_enriches_file_questions_and_appends_annotated():
@@ -135,3 +142,42 @@ def test_experiment_runs_schema_tracks_embedding_and_distance():
     assert "mrr" in sql
     assert "ndcg" in sql
     assert "precision_at_k" in sql
+
+
+def test_upsert_test_question_jsonl_appends_hitl_fields(tmp_path):
+    path = tmp_path / "bank.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "question": "¿Qué es POSEI?",
+                "keywords": ["Alejamiento"],
+                "reference_answer": "Programa de opciones específicas.",
+                "category": "direct_fact",
+            },
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    upsert_test_question_jsonl(
+        question="¿Qué medida cubre el plátano IGP?",
+        keywords=["Medida II", "plátano"],
+        reference_answer="La Medida II.",
+        category="direct_fact",
+        source_file="03_posei_medidas.md",
+        path=path,
+    )
+    rows = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(rows) == 2
+    added = rows[1]
+    assert added["question"] == "¿Qué medida cubre el plátano IGP?"
+    assert added["keywords"] == ["Medida II", "plátano"]
+    assert added["reference_answer"] == "La Medida II."
+    assert added["category"] == "direct_fact"
+    loaded = load_tests(path)
+    assert len(loaded) == 2
+    assert loaded[1].keywords == ["Medida II", "plátano"]

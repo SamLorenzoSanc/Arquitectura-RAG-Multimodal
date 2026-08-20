@@ -1,25 +1,21 @@
 from __future__ import annotations
 
 import logging
-import os
 from enum import Enum
 from typing import Dict, List, Optional
-import jwt
 from dotenv import load_dotenv
 
 from fastapi import Depends, Header, HTTPException, status
-from sqlalchemy import text, select
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from identity.adapters.inbound.auth import get_current_user
 from services.database import get_db, AsyncSessionLocal
 from models.user import User
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
-
-SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key")
-ALGORITHM = "HS256"
 
 
 # ==========================================
@@ -169,53 +165,7 @@ async def user_is_admin(db: AsyncSession, user_id: object) -> bool:
 # ==========================================
 # 2. AUTENTICACIÓN Y RESOLUCIÓN DE TENANT
 # ==========================================
-
-
-def decode_token(token: str) -> dict:
-    try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="El token de acceso ha expirado.",
-        )
-    except jwt.InvalidTokenError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token de acceso inválido."
-        )
-
-
-async def get_current_user(
-    authorization: str = Header(...),
-    db: AsyncSession = Depends(get_db),
-) -> User:
-    """Extrae y valida el usuario actual desde el header JWT Bearer."""
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Cabecera Authorization inválida o ausente.",
-        )
-
-    token = authorization.removeprefix("Bearer ").strip()
-    payload = decode_token(token)
-    user_id = payload.get("sub")
-
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido: falta el identificador del usuario.",
-        )
-
-    user = await db.scalar(
-        select(User).where(User.id == user_id, User.active.is_(True))
-    )
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuario inexistente o inactivo.",
-        )
-
-    return user
+# get_current_user vive en identity (único punto de autenticación JWT).
 
 
 async def get_tenant_context(

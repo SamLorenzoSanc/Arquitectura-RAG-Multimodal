@@ -134,7 +134,10 @@ def test_create_support_ticket(authenticated_client, override_db):
     app.dependency_overrides[get_current_user] = lambda: user
     override_db.execute = AsyncMock()
     override_db.commit = AsyncMock()
-    with patch("routes.account.ensure_account_tables", AsyncMock()):
+    with patch(
+        "identity.adapters.outbound.postgres.PostgresIdentityRepository.ensure_tables",
+        AsyncMock(),
+    ):
         response = authenticated_client.post(
             "/api/v1/account/support",
             json={
@@ -160,4 +163,23 @@ def test_account_usage(authenticated_client, override_db):
     body = response.json()
     assert "documents" in body
     assert "conversations" in body
+    app.dependency_overrides.pop(get_current_user, None)
+
+
+def test_account_analytics(authenticated_client, override_db):
+    user = MagicMock()
+    user.id = uuid.uuid4()
+    user.email = "ana@agrops.test"
+    user.name = "Ana"
+    app.dependency_overrides[get_current_user] = lambda: user
+    override_db.scalar = AsyncMock(return_value=2)
+    override_db.execute = AsyncMock(return_value=_empty_query())
+    override_db.commit = AsyncMock()
+    response = authenticated_client.get("/api/v1/account/analytics")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user_id"] == str(user.id)
+    assert "totals" in body
+    assert "documents" in body["totals"]
+    assert "timeline" in body
     app.dependency_overrides.pop(get_current_user, None)

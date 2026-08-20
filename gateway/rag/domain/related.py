@@ -28,11 +28,11 @@ def generate_related_questions(
     max_questions: int = 5,
 ) -> list[str]:
     templates = [
-        "¿Cuáles son los pasos para resolver un problema de {topic}?",
-        "¿Qué herramientas y recambios se necesitan para {topic}?",
-        "¿Qué datos técnicos (dosis, tiempos, temperaturas) aplican a {topic}?",
-        "¿Cómo diagnosticar y corregir un fallo de {topic}?",
-        "¿Qué precauciones de seguridad hay al trabajar {topic}?",
+        "¿Qué dice el corpus exactamente sobre {topic}?",
+        "¿Hay dosis, plazos, importes o requisitos ligados a {topic}?",
+        "¿Qué documentos de la organización cubren {topic}?",
+        "¿Cómo se aplica {topic} en Canarias (PAC, POSEI o ficha de uso)?",
+        "¿Qué precauciones o límites aparecen para {topic}?",
     ]
     seen: set[str] = set()
     out: list[str] = []

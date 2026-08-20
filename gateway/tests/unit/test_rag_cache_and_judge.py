@@ -72,8 +72,11 @@ async def test_judge_receives_reference_context_and_overrides_deterministic_scor
         "Según [posei.pdf], 1.200 €.",
         [Result(page_content="La ayuda es 1.200 €.", metadata={"source": "posei.pdf"})],
         reference_answer="La ayuda es 1.200 €.",
+        keywords=["1.200"],
     )
     assert "Respuesta de referencia" in captured["prompt"]
     assert "Contexto recuperado" in captured["prompt"]
+    assert "Palabras clave esperadas" in captured["prompt"]
     assert result.numeric_match == 1
     assert result.citation_accuracy == 1
+    assert result.keyword_coverage == 100.0

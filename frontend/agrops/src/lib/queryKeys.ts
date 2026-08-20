@@ -1,6 +1,7 @@
 export const queryKeys = {
   organizations: ["organizations"] as const,
-  knowledgeBases: (orgId: string) => ["knowledge-bases", orgId] as const,
+  knowledgeBases: (orgId: string, departmentId?: string) =>
+    ["knowledge-bases", orgId, departmentId ?? "accessible"] as const,
   documents: (kbId: string) => ["documents", kbId] as const,
   datasets: (orgId: string, departmentId?: string) =>
     ["datasets", orgId, departmentId ?? "all"] as const,
@@ -8,6 +9,10 @@ export const queryKeys = {
   conversations: ["conversations"] as const,
   chromaDocuments: ["chroma", "documents"] as const,
   evaluationTests: ["evaluation", "tests"] as const,
+  humanReviews: (orgId: string, status: string, source: string) =>
+    ["human-reviews", orgId, status, source] as const,
+  evaluationHistory: (orgId: string) =>
+    ["evaluation", "history", orgId] as const,
   evaluationCatalog: (orgId: string, datasetId: string) =>
     ["evaluation", "catalog", orgId, datasetId] as const,
   evaluationConfigs: (orgId: string, datasetId: string) =>
@@ -22,4 +27,5 @@ export const queryKeys = {
   roles: ["roles"] as const,
   fieldNotebook: (orgId: string, from: string, to: string) =>
     ["field-notebook", orgId, from, to] as const,
+  analytics: (userId: string) => ["analytics", userId] as const,
 };

@@ -33,8 +33,12 @@ class ChatService {
             );
 
             throw new Error(
-                error.response?.data?.detail ??
-                "No se pudo enviar la pregunta"
+                typeof error.response?.data?.detail === "string" &&
+                !/sqlalchemy|asyncpg|vector dimensions|\[SQL:/i.test(
+                    error.response.data.detail,
+                )
+                    ? error.response.data.detail
+                    : "No se pudo consultar la documentación.",
             );
 
         }

@@ -137,6 +137,74 @@ def abstention_score(answer: str | None, out_of_knowledge: bool) -> float:
     return float(abstained if out_of_knowledge else not abstained)
 
 
+def split_answer_units(answer: str | None) -> list[str]:
+    """Parte la respuesta en unidades comparables a fragmentos recuperados."""
+    cleaned = re.sub(r"\s+", " ", answer or "").strip()
+    if not cleaned:
+        return []
+    parts = re.split(r"(?<=[.!?])\s+|\n+", cleaned)
+    units = [part.strip() for part in parts if part.strip()]
+    return units or [cleaned]
+
+
+def keyword_hit_rank(keyword: str, texts: Sequence[str]) -> float:
+    needle = normalize_text(keyword)
+    if not needle:
+        return 0.0
+    for rank, text in enumerate(texts, 1):
+        if needle in normalize_text(text):
+            return 1.0 / rank
+    return 0.0
+
+
+def keyword_ndcg(keyword: str, texts: Sequence[str], k: int = 10) -> float:
+    needle = normalize_text(keyword)
+    relevances = [
+        1 if needle and needle in normalize_text(text) else 0 for text in texts[:k]
+    ]
+    dcg = sum(
+        rel / math.log2(rank + 1) for rank, rel in enumerate(relevances, 1)
+    )
+    ideal_hits = min(k, sum(relevances))
+    idcg = sum(1.0 / math.log2(rank + 1) for rank in range(1, ideal_hits + 1))
+    return dcg / idcg if idcg else 0.0
+
+
+def keyword_ir_metrics(
+    keywords: Sequence[str],
+    texts: Sequence[str],
+    k: int = 10,
+) -> dict[str, float | int]:
+    """MRR, nDCG, cobertura y precisión@k con las mismas reglas para contexto y respuesta."""
+    needles = [item for item in keywords if normalize_text(str(item))]
+    ranked = list(texts)[:k] if k > 0 else list(texts)
+    if not needles:
+        return {
+            "mrr": 0.0,
+            "ndcg": 0.0,
+            "keywords_found": 0,
+            "total_keywords": 0,
+            "keyword_coverage": 0.0,
+            "accuracy": 0.0,
+        }
+    mrr_scores = [keyword_hit_rank(item, ranked) for item in needles]
+    ndcg_scores = [keyword_ndcg(item, ranked, k) for item in needles]
+    found = sum(1 for score in mrr_scores if score > 0)
+    relevant_docs = 0
+    for text in ranked:
+        blob = normalize_text(text)
+        if any(normalize_text(item) in blob for item in needles):
+            relevant_docs += 1
+    return {
+        "mrr": sum(mrr_scores) / len(mrr_scores),
+        "ndcg": sum(ndcg_scores) / len(ndcg_scores),
+        "keywords_found": found,
+        "total_keywords": len(needles),
+        "keyword_coverage": found / len(needles) * 100.0,
+        "accuracy": (relevant_docs / len(ranked) * 100.0) if ranked else 0.0,
+    }
+
+
 def dataset_fingerprint(rows: Iterable[Mapping]) -> str:
     canonical = []
     for row in rows:

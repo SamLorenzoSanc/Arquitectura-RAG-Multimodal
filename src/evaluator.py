@@ -86,6 +86,9 @@ def run_retrieval_evaluation(progress=gr.Progress()):
     total_mrr = 0.0
     total_ndcg = 0.0
     total_coverage = 0.0
+    total_accuracy = 0.0
+    total_completeness = 0.0
+    total_relevance = 0.0
     category_mrr = defaultdict(list)
     count = 0
 
@@ -94,6 +97,9 @@ def run_retrieval_evaluation(progress=gr.Progress()):
         total_mrr += result.mrr
         total_ndcg += result.ndcg
         total_coverage += result.keyword_coverage
+        total_accuracy += result.accuracy
+        total_completeness += result.completeness
+        total_relevance += result.relevance
         category_mrr[test.category].append(result.mrr)
 
         progress(prog_value, desc=f"⚡ Analizando prueba #{count}...")
@@ -101,12 +107,18 @@ def run_retrieval_evaluation(progress=gr.Progress()):
     avg_mrr = total_mrr / count
     avg_ndcg = total_ndcg / count
     avg_coverage = total_coverage / count
+    avg_accuracy = total_accuracy / count
+    avg_completeness = total_completeness / count
+    avg_relevance = total_relevance / count
 
     final_html = f"""
     <div style="display: flex; flex-direction: column; gap: 8px;">
         {format_metric_html("Mean Reciprocal Rank (MRR)", avg_mrr, "mrr")}
         {format_metric_html("Normalized DCG (nDCG)", avg_ndcg, "ndcg")}
         {format_metric_html("Cobertura de Palabras Clave", avg_coverage, "coverage", is_percentage=True)}
+        {format_metric_html("Precisión@k", avg_accuracy, "coverage", is_percentage=True)}
+        {format_metric_html("Exhaustividad (1-5)", avg_completeness, "completeness", score_format=True)}
+        {format_metric_html("Pertinencia (1-5)", avg_relevance, "relevance", score_format=True)}
 
         <div style="margin-top: 15px; padding: 12px; background: rgba(16, 185, 129, 0.1); border-radius: 8px; text-align: center; border: 1px solid #10b981; color: #34d399; font-weight: 600;">
          Evaluación de Recuperación Completada: {count} Tests Ejecutados
@@ -126,6 +138,10 @@ def run_answer_evaluation(progress=gr.Progress()):
     total_accuracy = 0.0
     total_completeness = 0.0
     total_relevance = 0.0
+    total_faithfulness = 0.0
+    total_mrr = 0.0
+    total_ndcg = 0.0
+    total_coverage = 0.0
     category_accuracy = defaultdict(list)
     count = 0
 
@@ -134,6 +150,10 @@ def run_answer_evaluation(progress=gr.Progress()):
         total_accuracy += result.accuracy
         total_completeness += result.completeness
         total_relevance += result.relevance
+        total_faithfulness += result.faithfulness
+        total_mrr += result.mrr
+        total_ndcg += result.ndcg
+        total_coverage += result.keyword_coverage
         category_accuracy[test.category].append(result.accuracy)
 
         progress(prog_value, desc=f"🧠 Evaluando respuesta #{count}...")
@@ -141,12 +161,20 @@ def run_answer_evaluation(progress=gr.Progress()):
     avg_accuracy = total_accuracy / count
     avg_completeness = total_completeness / count
     avg_relevance = total_relevance / count
+    avg_faithfulness = total_faithfulness / count
+    avg_mrr = total_mrr / count
+    avg_ndcg = total_ndcg / count
+    avg_coverage = total_coverage / count
 
     final_html = f"""
     <div style="display: flex; flex-direction: column; gap: 8px;">
+        {format_metric_html("Mean Reciprocal Rank (MRR)", avg_mrr, "mrr")}
+        {format_metric_html("Normalized DCG (nDCG)", avg_ndcg, "ndcg")}
+        {format_metric_html("Cobertura de Palabras Clave", avg_coverage, "coverage", is_percentage=True)}
         {format_metric_html("Precisión Fáctica (Accuracy)", avg_accuracy, "accuracy", score_format=True)}
         {format_metric_html("Exhaustividad (Completeness)", avg_completeness, "completeness", score_format=True)}
         {format_metric_html("Pertinencia (Relevance)", avg_relevance, "relevance", score_format=True)}
+        {format_metric_html("Fidelidad al contexto", avg_faithfulness, "relevance", score_format=True)}
 
         <div style="margin-top: 15px; padding: 12px; background: rgba(59, 130, 246, 0.1); border-radius: 8px; text-align: center; border: 1px solid #3b82f6; color: #60a5fa; font-weight: 600;">
             Auditoría Humana/LLM Finalizada: {count} Evaluaciones Completadas

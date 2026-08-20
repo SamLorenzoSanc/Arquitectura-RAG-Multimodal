@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Camera, Copy, Trash2 } from "lucide-react";
+import { Camera, Copy, Search, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useOrganization } from "@/context/OrganizationContext";
-import { useKnowledgeBases } from "@/hooks/useCachedApi";
-import { SETTINGS_TABS, type SettingsTab } from "@/lib/nav";
+import { useTranslation } from "@/i18n/I18nProvider";
+import { SETTINGS_TAB_KEYS, type SettingsTab } from "@/lib/nav";
 import AccountService, {
   type AccessTokenItem,
   type AccountUsage,
+  type ManagedUser,
   type UserProfile,
 } from "@/services/account.service";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -22,7 +23,14 @@ const ISLANDS = [
   "Tenerife",
 ];
 
-const CROPS = ["Plátano", "Aguacate", "Papa", "Tomate", "Uva", "Otro"];
+const CROP_OPTIONS = [
+  { value: "Plátano", labelKey: "settingsExtended.cropBanana" },
+  { value: "Aguacate", labelKey: "settingsExtended.cropAvocado" },
+  { value: "Papa", labelKey: "settingsExtended.cropPotato" },
+  { value: "Tomate", labelKey: "settingsExtended.cropTomato" },
+  { value: "Uva", labelKey: "settingsExtended.cropGrape" },
+  { value: "Otro", labelKey: "settingsExtended.cropOther" },
+];
 
 const emptyProfile = {
   name: "",
@@ -38,7 +46,7 @@ const emptyProfile = {
 };
 
 function isSettingsTab(value: string | null): value is SettingsTab {
-  return SETTINGS_TABS.some((tab) => tab.id === value);
+  return SETTINGS_TAB_KEYS.some((tab) => tab.id === value);
 }
 
 function formatDate(value?: string | null) {
@@ -55,6 +63,7 @@ function formatDate(value?: string | null) {
 }
 
 export default function SettingsPage() {
+  const { t, changeLanguage, language } = useTranslation();
   const { user, updateUser } = useAuth();
   const { selectedOrg } = useOrganization();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -70,15 +79,20 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tokens, setTokens] = useState<AccessTokenItem[]>([]);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [createdPrefix, setCreatedPrefix] = useState<string | null>(null);
   const [tokenName, setTokenName] = useState("");
   const [usage, setUsage] = useState<AccountUsage | null>(null);
-  const { data: knowledgeBases } = useKnowledgeBases(selectedOrg?.id);
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [usersAdmin, setUsersAdmin] = useState(false);
+  const [userQuery, setUserQuery] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
 
   const setTab = (next: SettingsTab) => {
     setSearchParams({ tab: next });
     setMessage(null);
     setError(null);
     setCreatedToken(null);
+    setCreatedPrefix(null);
   };
 
   useEffect(() => {
@@ -102,6 +116,10 @@ export default function SettingsPage() {
           notify_email: data.notify_email !== false,
           notify_whatsapp: Boolean(data.notify_whatsapp),
         });
+        const lang = data.preferred_language === "en" ? "en" : "es";
+        if (lang !== language) {
+          changeLanguage(lang);
+        }
         if (data.has_avatar) {
           try {
             const url = await AccountService.avatarObjectUrl();
@@ -123,16 +141,36 @@ export default function SettingsPage() {
         .then(setTokens)
         .catch(() => setTokens([]));
     }
-    if (tab === "usage") {
+    if (tab === "usage" || tab === "billing") {
       void AccountService.usage()
         .then(setUsage)
         .catch(() => setUsage(null));
     }
-  }, [tab, selectedOrg?.id]);
+    if (tab === "users") {
+      void AccountService.listUsers(selectedOrg?.id, userQuery)
+        .then((page) => {
+          setUsers(page.items);
+          setUsersAdmin(page.is_admin);
+          setSelectedUserId((current) => {
+            if (current && page.items.some((item) => item.id === current)) {
+              return current;
+            }
+            return page.items[0]?.id ?? user?.id ?? null;
+          });
+        })
+        .catch(() => {
+          setUsers([]);
+          setUsersAdmin(false);
+        });
+    }
+  }, [tab, selectedOrg?.id, userQuery, user?.id]);
 
   const title = useMemo(
-    () => SETTINGS_TABS.find((item) => item.id === tab)?.label || "Ajustes",
-    [tab],
+    () =>
+      SETTINGS_TAB_KEYS.find((item) => item.id === tab)
+        ? t(SETTINGS_TAB_KEYS.find((item) => item.id === tab)!.labelKey)
+        : t("common.settings"),
+    [tab, t],
   );
 
   const handleSaveProfile = async () => {
@@ -171,7 +209,7 @@ export default function SettingsPage() {
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })
         .response?.data?.detail;
-      setError(detail || "No se pudo guardar el perfil.");
+      setError(detail || t("auth.unexpectedError"));
     } finally {
       setSaving(false);
     }
@@ -223,18 +261,19 @@ export default function SettingsPage() {
     setCreatedToken(null);
     try {
       const created = await AccountService.createToken({
-        name: tokenName || (kind === "api_key" ? "Clave de API" : "Token de acceso"),
+        name: tokenName || (kind === "api_key" ? t("settingsExtended.defaultApiKeyName") : t("settingsExtended.defaultTokenName")),
         kind,
         expires_days: kind === "api_key" ? 365 : 30,
       });
       setCreatedToken(created.token);
+      setCreatedPrefix(created.prefix || created.token_prefix || null);
       setTokenName("");
       setTokens(await AccountService.listTokens(kind));
-      setMessage(created.note || "Token generado. Cópialo ahora.");
+      setMessage(created.note || t("settingsExtended.tokenGenerated"));
     } catch (err: unknown) {
       const detail = (err as { response?: { data?: { detail?: string } } })
         .response?.data?.detail;
-      setError(detail || "No se pudo generar el token.");
+      setError(detail || t("settingsExtended.tokenGenerateFailed"));
     } finally {
       setSaving(false);
     }
@@ -244,41 +283,38 @@ export default function SettingsPage() {
     try {
       await AccountService.revokeToken(id);
       setTokens(await AccountService.listTokens(kind));
-      setMessage("Token revocado.");
+      setMessage(t("settingsExtended.tokenRevoked"));
     } catch {
-      setError("No se pudo revocar el token.");
+      setError(t("settingsExtended.tokenRevokeFailed"));
     }
   };
 
-  const copyToken = async () => {
-    if (!createdToken) return;
-    await navigator.clipboard.writeText(createdToken);
-    setMessage("Token copiado al portapapeles.");
+  const copyValue = async (value: string, label: string) => {
+    await navigator.clipboard.writeText(value);
+    setMessage(t("settingsExtended.copiedToClipboard", { label }));
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-5 pt-4">
-        <div className="flex flex-wrap gap-1">
-          {SETTINGS_TABS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setTab(item.id)}
-              className={`rounded-t-md px-3 py-2 text-xs font-semibold ${
-                tab === item.id
-                  ? "border-b-2 border-[color:var(--agro-primary)] text-[color:var(--agro-primary)]"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+    <div className="flex flex-col gap-4 pb-8">
+      <div className="flex flex-wrap gap-2">
+        {SETTINGS_TAB_KEYS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => setTab(item.id)}
+            className={`rounded-lg px-3.5 py-2 text-xs font-semibold transition ${
+              tab === item.id
+                ? "bg-[color:var(--agro-primary)] text-white shadow-sm"
+                : "bg-white text-slate-600 ring-1 ring-[color:var(--agro-border)] hover:text-[color:var(--agro-primary)]"
+            }`}
+          >
+            {t(item.labelKey)}
+          </button>
+        ))}
       </div>
 
-      <div className="px-6 py-6">
-        <div className="mb-5 flex items-center justify-between gap-3">
+      <div className="rounded-xl border border-[color:var(--agro-border)] bg-white p-6 shadow-sm">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-bold text-slate-900">{title}</h1>
           {(tab === "authenticate" || tab === "api-keys") && (
             <button
@@ -287,9 +323,9 @@ export default function SettingsPage() {
               onClick={() =>
                 void handleCreateToken(tab === "api-keys" ? "api_key" : "access")
               }
-              className="rounded-lg bg-[color:var(--agro-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+              className="rounded-lg bg-[color:var(--agro-primary)] px-3 py-2 text-xs font-bold text-white hover:bg-[color:var(--agro-primary-hover)] disabled:opacity-50"
             >
-              {saving ? "Generando…" : "Generar nueva clave"}
+              {saving ? t("settingsExtended.generating") : t("settingsExtended.generateNewKey")}
             </button>
           )}
         </div>
@@ -326,7 +362,7 @@ export default function SettingsPage() {
                 onClick={() => avatarInputRef.current?.click()}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[color:var(--agro-primary)] px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50"
               >
-                <Camera size={13} /> Cambiar foto
+                <Camera size={13} /> {t("settingsExtended.changePhoto")}
               </button>
               {avatarPreview && (
                 <button
@@ -335,18 +371,18 @@ export default function SettingsPage() {
                   onClick={() => void handleDeleteAvatar()}
                   className="text-[11px] font-medium text-red-600"
                 >
-                  Quitar foto
+                  {t("settingsExtended.removePhoto")}
                 </button>
               )}
               <p className="text-center text-[10px] text-slate-400">
-                JPG, PNG o WEBP. Máximo 2 MB.
+                {t("settingsExtended.photoHint")}
               </p>
             </div>
 
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block text-xs font-semibold text-slate-600">
-                  Nombre visible
+                  {t("settingsExtended.displayName")}
                   <input
                     value={name}
                     onChange={(event) => setName(event.target.value)}
@@ -354,7 +390,7 @@ export default function SettingsPage() {
                   />
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">
-                  Cargo
+                  {t("settingsExtended.jobTitle")}
                   <input
                     value={profile.job_title}
                     onChange={(event) =>
@@ -363,12 +399,12 @@ export default function SettingsPage() {
                         job_title: event.target.value,
                       }))
                     }
-                    placeholder="Agricultor, calidad, logística…"
+                    placeholder={t("settingsExtended.jobPlaceholder")}
                     className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
                   />
                 </label>
                 <label className="block text-xs font-semibold text-slate-600 sm:col-span-2">
-                  Correo
+                  {t("settingsExtended.email")}
                   <input
                     value={user?.email || ""}
                     disabled
@@ -376,7 +412,7 @@ export default function SettingsPage() {
                   />
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">
-                  Teléfono
+                  {t("settingsExtended.phone")}
                   <input
                     value={profile.phone}
                     onChange={(event) =>
@@ -390,7 +426,7 @@ export default function SettingsPage() {
                   />
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">
-                  Isla
+                  {t("settingsExtended.island")}
                   <select
                     value={profile.island}
                     onChange={(event) =>
@@ -401,7 +437,7 @@ export default function SettingsPage() {
                     }
                     className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                   >
-                    <option value="">Sin especificar</option>
+                    <option value="">{t("settingsExtended.unspecified")}</option>
                     {ISLANDS.map((island) => (
                       <option key={island} value={island}>
                         {island}
@@ -410,7 +446,7 @@ export default function SettingsPage() {
                   </select>
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">
-                  Municipio
+                  {t("settingsExtended.municipality")}
                   <input
                     value={profile.municipality}
                     onChange={(event) =>
@@ -419,12 +455,12 @@ export default function SettingsPage() {
                         municipality: event.target.value,
                       }))
                     }
-                    placeholder="Los Llanos, Guía de Isora…"
+                    placeholder={t("settingsExtended.municipalityPlaceholder")}
                     className="mt-1 h-10 w-full rounded-md border border-slate-200 px-3 text-sm"
                   />
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">
-                  Cultivo principal
+                  {t("settingsExtended.mainCrop")}
                   <select
                     value={profile.crop_focus}
                     onChange={(event) =>
@@ -435,16 +471,16 @@ export default function SettingsPage() {
                     }
                     className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                   >
-                    <option value="">Sin especificar</option>
-                    {CROPS.map((crop) => (
-                      <option key={crop} value={crop}>
-                        {crop}
+                    <option value="">{t("settingsExtended.unspecified")}</option>
+                    {CROP_OPTIONS.map((crop) => (
+                      <option key={crop.value} value={crop.value}>
+                        {t(crop.labelKey)}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="block text-xs font-semibold text-slate-600 sm:col-span-2">
-                  Sobre ti
+                  {t("settingsExtended.aboutYou")}
                   <textarea
                     value={profile.bio}
                     maxLength={500}
@@ -455,7 +491,7 @@ export default function SettingsPage() {
                         bio: event.target.value,
                       }))
                     }
-                    placeholder="Cuéntanos tu explotación, cooperativa o rol en la cadena de frío."
+                    placeholder={t("settingsExtended.bioPlaceholder")}
                     className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm"
                   />
                   <span className="mt-1 block text-[10px] font-normal text-slate-400">
@@ -463,25 +499,27 @@ export default function SettingsPage() {
                   </span>
                 </label>
                 <label className="block text-xs font-semibold text-slate-600">
-                  Idioma
+                  {t("common.language")}
                   <select
                     value={profile.preferred_language}
-                    onChange={(event) =>
+                    onChange={(event) => {
+                      const lang = event.target.value as "es" | "en";
                       setProfile((current) => ({
                         ...current,
-                        preferred_language: event.target.value,
-                      }))
-                    }
+                        preferred_language: lang,
+                      }));
+                      changeLanguage(lang);
+                    }}
                     className="mt-1 h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm"
                   >
-                    <option value="es">Español</option>
-                    <option value="en">English</option>
+                    <option value="es">{t("common.languageEs")}</option>
+                    <option value="en">{t("common.languageEn")}</option>
                   </select>
                 </label>
               </div>
 
               <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-4">
-                <p className="text-xs font-bold text-slate-700">Avisos</p>
+                <p className="text-xs font-bold text-slate-700">{t("settingsExtended.notifications")}</p>
                 <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"
@@ -493,7 +531,7 @@ export default function SettingsPage() {
                       }))
                     }
                   />
-                  Recibir avisos por correo
+                  {t("settingsExtended.notifyEmail")}
                 </label>
                 <label className="mt-2 flex items-center gap-2 text-sm text-slate-700">
                   <input
@@ -506,12 +544,12 @@ export default function SettingsPage() {
                       }))
                     }
                   />
-                  Recibir alertas de cadena de frío por WhatsApp
+                  {t("settingsExtended.notifyWhatsapp")}
                 </label>
               </div>
 
               <p className="text-xs text-slate-400">
-                El correo identifica tu cuenta y no se puede cambiar desde aquí.
+                {t("settingsExtended.emailHint")}
               </p>
               <button
                 type="button"
@@ -519,7 +557,7 @@ export default function SettingsPage() {
                 onClick={() => void handleSaveProfile()}
                 className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
               >
-                {saving ? "Guardando…" : "Guardar perfil"}
+                {saving ? t("common.saving") : t("settingsExtended.saveProfile")}
               </button>
             </div>
           </div>
@@ -529,50 +567,69 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <p className="max-w-2xl text-sm text-slate-600">
               {tab === "authenticate"
-                ? "Genera un token Bearer para llamar al backend (Authorization: Bearer …) sin usar la sesión del navegador."
-                : "Las API keys son tokens de larga duración para integraciones. Trátalas como una contraseña."}
+                ? t("settingsExtended.authHint")
+                : t("settingsExtended.apiKeysHint")}
             </p>
             <input
               value={tokenName}
               onChange={(event) => setTokenName(event.target.value)}
               placeholder={
-                tab === "api-keys" ? "Nombre de la clave" : "Nombre del token"
+                tab === "api-keys" ? t("settingsExtended.keyName") : t("settingsExtended.tokenName")
               }
               className="h-9 max-w-sm rounded-md border border-slate-200 px-3 text-xs"
             />
             {createdToken && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-xs font-semibold text-amber-800">
-                  Copia este valor ahora. No se mostrará otra vez.
+              <div className="overflow-hidden rounded-xl border border-[color:var(--agro-border)]">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[color:var(--agro-pill)] text-slate-600">
+                    <tr>
+                      <th className="px-4 py-2 font-semibold">Access Key</th>
+                      <th className="px-4 py-2 font-semibold">Secret Key</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-slate-100">
+                      <td className="px-4 py-3 font-mono text-slate-700">
+                        <span className="mr-2">{createdPrefix || "agro_key"}</span>
+                        <button
+                          type="button"
+                          onClick={() => void copyValue(createdPrefix || "", "Access Key")}
+                          className="inline-flex text-slate-400 hover:text-[color:var(--agro-primary)]"
+                        >
+                          <Copy size={13} />
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-slate-700">
+                        <span className="mr-2 break-all">{createdToken}</span>
+                        <button
+                          type="button"
+                          onClick={() => void copyValue(createdToken, "Secret Key")}
+                          className="inline-flex text-slate-400 hover:text-[color:var(--agro-primary)]"
+                        >
+                          <Copy size={13} />
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p className="border-t border-slate-100 bg-amber-50 px-4 py-2 text-[11px] text-amber-800">
+                  {t("settingsExtended.copySecretNow")}
                 </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <code className="flex-1 truncate rounded-md bg-white px-3 py-2 text-[11px] text-slate-700">
-                    {createdToken}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => void copyToken()}
-                    className="rounded-md border border-slate-200 bg-white p-2 text-slate-600"
-                    title="Copiar"
-                  >
-                    <Copy size={14} />
-                  </button>
-                </div>
               </div>
             )}
-            {tokens.length === 0 ? (
-              <p className="py-10 text-center text-sm text-slate-400">
-                Aún no hay claves.
+            {tokens.length === 0 && !createdToken ? (
+              <p className="py-16 text-center text-sm text-slate-400">
+                {t("support.noResults")}
               </p>
-            ) : (
+            ) : tokens.length > 0 ? (
               <div className="overflow-hidden rounded-xl border border-slate-100">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 text-slate-400">
                     <tr>
-                      <th className="px-4 py-2 font-medium">Nombre</th>
-                      <th className="px-4 py-2 font-medium">Prefijo</th>
-                      <th className="px-4 py-2 font-medium">Caduca</th>
-                      <th className="px-4 py-2 font-medium">Estado</th>
+                      <th className="px-4 py-2 font-medium">{t("common.name")}</th>
+                      <th className="px-4 py-2 font-medium">Access Key</th>
+                      <th className="px-4 py-2 font-medium">{t("settingsExtended.expires")}</th>
+                      <th className="px-4 py-2 font-medium">{t("settingsExtended.status")}</th>
                       <th className="px-4 py-2" />
                     </tr>
                   </thead>
@@ -589,7 +646,7 @@ export default function SettingsPage() {
                           {formatDate(item.expires_at)}
                         </td>
                         <td className="px-4 py-2">
-                          {item.revoked_at ? "Revocada" : "Activa"}
+                          {item.revoked_at ? t("settingsExtended.revoked") : t("settingsExtended.active")}
                         </td>
                         <td className="px-4 py-2 text-right">
                           {!item.revoked_at && (
@@ -603,7 +660,7 @@ export default function SettingsPage() {
                               }
                               className="inline-flex items-center gap-1 text-red-600"
                             >
-                              <Trash2 size={12} /> Revocar
+                              <Trash2 size={12} />
                             </button>
                           )}
                         </td>
@@ -612,17 +669,17 @@ export default function SettingsPage() {
                   </tbody>
                 </table>
               </div>
-            )}
+            ) : null}
           </div>
         )}
 
         {tab === "usage" && (
           <div className="grid max-w-3xl gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ["Documentos", usage?.documents ?? 0],
-              ["Conversaciones", usage?.conversations ?? 0],
-              ["Llamadas API", usage?.api_calls ?? 0],
-              ["Tokens activos", usage?.active_tokens ?? 0],
+              [t("dashboardWidgets.documents"), usage?.documents ?? 0],
+              [t("dashboardWidgets.conversations"), usage?.conversations ?? 0],
+              [t("settingsExtended.apiCalls"), usage?.api_calls ?? 0],
+              [t("settingsExtended.activeTokens"), usage?.active_tokens ?? 0],
             ].map(([label, value]) => (
               <div
                 key={String(label)}
@@ -637,37 +694,93 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {tab === "projects" && (
-          <div>
-            <p className="mb-3 text-sm text-slate-600">
-              Bases de conocimiento (proyectos) de tu organización.
-            </p>
-            {!knowledgeBases?.length ? (
-              <p className="py-10 text-center text-sm text-slate-400">
-                No hay proyectos todavía.
+        {tab === "billing" && (
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="rounded-xl border border-[color:var(--agro-border)] p-5">
+              <p className="text-xs font-bold uppercase tracking-wide text-[color:var(--agro-primary)]">
+                {t("settingsExtended.currentPlan")}
               </p>
-            ) : (
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {(
-                  knowledgeBases as Array<{
-                    id: string;
-                    name?: string;
-                    description?: string;
-                  }>
-                ).map((project) => (
-                  <li
-                    key={project.id}
-                    className="rounded-xl border border-slate-100 bg-slate-50 p-4"
-                  >
-                    <p className="text-sm font-semibold text-slate-800">
-                      {project.name || "Proyecto"}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {project.description || "Base de conocimiento RAG"}
-                    </p>
-                  </li>
-                ))}
+              <h2 className="mt-1 text-xl font-bold text-slate-900">{t("settingsExtended.planName")}</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                {t("settingsExtended.billingDesc")}
+              </p>
+              <p className="mt-4 text-3xl font-bold text-slate-900">0,00 €</p>
+              <p className="text-xs text-slate-400">{t("settingsExtended.billingPeriod")}</p>
+            </div>
+            <div className="rounded-xl border border-[color:var(--agro-border)] p-5">
+              <p className="text-sm font-semibold text-slate-800">{t("settingsExtended.estimatedUsage")}</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                <li className="flex justify-between">
+                  <span>{t("settingsExtended.indexedDocs")}</span>
+                  <span className="font-semibold">{usage?.documents ?? 0}</span>
+                </li>
+                <li className="flex justify-between">
+                  <span>{t("dashboardWidgets.conversations")}</span>
+                  <span className="font-semibold">{usage?.conversations ?? 0}</span>
+                </li>
+                <li className="flex justify-between">
+                  <span>{t("settingsExtended.apiCalls")}</span>
+                  <span className="font-semibold">{usage?.api_calls ?? 0}</span>
+                </li>
+                <li className="flex justify-between border-t border-slate-100 pt-2">
+                  <span>{t("settingsExtended.totalDue")}</span>
+                  <span className="font-bold text-[color:var(--agro-primary)]">0,00 €</span>
+                </li>
               </ul>
+            </div>
+          </div>
+        )}
+
+        {tab === "users" && (
+          <div className="space-y-4">
+            <div className="relative max-w-md">
+              <Search
+                size={15}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                value={userQuery}
+                onChange={(event) => setUserQuery(event.target.value)}
+                placeholder={t("settingsExtended.searchUser")}
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-[color:var(--agro-primary)]"
+              />
+            </div>
+            {users.length === 0 ? (
+              <p className="py-16 text-center text-sm text-slate-400">No Results Found</p>
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-slate-100">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-slate-400">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">{t("common.name")}</th>
+                      <th className="px-4 py-2 font-medium">{t("settingsExtended.email")}</th>
+                      <th className="px-4 py-2 font-medium">{t("settingsExtended.role")}</th>
+                      <th className="px-4 py-2 font-medium">{t("settingsExtended.status")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((item) => (
+                      <tr key={item.id} className="border-t border-slate-100">
+                        <td className="px-4 py-2 font-semibold text-slate-800">
+                          {item.name}
+                          {item.is_self ? (
+                            <span className="ml-2 rounded-full bg-[color:var(--agro-pill)] px-2 py-0.5 text-[10px] text-[color:var(--agro-primary)]">
+                              {t("settingsExtended.you")}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="px-4 py-2 text-slate-500">{item.email}</td>
+                        <td className="px-4 py-2 text-slate-500">
+                          {item.role || (usersAdmin ? t("settingsExtended.member") : t("settingsExtended.account"))}
+                        </td>
+                        <td className="px-4 py-2">
+                          {item.active === false ? t("settingsExtended.inactive") : t("settingsExtended.active")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}

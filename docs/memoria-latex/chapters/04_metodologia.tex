@@ -1,15 +1,54 @@
 % -*- coding: utf-8 -*-
 \chapter{Marco metodológico}
+\label{ch:metodologia}
 
-El presente capítulo expone el diseño metodológico y el procedimiento empírico-analítico formulado para evaluar cuantitativamente la reducción de alucinaciones en modelos de lenguaje de gran tamaño (Large Language Models, LLMs) aplicados a la documentación regulatoria del sector agrario (Política Agraria Común - PAC, programa POSEI y normativa de Sanidad Vegetal). La investigación parte de la necesidad crítica detectada en el ámbito de la gestión pública agrícola: la incapacidad de los LLMs autónomos para responder con precisión y trazabilidad sobre cuerpos normativos densos, heterogéneos y fuertemente tabulares. Para abordar este problema, se ha configurado un diseño experimental cuantitativo, aplicado y transversal, estructurado mediante un flujo de trabajo que abarca la adquisición automatizada de datos (web crawling y layout parsing), el diseño de un pipeline de Generación Aumentada por Recuperación (Retrieval-Augmented Generation, RAG) con fragmentación contextualizada, la construcción de un conjunto de prueba de referencia (Ground Truth) de  consultas técnicas, y una doble metodología de auditoría compuesta por métricas automatizadas de Procesamiento del Lenguaje Natural (PLN) mediante el framework RAGAS y un escrutinio mediante juicio de expertos técnicos.
+El presente capítulo expone el diseño metodológico y el procedimiento empírico-analítico formulado para evaluar cuantitativamente la \textbf{mitigación} de alucinaciones en modelos de lenguaje de gran tamaño (Large Language Models, LLMs) aplicados a la documentación regulatoria del sector agrario (Política Agraria Común ---PAC---, programa POSEI y normativa de sanidad vegetal). La investigación parte de una limitación observada en la gestión pública agrícola: un LLM autónomo puede producir respuestas fluidas sobre cuerpos normativos densos, heterogéneos y tabulares sin anclarlas a un expediente concreto. Para abordarla se configura un diseño experimental cuantitativo, aplicado y transversal: ingestión y fragmentación de un corpus de demostración, un pipeline RAG textual (recuperación híbrida y generación local) y un banco de prueba versionado. La auditoría combina \textbf{métricas propias de recuperación de información}, un \textbf{LLM-as-a-Judge} local y, de forma opcional, un adaptador RAGAS con fallback heurístico. No se constituye un panel de inspectores ni se presenta RAGAS como único marco de medida.
 
-\section{Orden de desarrollo del núcleo RAG}
+\section{Arquitectura hexagonal como método de construcción del núcleo RAG}
 
-El prototipo se implementó como monolito FastAPI, pero el núcleo de recuperación y generación no se construyó mezclando reglas de negocio con SQLAlchemy u Ollama. Se aplicó arquitectura hexagonal únicamente al \emph{bounded context} RAG (ingesta, recuperación, generación y evaluación), dejando autenticación, organizaciones, cuaderno de campo y OpenData fuera de esa reescritura.
+La arquitectura hexagonal, o \emph{Ports and Adapters} (Cockburn, 2005), se empleó como método para construir el objeto experimental: un núcleo RAG cuya lógica de anclaje, citación y fusión de evidencia pudiera medirse con independencia de FastAPI, PostgreSQL u Ollama. El método se aplicó al \emph{bounded context} de ingesta, recuperación y generación del MVP. En este caso práctico se ha llamado dominio, aplicación y adaptador a las tres capas del hexágono, que la figura~\ref{fig:hexagono-metodologia} resume.
 
-El orden de desarrollo sigue a Cockburn (2005): el dominio no depende de frameworks. Primero se definieron las entidades y reglas puras (\texttt{Chunk}, fusión RRF, expansión léxica agrícola) y los puertos de salida (\texttt{ChunkRepository}, \texttt{EmbeddingPort}, \texttt{LlmPort}, \texttt{LexicalIndexPort}, \texttt{RerankerPort}). A continuación se escribieron los casos de uso (\texttt{AnswerQuestion}, \texttt{IngestDocument}, \texttt{EvaluateRetrieval} y \texttt{EvaluateAnswer}) inyectando esas interfaces. Solo después se extrajeron los adaptadores de infraestructura (pgvector, BM25 en disco, cliente OpenAI-compatible de Ollama y Cross-Encoder) y se cablearon en un composition root importado desde el arranque de la API. Las rutas HTTP existentes delegan en la fachada; el contrato \texttt{/api/v1} no cambia.
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/hexagono-rag-agrops.png}
+\caption{Aplicación de la arquitectura hexagonal en AgroPS: lado conductor (UI, API REST y pruebas), tres anillos del hexágono RAG (dominio, aplicación y adaptadores) y lado dirigido (PostgreSQL/\texttt{pgvector}, Ollama y BM25). El composition root inyecta los adaptadores en los puertos; el dominio no depende de FastAPI ni de Ollama.}
+\label{fig:hexagono-metodologia}
+\end{figure}
 
-Esta secuencia permite probar el RAG con puertos falsos (listas en memoria y un LLM stub) sin PostgreSQL ni Ollama, y documenta en código la independencia entre reglas de fusión y detalles de persistencia o inferencia.
+\begin{enumerate}[leftmargin=*, itemsep=0.85em, label=\textbf{\arabic*.}]
+  \item \textbf{Dominio.}
+        El dominio se encarga de modelar el problema del mundo real dentro del software y reúne los elementos que describen los problemas centrales que el prototipo resuelve. En AgroPS ese problema es la consulta de normativa agrícola con una respuesta fundamentada en fragmentos verificables, no en la memoria paramétrica del LLM. Esta capa está formada por entidades y objetos valor que encapsulan los datos y las reglas de negocio, manteniéndose aislados de la tecnología. Las entidades representan elementos con identidad propia: el fragmento recuperado se identifica por documento, sección y página. Los objetos valor son componentes inmutables que se usan para componer esas entidades: la consulta (pregunta, organización, colecciones y estrategia) y el conjunto fusionado de evidencia. Las reglas de negocio ---combinar búsqueda densa y léxica mediante RRF, expandir el léxico agrario y no desligar el texto de su fuente--- viven aquí, de modo que un cambio de base vectorial o de modelo no reescribe qué cuenta como evidencia.
+
+  \item \textbf{Aplicación.}
+        La aplicación orquesta las tareas específicas del prototipo desde un punto de vista abstracto, describiendo las funcionalidades del software a partir de las reglas de negocio definidas en el dominio, sin fijar con qué tecnología se ejecutan. Esto lo hace por medio de los casos de uso, los puertos de entrada y los puertos de salida.
+
+        \begin{enumerate}[leftmargin=*, itemsep=0.65em, label=\textbf{\arabic{enumi}.\arabic*.}]
+          \item \textbf{Casos de uso.}
+                Definen el comportamiento del sistema, es decir, lo que el software ha de hacer para alcanzar un objetivo de negocio, pero sin llegar a definir detalles técnicos. En este trabajo los casos de uso consisten en responder una pregunta con evidencia, ingestiar un documento, recuperar de forma híbrida y evaluar el recuperador o el generador. Ninguno de ellos prescribe SQL, HTTP ni un proveedor concreto de inferencia.
+
+          \item \textbf{Puertos de entrada.}
+                Los puertos de entrada, también conocidos como servicios, se encargan de implementar las acciones dictadas por los casos de uso. Son estos los que llevan a cabo, de la mano de los adaptadores, las acciones para alcanzar los distintos objetivos. En el prototipo coinciden con el contrato que invocan React y FastAPI cuando el usuario pregunta, carga un corpus o lanza una evaluación.
+
+          \item \textbf{Puertos de salida.}
+                Se trata de interfaces que definen qué datos necesita el sistema desde el exterior, sin llegar a definir cómo obtenerlos. En AgroPS declaran la necesidad de vectores, de generación de texto, de un índice léxico y de reordenación, sin nombrar PostgreSQL, Ollama, BM25 ni el Cross-Encoder.
+        \end{enumerate}
+
+  \item \textbf{Adaptador.}
+        El adaptador es responsable de manejar las comunicaciones con tecnologías externas, haciendo de puente con el mundo exterior. Define cómo se exponen las funcionalidades de la aplicación y cómo se consumen datos de fuentes externas. Esto se consigue por medio de los adaptadores de entrada y de los adaptadores de salida.
+
+        \begin{enumerate}[leftmargin=*, itemsep=0.65em, label=\textbf{\arabic{enumi}.\arabic*.}]
+          \item \textbf{Adaptadores de entrada.}
+                Reciben solicitudes desde el exterior y usan los casos de uso para hacer las operaciones que correspondan. En este caso práctico son la interfaz React, las rutas FastAPI, el orquestador agéntico ---que consulta la base de conocimiento como herramienta y no como regla de dominio--- y los tests del hexágono.
+
+          \item \textbf{Adaptadores de salida.}
+                Implementan la definición de los puertos de salida y se encargan de obtener o enviar información al exterior. En AgroPS corresponden a PostgreSQL/\texttt{pgvector}, al índice BM25, a Ollama (Llama~3.2 y embeddings) y al Cross-Encoder.
+        \end{enumerate}
+
+  \item \textbf{Beneficios.}
+        La utilización de la arquitectura hexagonal prepara el software para afrontar cambios de tecnología: puede adoptarse otro LLM o almacén vectorial modificando solo puertos y adaptadores, mientras la lógica de negocio permanece aislada en el dominio. También ofrece ventajas respecto a la realización de pruebas, porque da flexibilidad para ejercitar las partes críticas ---fusión de evidencia, anclaje y citación--- aún sin las tecnologías externas presentes, mediante puertos falsos. Además, tiene una estructura clara y modular que evita acoplamientos innecesarios entre el chat, la evaluación o el modo agéntico y un motor concreto, facilitando la evolución del sistema y reduciendo deuda técnica a largo plazo. El orden de desarrollo siguió este esquema: primero el dominio y los puertos, después los casos de uso y, al final, los adaptadores cableados en el composition root, sin alterar el contrato \texttt{/api/v1}.
+\end{enumerate}
+
+En síntesis, el hexágono de AgroPS separa el problema agrícola de la tecnología que lo sirve. El dominio fija qué es una evidencia normativa trazable; la aplicación describe qué hay que hacer para responder, ingestiar o evaluar, a través de casos de uso y puertos; los adaptadores traducen esas operaciones a React, FastAPI, PostgreSQL, BM25 y Ollama. Esa separación permite cambiar el modelo o la base vectorial, probar el núcleo sin infraestructura y comparar el modo híbrido con el agéntico sin reescribir las reglas de citación.
 
 \section{Población y muestra}
 En la evaluación de sistemas de recuperación de información e inteligencia artificial, la población no corresponde a sujetos humanos, sino al universo informacional y normativo que constituye la base de conocimiento (knowledge base) de la especialidad.
@@ -18,10 +57,10 @@ La población está integrada por la totalidad de las disposiciones legales, cir
 
 La población está constituida por el conjunto de disposiciones legales, manuales de procedimiento, bases de datos de productos fitosanitarios y directrices de condicionalidad emitidas por la Unión Europea, el Ministerio de Agricultura, Pesca y Alimentación (MAPA) de España, el Fondo Español de Garantía Agraria (FEGA) y la Autoridad Europea de Seguridad Alimentaria (EFSA).
 
-Se ha extraído una muestra representativa mediante raspado web focalizado (targeted web crawling) sobre los portales institucionales de referencia configurados en el sistema (sources.json). La muestra consolidada consta de N = 1760 documentos de alta complejidad estructural, que suman un total estimado de P = 2.845 páginas equivalentes de texto, datos tabulares y diagramas normativos. Criterios de Inclusión: Vigencia Regulatoria: Documentación y marcos aplicables al periodo actual (2023--2026). Alta Densidad Estructural: Presencia obligatoria de listas de materias activas, límites máximos de residuos (LMR), tablas de coeficientes de admisibilidad de pastos (CAP) o regímenes de sanciones. Criticidad de Cumplimiento: Textos cuyo incumplimiento derivaría en sanciones económicas o denegación de subvenciones normativas.
+La \emph{población teórica} es ese universo institucional. La \emph{muestra experimental} de este TFM no es un corpus de 1760 documentos ni de 2845 páginas: es el conjunto de demostración indexado en el prototipo (del orden de $N=20$ ficheros PDF, CSV y Markdown ---POSEI, vademécum y fichas de ejemplo---, unas cincuenta páginas equivalentes). Los criterios de inclusión de la demo son vigencia aproximada 2023--2026, presencia de tablas o listas normativas y criticidad de cumplimiento (ayudas, condicionalidad, fitosanitarios). Un crawling masivo sobre \texttt{sources.json} queda descrito como capacidad del prototipo, no como el dataset sobre el que se publican las tablas del Capítulo~\ref{ch:evaluacion}.
 
 \section{Objetivos de investigación}
-El propósito central de la fase experimental es evaluar cuantitativamente el impacto de la arquitectura RAG multimodal en la reducción de la tasa de alucinación y el incremento de la fidelidad informativa frente a un LLM en modo autónomo (standalone).
+El propósito central de la fase experimental es evaluar cuantitativamente el impacto de la arquitectura RAG \textbf{textual} ---con ingesta de PDF y, en su caso, texto extraído por OCR--- en la mitigación de la tasa de alucinación y el incremento de la fidelidad informativa frente a un LLM en modo autónomo (\emph{standalone}). El prototipo no ejecuta un razonamiento visual end-to-end: las métricas de este capítulo se calculan sobre texto y embeddings, no sobre píxeles.
 
 De manera específica, la experimentación persigue:
 
@@ -29,14 +68,14 @@ Determinar la variación cuantitativa en la métrica Faithfulness (Fidelidad) al
 
 Evaluar el impacto de la preservación de maquetación (Docling) y la fragmentación contextual sobre la precisión de recuperación de datos numéricos tabulares.
 
-Medir el grado de concordancia entre la evaluación automatizada (LLM-as-a-judge) y la validación ciega de expertos humanos en normativa agrícola.
+Registrar, con honestidad metodológica, que no existe en esta edición un estudio de concordancia entre el juez automático y un panel de inspectores; la validación del banco es de autor (comentario 12 del tutor).
 
 \section{Variables intervinientes e instrumentos de evaluación}
 Para llevar a cabo la medición objetiva y reproducible de las variables dependientes, se desarrollaron dos herramientas específicas basadas en el lenguaje Python:
 
 Dashboard de Control y Auditoría (Gradio Framework): Se diseñó un panel de control interactivo mediante la librería Gradio para la ejecución, monitoreo en tiempo real y visualización analítica de los procesos de evaluación. El dashboard automatiza la lectura secuencial del banco de pruebas (tests.jsonl), gestiona las llamadas asíncronas a los modelos y genera métricas agregadas por categoría documental, visualizando las desviaciones mediante gráficos de barras interactivos (gr.BarPlot) y semáforos de calidad basados en umbrales prefijados.
 
-Evaluador Basado en LLM como Juez (LLM-as-a-judge via LiteLLM): La calidad de las respuestas se audita automáticamente mediante la integración de la librería LiteLLM conectada a un servidor local de Ollama ejecutando el modelo llama3. Para eliminar la variabilidad y la falta de estructura en la salida del juez, se forzó la generación de un esquema JSON estructurado validado de forma estricta mediante modelos Pydantic (AnswerEval).
+Evaluador basado en LLM como juez: la calidad de las respuestas se audita con el mismo runtime Ollama que el generador (\texttt{llama3.2:latest}), a través del adaptador de inferencia del gateway, no mediante un proxy LiteLLM. Se pide al modelo un JSON con notas 1--5 (exactitud, exhaustividad, relevancia) y se parsea en el servicio de evaluación. Esa salida es un juicio automático, no una rúbrica humana.
 
 El procedimiento computacional de auditoría se divide en dos módulos independientes: Evaluación del Recuperador (Retrieval) y Evaluación del Generador (Answer Evaluation).
 
@@ -70,7 +109,7 @@ Son aquellas condiciones técnicas manipuladas para observar su efecto sobre la 
 
 Estrategia de Fragmentación (Chunking y Layout Analysis): Técnica aplicada para la segmentación del texto fuente. Se contrasta la fragmentación estática mediante ventana deslizante de longitud fija frente al análisis de diseño jerárquico asistido por modelos de visión/parsing (v.g., preservación explícita de estructuras tabulares y maquetación mediante Markdown/HTML).
 
-Modelo de Embedding y Base de Datos Vectorial: Par formado por el algoritmo de representación semántica densa y el motor de almacenamiento vectorial (v.g., búsqueda por vecinos más cercanos indexada con HNSW sobre Qdrant/PostgreSQL/pgvector frente a indexación relacional tradicional).
+Modelo de embedding y base vectorial: par formado por \texttt{nomic-embed-text} (por defecto en \texttt{.env.example}) y PostgreSQL con la extensión \texttt{pgvector}. No se emplea Qdrant en el prototipo evaluado.
 
 Variables Dependientes (Métricas de Rendimiento)
 
@@ -86,45 +125,31 @@ La medición objetiva de las variables dependientes se apoyó en una estrategia 
 
 La medición objetiva de las variables dependientes se apoyó en una estrategia de evaluación híbrida que combina marcos automáticos de PLN con la validación por juicio humano.
 
-Evaluación Automática mediante Frameworks de PLN (RAGAS / TruLens): Se implementó el framework especializado RAGAS para calcular algorítmicamente las métricas de fidelidad, relevancia y precisión en una escala continua de  a . Este instrumento utiliza un modelo de lenguaje de alta capacidad como juez (LLM-as-a-judge, v.g., GPT-4 o Llama-3-70B) configurado con prompts estandarizados y metodologías de validación cruzada para garantizar la reproducibilidad y objetividad de los cómputos.
+Evaluación automática: las métricas de recuperación (MRR, nDCG, Precision@$K$, Recall@$K$, cobertura de palabras clave) se calculan con funciones propias en \texttt{evaluation\_metrics.py}. La calidad de la respuesta (escala 1--5) la asigna un LLM-as-a-Judge local. El adaptador RAGAS (\texttt{faithfulness}, \texttt{answer\_relevancy}, \texttt{context\_precision}, \texttt{context\_recall}) es opcional: si la librería no responde, el endpoint aplica un fallback heurístico que \textbf{no} debe citarse como puntuación RAGAS oficial. No se usa TruLens ni GPT-4 como juez en este prototipo.
 
-\begin{quote}Tabla 4 Frameworks RAG\end{quote}
-Framework
+\begin{table}[htbp]
+\centering
+\caption{Frameworks de orquestación RAG considerados; el prototipo usa un hexágono propio, no LangChain.}
+\label{tab:frameworks}
+\begin{tabular}{lll}
+\toprule
+\textbf{Framework} & \textbf{Lenguaje} & \textbf{En este TFM} \\
+\midrule
+LangChain & Python & Descartado como núcleo; demasiado acoplamiento \\
+LlamaIndex & Python & Descartado como núcleo \\
+Haystack & Python & No se usa \\
+DSPy & Python & No se usa \\
+Hexágono propio (FastAPI) & Python & Núcleo evaluado \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Lenguaje
-
-Popularida
-
-LangChain
-
-Python
-
-Muy Alta
-
-LlamaIndex
-
-Python
-
-Muy Alta
-
-Haystack
-
-Python
-
-Alta
-
-DSPy
-
-Python
-
-Creciente
-
-Juicio de Expertos (Evaluación Humana en Dominio Regulado): Con el objetivo de contrastar la aplicabilidad real del sistema en entornos normativos oficiales, se constituyó un panel de evaluación formado por técnicos gestores e inspectores de la Política Agraria Común (PAC). Este panel auditó una muestra ciega de respuestas generadas por las distintas configuraciones del sistema, evaluándolas mediante una escala Likert de 1 a 5 (donde 1 representa una respuesta completamente deficiente o inviable y 5 una respuesta plenamente precisa, trazable y utilizable en expediente administrativo).
+Juicio de expertos: no se constituyó un panel de inspectores PAC. El comentario 12 del tutor exige tamaño de muestra revisada y acuerdo con el juez; esa evidencia no existe en el repositorio. La validación del banco es de autor (contraste de la referencia con el texto fuente). Un estudio interanotador queda fuera de esta edición.
 
 \section{Modelo de análisis de datos}
 La presente investigación adopta un enfoque empírico-analítico de carácter experimental y transversal. El procedimiento metodológico se articula secuencialmente en cuatro fases interconectadas, orientadas a garantizar la reproducibilidad técnica y el rigor estadístico en la evaluación de la arquitectura AgroRAG.
 
-En esta fase inicial, la muestra de N = 20 documentos oficiales en formato PDF se somete a dos flujos diferenciados de procesamiento para comparar el efecto de la maquetación en el rendimiento posterior: Configuración de Extracción Plana (Baseline): Extracción directa de cadenas de texto sin preservación de coordenadas visuales ni etiquetas estructurales, convirtiendo el contenido a texto sin formato (plain text).Configuración Estructurada (AgroRAG): Reconstrucción jerárquica mediante Docling e inferencia visual local, convirtiendo tablas complejas, anexos numéricos y listas a sintaxis Markdown/HTML. Posteriormente, ambos corpus se dividen mediante fragmentación (chunking) contextual e indexación densa en la base de datos vectorial PostgreSQL/pgvector utilizando el modelo de embeddings qwen3-embedding:latest.
+En esta fase inicial, la muestra de demostración (del orden de $N=20$ documentos PDF PAC/POSEI y fichas fitosanitarias, no 1760) se fragmenta e indexa de forma densa en PostgreSQL/\texttt{pgvector} con \texttt{nomic-embed-text}, más un índice léxico BM25 por tenant. No se compara de forma experimental un baseline de extracción plana frente a Docling en las tablas de resultados: esa ablación queda descrita como diseño, no como resultado publicado.
 
 Para validar la capacidad de recuperación y generación, se estructuró un conjunto de datos de prueba compuesto por consultas técnicas sintéticas y reales. El banco de pruebas simula las situaciones operativas habituales a las que se enfrenta un inspector o gestor de expedientes PAC/POSEI.El dataset abarca tres niveles de complejidad tipológica: Consultas Factuales Directas (30\%): Búsqueda de definiciones normativas, plazos administrativos y requisitos de admisibilidad. Consultas de Extracción Tabular (40\%): Requerimiento de valores numéricos específicos, coeficientes de admisibilidad de pastos (CAP) o límites máximos de residuos (LMR). Consultas de Razonamiento Cruzado (30\%): Preguntas que exigen relacionar información dispersa entre múltiples anexos o disposiciones reglamentarias normativas.
 
@@ -138,49 +163,54 @@ Para validar la capacidad de recuperación y generación, se estructuró un conj
 \toprule
 \textbf{Componente} & \textbf{Valor} \\
 \midrule
-Generador RAG (servicio) & \texttt{llama3} (\texttt{RAG\_GENERATION\_MODEL}) \\
-Generador chat web & \texttt{llama3.2:latest} (seleccionable) \\
-Generador evaluación & \texttt{llama3.2} \\
-Embedding & \texttt{qwen3-embedding:latest} \\
-Cross-Encoder & \texttt{BAAI/bge-reranker-v2-m3} (\texttt{max\_length=512}, batch 16) \\
-Chunk size / overlap & 1000 / 150 \emph{caracteres} \\
-Dense top-$k$ inicial & 10 (\texttt{retrieval\_k}) \\
-BM25 top-$k$ inicial & 10 (\texttt{bm25\_k}) \\
-Fusión RRF & $k=60$ (hasta 15 candidatos) \\
-Top-$k$ final contexto & 3 (servicio) / 5 (evaluación) \\
-Temperatura & no fijada explícitamente en el cliente Ollama del servicio (predeterminado del servidor) \\
-Almacén vectorial & PostgreSQL 15 + extensión \texttt{vector} (pgvector) \\
-API & FastAPI (lockfile \texttt{gateway/uv.lock}) \\
-Orquestación & Docker Compose (api, frontend, postgres, ollama, migrate) \\
+Generador (chat y evaluación) & \texttt{llama3.2:latest} vía Ollama (\texttt{RAG\_GENERATION\_MODEL}) \\
+Embedding & \texttt{nomic-embed-text} (\texttt{RAG\_EMBEDDING\_MODEL}) \\
+Cross-Encoder & \texttt{BAAI/bge-reranker-v2-m3} (disponible; \texttt{RAG\_USE\_RERANKER=false} en la demo) \\
+Chunk size / overlap & 1400 / 120 \emph{caracteres} (no tokens) \\
+Dense / BM25 top-$k$ & 10 / 10 \\
+Fusión RRF & $k=60$ \\
+Top-$k$ final (chat) & 8 (\texttt{final\_k}); evaluación de laboratorio suele usar 5--10 \\
+Temperatura & no se envía en el cliente; rige el valor por defecto de Ollama \\
+Almacén vectorial & PostgreSQL + extensión \texttt{pgvector} \\
+API / UI & FastAPI $\geq$ 0.139 (Python 3.12) + React 19.2 / Vite / Tailwind 4 \\
+PostgreSQL & imagen \texttt{pgvector/pgvector:pg18} \\
+Ollama & imagen \texttt{ollama/ollama:latest}; modelos \texttt{llama3.2:latest} y \texttt{nomic-embed-text} \\
+Orquestación & Docker Compose (\texttt{api}, \texttt{frontend}, \texttt{postgres}, \texttt{ollama}, \texttt{ollama-init}, \texttt{migrate}) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 
 \section{Dataset de evaluación y categorías}
-El banco versionado en el repositorio (\texttt{gateway/core/tests.jsonl} y equivalentes) contiene \textbf{21 filas y 19 preguntas únicas}, no 150. Dos ítems de la categoría \texttt{relationship} están duplicados.
+El extractor de preguntas del prototipo (\texttt{question\_extraction.py}) define \textbf{siete categorías} de consulta. El banco de oro versionado (\texttt{knowledge-base/gold\_tests.jsonl}, replicado en \texttt{gateway/core/tests.jsonl} y las demás copias) contiene \textbf{35 preguntas} (cinco por categoría), cada una con \texttt{source\_file}, sección y respuesta de referencia contrastable contra el markdown de \texttt{asesor-canarias}. No es un dataset de 150 ítems ni un panel de inspectores PAC.
 
 \begin{table}[htbp]
 \centering
-\caption{Siete categorías del dataset versionado, conteo y ejemplo representativo.}
+\caption{Siete categorías del banco de oro ($N=35$), con ejemplos anclados a \texttt{asesor-canarias}.}
 \label{tab:categories}
-\begin{tabular}{llp{7.2cm}}
+\small
+\begin{tabular}{llp{5.4cm}p{5.0cm}}
 \toprule
-\textbf{Categoría} & \textbf{N} & \textbf{Ejemplo} \\
+\textbf{Categoría} & \textbf{N} & \textbf{Ejemplo 1} & \textbf{Ejemplo 2} \\
 \midrule
-\texttt{direct\_fact} & 6 & Ayuda por hectárea de aguacate bajo POSEI \\
-\texttt{temporal} & 4 & Cambios BCAM 8 en superficies no productivas \\
-\texttt{relationship} & 5 (3 únicas) & Superficie admisible POSEI y recinto declarado \\
-\texttt{spanning} & 3 & Reducción de ayuda sobre 50\,ha de tomate \\
-\texttt{regulatory\_compliance} & 1 & Requisitos PAC para pimiento y frutales \\
-\texttt{regulatory\_fact} & 1 & Condicionalidad de un ecorrégimen PAC \\
-\texttt{traceability} & 1 & Página/anexo jóvenes agricultores \\
+\texttt{direct\_fact} & 5 & ¿Qué significa la sigla POSEI? & ¿Qué medida cubre el plátano IGP? \\
+\texttt{temporal} & 5 & ¿Desde cuándo rige el consolidado POSEI 2026? & ¿Desde cuándo es obligatoria la GIP? \\
+\texttt{relationship} & 5 & ¿Qué distinguen REAC, CUE y REA? & ¿Quién gestiona el REA frente a la producción local? \\
+\texttt{spanning} & 5 & Fusarium y el 70~\% de la cantidad de referencia & Vid DOP (I.3) y filoxera de cuarentena \\
+\texttt{regulatory\_compliance} & 5 & Orden de la GIP antes del químico & Qué anotar en el CUE al tratar \\
+\texttt{regulatory\_fact} & 5 & El aguacate no tiene medida propia (I.1) & Acciones POSEI suprimidas \\
+\texttt{traceability} & 5 & Decreto 18/2025 y BOC del REAC & N.º de registro de AGROIL en platanera \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection*{Validación de preguntas sintéticas}
-\textbf{Evidencia pendiente.} No se ha localizado en el repositorio el artefacto de 150 preguntas ni un registro que identifique quién validó las preguntas sintéticas, su cualificación, el procedimiento de contraste de las respuestas de referencia ni la proporción revisada. Mientras no se incorpore dicho protocolo, las afirmaciones de ``150 validadas'' no se consideran demostradas. El banco operativo actual es el de 21/19 ítems citado arriba.
+El banco git añade dos ítems \texttt{out\_of\_knowledge} (cifra no soportada por el contexto; pregunta fuera del dominio agrario) para comprobar la abstención. No forman parte de las siete categorías del extractor, pero sí del protocolo de alucinación extrínseca.
+
+\subsection*{Validación de las preguntas del banco}
+El banco operativo no es un dataset de 150 ítems. Lo elaboró el autor a partir de \texttt{knowledge-base/asesor-canarias} (marco POSEI, GIP, cuarentena y dossiers de cultivo con usos MAPA). Cada ítem fija pregunta, palabras clave y respuesta de referencia con fichero y sección. La casilla \texttt{ok}/\texttt{corregir} de \texttt{docs/evaluation\_runs/gold\_validation.csv} es la evidencia de que el autor leyó la fuente; no hay panel PAC ni segundo anotador, y por tanto no hay $\kappa$. Un protocolo HITL existe en el prototipo; no sustituye esa validación de autor.
+
+\section{Alcance textual frente al término multimodal}
+El título del repositorio y parte de la literatura hablan de RAG multimodal. En este prototipo la ingesta acepta PDF (y, si el parser aplica OCR, texto extraído de páginas escaneadas), CSV y Markdown. Retrieval, generación y evaluación operan sobre \textbf{texto y vectores}. No se evalúa un modelo de visión que razone sobre la imagen original. Por tanto, ``multimodal'' se entiende aquí como \emph{corpus heterogéneo que se reduce a texto}, no como razonamiento visual end-to-end.
 
 
 \section{Origen de las métricas: propias, juez y RAGAS}
@@ -191,6 +221,14 @@ Es obligatorio no mezclar familias de métricas:
   \item[LLM-as-a-Judge] \texttt{accuracy}, \texttt{completeness}, \texttt{relevance} (escala 1--5) vía \texttt{RAGService.evaluate\_answer}. No es evaluación humana ni RAGAS.
   \item[RAGAS + alucinación binaria] Adaptador en \texttt{ragas\_service} y ruta \texttt{POST /api/v1/evaluation/ragas-run} con métricas \texttt{faithfulness}, \texttt{answer\_relevancy}, \texttt{context\_precision}, \texttt{context\_recall}, más \texttt{is\_hallucination}. Si la librería RAGAS no está operativa en el entorno, el endpoint aplica un \emph{fallback heurístico} etiquetado como tal; no debe presentarse como puntuación RAGAS oficial.
 \end{description}
+
+\section{Protocolo experimental y amenazas a la validez}
+El protocolo que se siguió ---y el que un replicador debería seguir--- es lineal. (1)~Levantar el prototipo contenedorizado y comprobar que Ollama sirve \texttt{llama3.2:latest} y \texttt{nomic-embed-text}. (2)~Indexar el corpus de demostración con chunk 1400/120 y reranker desactivado. (3)~Ejecutar el banco de preguntas, una vez \emph{sin} recuperación (el generador solo ve la pregunta y la instrucción de sistema) y otra \emph{con} el pipeline híbrido. (4)~Calcular IR con funciones propias sobre identificadores o palabras clave; pedir al juez las notas 1--5; si el adaptador RAGAS está disponible, registrar sus cuatro métricas con la etiqueta de origen. (5)~Agregar por categoría, no solo en media global. (6)~Inspeccionar a mano los fallos \texttt{spanning} y de trazabilidad.
+
+Las amenazas a la validez interna son claras. El juez ve la respuesta de referencia: hay riesgo de \emph{leakage} y de sobreestimar la exactitud. El mismo modelo genera y juzga, de modo que comparte sesgos. El banco es pequeño ($N=35$) aunque ya no hay categorías con $N=1$. Las amenazas a la validez externa son igualmente explícitas: el corpus es el markdown de asesoría versionado, no el universo MAPA/FEGA; el usuario es el autor, no un inspector PAC; el hardware de inferencia (CPU o GPU local) cambia latencia y, a veces, el orden de candidatos. La validez de constructo de ``tasa de alucinación'' depende de una marca binaria del juez, no de una taxonomía de Huang et al.\ aplicada por anotadores. Estas amenazas no anulan el objetivo de comparar LLM sin RAG frente a LLM con RAG; sí obligan a leer las cifras como indicios del prototipo, no como una ley del dominio agrario. Solo se citarán medias atadas al \texttt{run\_id} de \texttt{docs/evaluation\_runs/}.
+
+\section{Validación de las respuestas de referencia}
+El comentario de revisión pregunta quién validó las preguntas sintéticas y cómo se comprobó que la referencia era correcta. La respuesta, sin adornos, es: el autor. El procedimiento fue leer el fragmento o el documento fuente, redactar una respuesta breve que no añadiera cifras ausentes, y guardar palabras clave para el cálculo de cobertura. No hubo doble anotación, ni rúbrica ciega, ni acta de un organismo pagador. Cuando el extractor LLM propone preguntas a partir de un PDF, el autor puede aceptarlas o editarlas; esa aceptación sigue siendo humana y unipersonal. Un protocolo HITL en el prototipo permite marcar el chunk esperado tras una búsqueda; ese marcado mejora el banco futuro, pero no retroactiva un kappa sobre la corrida ya citada.
 
 
 

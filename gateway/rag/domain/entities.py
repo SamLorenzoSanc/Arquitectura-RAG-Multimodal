@@ -18,6 +18,7 @@ class RetrievalQuery:
     tenant_id: str = "global"
     collections: list[str] | None = None
     distance_metric: str = "cosine"
+    retrieval_strategy: str = "hybrid"
     use_reranking: bool = False
     use_query_rewrite: bool = False
     evaluation_mode: bool = False
