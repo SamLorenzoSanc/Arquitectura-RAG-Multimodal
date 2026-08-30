@@ -62,8 +62,8 @@ def test_list_experiments_returns_history(authenticated_client, override_db):
     override_db.execute = AsyncMock(return_value=mock_result)
 
     with patch(
-        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
-    ), patch("chat.adapters.inbound.http.init_experiment_runs_table", AsyncMock()):
+        "chat.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+    ), patch("chat.http.init_experiment_runs_table", AsyncMock()):
         res = authenticated_client.get(EXPERIMENTS_ROUTE)
 
     assert res.status_code == 200
@@ -91,14 +91,14 @@ def test_create_experiment_persists_run(authenticated_client, override_db):
     saved = {"id": 11, "created_at": None}
 
     with patch(
-        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+        "chat.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch(
-        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
+        "chat.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
     ), patch(
-        "chat.adapters.inbound.http.evaluate_retrieval_internal",
+        "chat.http.evaluate_retrieval_internal",
         AsyncMock(return_value=_fake_eval()),
     ), patch(
-        "chat.adapters.inbound.http.record_experiment_run", AsyncMock(return_value=saved)
+        "chat.http.record_experiment_run", AsyncMock(return_value=saved)
     ):
         res = authenticated_client.post(
             EXPERIMENTS_ROUTE,
@@ -134,14 +134,14 @@ def test_compare_experiments_runs_three_distances(authenticated_client):
     saved = {"id": 1, "created_at": None}
 
     with patch(
-        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+        "chat.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch(
-        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
+        "chat.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
     ), patch(
-        "chat.adapters.inbound.http.evaluate_retrieval_internal",
+        "chat.http.evaluate_retrieval_internal",
         AsyncMock(return_value=_fake_eval(mrr=0.9)),
     ), patch(
-        "chat.adapters.inbound.http.record_experiment_run", AsyncMock(return_value=saved)
+        "chat.http.record_experiment_run", AsyncMock(return_value=saved)
     ) as persist:
         res = authenticated_client.post(
             COMPARE_ROUTE,
@@ -180,14 +180,14 @@ def test_compare_experiments_runs_two_embeddings(authenticated_client):
     saved = {"id": 3, "created_at": None}
 
     with patch(
-        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+        "chat.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch(
-        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
+        "chat.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
     ), patch(
-        "chat.adapters.inbound.http.evaluate_retrieval_internal",
+        "chat.http.evaluate_retrieval_internal",
         AsyncMock(return_value=_fake_eval(mrr=0.85)),
     ), patch(
-        "chat.adapters.inbound.http.record_experiment_run", AsyncMock(return_value=saved)
+        "chat.http.record_experiment_run", AsyncMock(return_value=saved)
     ) as persist:
         res = authenticated_client.post(
             COMPARE_ROUTE,
@@ -228,13 +228,13 @@ def test_compare_retrieval_strategies_runs_same_bank(authenticated_client):
     evaluator = AsyncMock(return_value=_fake_eval(mrr=0.75))
 
     with patch(
-        "chat.adapters.inbound.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
+        "chat.http.get_user_tenant_id", AsyncMock(return_value="tenant-1")
     ), patch(
-        "chat.adapters.inbound.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
+        "chat.http.resolve_evaluation_tests", AsyncMock(return_value=sample)
     ), patch(
-        "chat.adapters.inbound.http.evaluate_retrieval_internal", evaluator
+        "chat.http.evaluate_retrieval_internal", evaluator
     ), patch(
-        "chat.adapters.inbound.http.record_experiment_run",
+        "chat.http.record_experiment_run",
         AsyncMock(side_effect=[
             {"id": 21, "created_at": None},
             {"id": 22, "created_at": None},
@@ -266,3 +266,116 @@ def test_compare_retrieval_strategies_runs_same_bank(authenticated_client):
 def test_dataset_evaluation_request_can_skip_cache():
     assert DatasetEvaluationRequest().force is False
     assert DatasetEvaluationRequest(force=True).force is True
+
+
+INDEXED_MODELS_ROUTE = "/api/v1/chat/evaluation/experiments/indexed-models"
+
+
+def test_indexed_models_runs_each_embedding(authenticated_client):
+    sample = [
+        type(
+            "T",
+            (),
+            {
+                "question": "¿Qué es SIGPAC?",
+                "keywords": ["SIGPAC"],
+                "reference_answer": "Parcelas.",
+                "category": "direct_fact",
+                "out_of_knowledge": False,
+                "metadata": {},
+            },
+        )()
+    ]
+    persist = AsyncMock(
+        side_effect=[
+            {"id": 31, "created_at": None},
+            {"id": 32, "created_at": None},
+        ]
+    )
+
+    with patch(
+        "chat.http.get_user_tenant_id",
+        AsyncMock(return_value="tenant-1"),
+    ), patch(
+        "chat.http.resolve_evaluation_tests",
+        AsyncMock(return_value=sample),
+    ), patch(
+        "chat.http.evaluate_retrieval_internal",
+        AsyncMock(return_value=_fake_eval(mrr=0.7)),
+    ), patch(
+        "chat.http.record_experiment_run", persist
+    ):
+        res = authenticated_client.post(
+            INDEXED_MODELS_ROUTE,
+            json={
+                "distance_metric": "cosine",
+                "top_k": 3,
+                "embedding_models": [
+                    "nomic-embed-text",
+                    "qwen3-embedding:latest",
+                ],
+            },
+        )
+
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["runs"]) == 2
+    assert persist.await_count == 2
+    assert {run["embedding_model"] for run in body["runs"]} == {
+        "nomic-embed-text",
+        "qwen3-embedding:latest",
+    }
+    assert {run["experiment_type"] for run in body["runs"]} == {"question_bank"}
+    assert body["best_mrr_id"] in {31, 32}
+
+
+def test_indexed_models_discovers_from_index(authenticated_client):
+    sample = [
+        type(
+            "T",
+            (),
+            {
+                "question": "¿Qué es SIGPAC?",
+                "keywords": ["SIGPAC"],
+                "reference_answer": "Parcelas.",
+                "category": "direct_fact",
+                "out_of_knowledge": False,
+                "metadata": {},
+            },
+        )()
+    ]
+
+    with patch(
+        "chat.http.get_user_tenant_id",
+        AsyncMock(return_value="tenant-1"),
+    ), patch(
+        "chat.http.resolve_evaluation_tests",
+        AsyncMock(return_value=sample),
+    ), patch(
+        "chat.http._indexed_embedding_models",
+        AsyncMock(return_value=["mxbai-embed-large", "nomic-embed-text"]),
+    ), patch(
+        "chat.http.evaluate_retrieval_internal",
+        AsyncMock(return_value=_fake_eval(mrr=0.6)),
+    ), patch(
+        "chat.http.record_experiment_run",
+        AsyncMock(
+            side_effect=[
+                {"id": 41, "created_at": None},
+                {"id": 42, "created_at": None},
+            ]
+        ),
+    ) as persist:
+        res = authenticated_client.post(
+            INDEXED_MODELS_ROUTE,
+            json={"distance_metric": "cosine", "persist": True},
+        )
+
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["runs"]) == 2
+    assert persist.await_count == 2
+    assert [run["embedding_model"] for run in body["runs"]] == [
+        "mxbai-embed-large",
+        "nomic-embed-text",
+    ]

@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 
 from schemas.evaluation import EvaluationLabConfigCreate
-from services.evaluation_lab_service import (
+from evaluation.lab import (
     CATALOG_BY_ID,
     METRIC_CATALOG,
     _fallback_ragas,

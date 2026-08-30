@@ -2,10 +2,21 @@
 \chapter{Evaluación, resultados y discusión}
 \label{ch:evaluacion}
 
-Las cifras de este capítulo salen de la corrida \texttt{run\_20260819T165515Z} ($N=35$, 35/35 sin error, 289{,}6\,s), persistida en \texttt{docs/evaluation\_runs/run\_20260819T165515Z/}. El banco de oro tiene cinco ítems por cada una de las siete categorías (\texttt{knowledge-base/gold\_tests.jsonl}). Misma pregunta \emph{sin} contexto y \emph{con} recuperador híbrido (denso + BM25 + RRF, \texttt{RAG\_USE\_RERANKER=false}, chunk 1400/120, $k{=}8$). RAGAS \textbf{no} se ejecutó. No se citan medias exploratorias (p.\ ej.\ MRR $0{,}7911$).
+Este capítulo presenta el análisis, los resultados y la discusión del protocolo experimental. La muestra no es una encuesta sociodemográfica de usuarios, sino un \textbf{banco de evaluación versionado} diseñado para simular consultas técnicas sobre normativa agraria canaria. Las cifras proceden de la corrida congelada \texttt{run\_20260819T165515Z} ($N=35$, 35/35 sin error de ejecución, duración total $\approx 289{,}6$\,s), persistida en \texttt{docs/evaluation\_runs/run\_20260819T165515Z/}. Misma pregunta \emph{sin} contexto y \emph{con} recuperador híbrido (denso + BM25 + RRF, \texttt{RAG\_USE\_RERANKER=false}, chunk 1400/120, \texttt{final\_k}=8). RAGAS \textbf{no} se ejecutó. No se citan medias exploratorias de corridas previas.
+
+\section{Unidad de análisis y variables}
+Cada ítem del banco incluye pregunta, respuesta de referencia, palabras clave, categoría tipológica y anclaje a un fichero fuente del corpus \texttt{asesor-canarias} (markdown de asesoría: POSEI, GIP, cuarentena, dossiers de cultivo, etc.). El índice asociado comprende \textbf{1289} chunks. Hay cinco ítems por cada una de las siete categorías (tabla~\ref{tab:mrr-cat}).
+
+Las variables consideradas son:
+
+\begin{itemize}
+  \item \textbf{De recuperación:} posición del primer fragmento útil (MRR) y cobertura de palabras clave. El nDCG del harness \textbf{no} se cita como canónico en esta corrida: produjo valores anómalos $>1$ en \textbf{21 de 35} filas (no en 160).
+  \item \textbf{De generación} (LLM-as-a-Judge, escala 1--5): exactitud, exhaustividad y relevancia; además, tasa binaria de alucinación (\texttt{is\_hallucination}).
+  \item \textbf{De contraste experimental:} misma pregunta y modelo (\texttt{llama3.2:latest}) \emph{con} RAG (híbrido denso + BM25 + RRF, sin reranker) frente a \emph{sin} RAG (generación autónoma).
+\end{itemize}
 
 \section{Configuración congelada}
-La tabla~\ref{tab:eval-config} copia \texttt{config.json} de esa corrida. En esta ejecución la temperatura \textbf{no se envió} en el payload (default de Ollama). El laboratorio React posterior sí la expone y la manda (\texttt{RAG\_TEMPERATURE}=0).
+La tabla~\ref{tab:eval-config} resume \texttt{config.json} de esa corrida. En esta ejecución la temperatura \textbf{no se envió} en el payload (default de Ollama). El laboratorio React posterior sí la expone y la manda (\texttt{RAG\_TEMPERATURE}=0).
 
 \begin{table}[htbp]
 \centering
@@ -16,8 +27,8 @@ La tabla~\ref{tab:eval-config} copia \texttt{config.json} de esa corrida. En est
 \textbf{Parámetro} & \textbf{Valor} \\
 \midrule
 \texttt{run\_id} & \texttt{run\_20260819T165515Z} \\
-Generador & \texttt{llama3.2:latest} (digest \texttt{a80c4f17acd55265\ldots}) \\
-Embedder & \texttt{nomic-embed-text:latest} (digest \texttt{0a109f422b47e3a3\ldots}) \\
+Generador & \texttt{llama3.2:latest} \\
+Embedder & \texttt{nomic-embed-text:latest} \\
 Chunk / solape & 1400 / 120 caracteres \\
 Retrieve & denso $k{=}10$ + BM25 $k{=}10$ + RRF ($k{=}60$), \texttt{final\_k}=8 \\
 Reranker & \texttt{false} \\
@@ -28,16 +39,15 @@ RAGAS & no ejecutado \\
 \end{tabular}
 \end{table}
 
-\section{Análisis descriptivo de la muestra}
-El corpus es el markdown de asesoría canaria (POSEI, GIP, cuarentena, dossiers de cultivo con usos MAPA). Cinco ítems por categoría (tabla~\ref{tab:categories}). La muestra humana ciega son 21 ítems fijados en \texttt{human\_sample\_item\_ids.json} \emph{antes} de mirar al juez; la plantilla está en \texttt{author\_scorecard.csv} de este \texttt{run\_id}.
-
-\section{Resultados del recuperador}
-Métricas propias sobre palabras clave del ítem y los fragmentos recuperados (no RAGAS). El nDCG implementado en el harness produjo valores $>1$ en 21 de 35 filas: \textbf{no se cita} como nDCG canónico. Se informan MRR y cobertura de keywords.
+\section{Resultados de recuperación (IR)}
+Métricas propias sobre palabras clave del ítem y los fragmentos recuperados (no RAGAS).
 
 \begin{itemize}
-  \item Mean Reciprocal Rank (MRR): $0{,}8108$
-  \item Cobertura de palabras clave: $0{,}9643$
+  \item MRR global: $0{,}8108$
+  \item Cobertura de keywords: $0{,}9643$
 \end{itemize}
+
+Por categoría, el MRR más alto se observa en \texttt{relationship} ($0{,}933$) y \texttt{temporal} ($0{,}900$); el más bajo, en \texttt{traceability} ($0{,}667$).
 
 \begin{table}[htbp]
 \centering
@@ -60,8 +70,6 @@ Global & 35 & 0{,}811 \\
 \end{tabular}
 \end{table}
 
-La figura~\ref{fig:mrr-cat} es un esquema de barras por categoría; las cifras vinculantes son las de la Tabla~\ref{tab:mrr-cat}, no una corrida anterior.
-
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/metricas-mrr-categorias.png}
@@ -69,11 +77,19 @@ La figura~\ref{fig:mrr-cat} es un esquema de barras por categoría; las cifras v
 \label{fig:mrr-cat}
 \end{figure}
 
-\section{Calidad de generación (LLM-as-a-Judge)}
-El juez ($1$--$5$) es el mismo modelo generador. Medias con RAG: exactitud $4{,}46$, exhaustividad $4{,}06$, relevancia $4{,}00$. No se mezclan con IR ni con RAGAS.
+\section{Calidad de generación con RAG (LLM-as-a-Judge)}
+El juez ($1$--$5$) es el mismo modelo generador. Medias con RAG:
 
-\section{Comparación LLM sin RAG frente a LLM con RAG}
-Misma pregunta, mismo modelo (\texttt{llama3.2:latest}) y mismo juez. Sin RAG no hay fidelidad a un contexto recuperado; RAGAS no corre.
+\begin{itemize}
+  \item Exactitud: $4{,}46$
+  \item Exhaustividad: $4{,}06$
+  \item Relevancia: $4{,}00$
+\end{itemize}
+
+Estas notas no se mezclan con las métricas de IR ni con RAGAS.
+
+\section{Comparación sin RAG frente a con RAG}
+Misma pregunta, mismo modelo (\texttt{llama3.2:latest}) y mismo juez. Sin RAG no hay fidelidad a un contexto recuperado.
 
 \begin{table}[htbp]
 \centering
@@ -86,7 +102,6 @@ Misma pregunta, mismo modelo (\texttt{llama3.2:latest}) y mismo juez. Sin RAG no
 Exactitud (1--5) & 3{,}31 & 4{,}46 & $+1{,}14$ \\
 Exhaustividad (1--5) & 2{,}46 & 4{,}06 & $+1{,}60$ \\
 Relevancia (1--5) & 3{,}06 & 4{,}00 & $+0{,}94$ \\
-Faithfulness RAGAS & n/a & n/a & --- \\
 Tasa \texttt{is\_hallucination} (juez) & 0{,}314 & 0{,}086 & $-0{,}229$ \\
 \bottomrule
 \end{tabular}
@@ -99,9 +114,8 @@ Tasa \texttt{is\_hallucination} (juez) & 0{,}314 & 0{,}086 & $-0{,}229$ \\
 \label{fig:rag-vs-norag}
 \end{figure}
 
-En esta corrida RAG \textbf{gana}: la tasa binaria de alucinación del juez pasa de $0{,}314$ a $0{,}086$. No la elimina.
+El RAG mejora las tres dimensiones del juez y reduce la tasa binaria de alucinación aproximadamente a una cuarta parte ($0{,}314 \rightarrow 0{,}086$), \textbf{sin eliminarla}. Por tipología, \texttt{spanning} y \texttt{regulatory\_compliance} alcanzan exactitud $5{,}00$ y alucinación $0{,}00$ en el agregado de cinco ítems; \texttt{direct\_fact}, \texttt{temporal} y \texttt{traceability} concentran la residual ($0{,}20$).
 
-\section{Resultados por categoría (juez y alucinación)}
 \begin{table}[htbp]
 \centering
 \caption{MRR, exactitud del juez y alucinación por categoría (misma corrida).}
@@ -120,8 +134,6 @@ En esta corrida RAG \textbf{gana}: la tasa binaria de alucinación del juez pasa
 \bottomrule
 \end{tabular}
 \end{table}
-
-Ninguna categoría queda con $N=1$. En este banco el IR más débil no es \texttt{spanning} (MRR $0{,}867$, exactitud $5{,}00$) sino \texttt{traceability} (MRR $0{,}667$).
 
 \section{Origen de las métricas reportadas}
 \begin{table}[htbp]
@@ -164,5 +176,22 @@ Recortados de \texttt{failures.json} de la misma corrida (peores \texttt{traceab
 \section{Concordancia experto--juez}
 Protocolo: el autor puntúa a ciegas los 21 ítems de \texttt{author\_scorecard.csv} (rúbrica 1--5 de exactitud) \emph{sin} abrir las columnas del juez, y luego se calcula el acuerdo $\pm 1$ con \texttt{scripts/score\_human\_agreement.py}. No hay segundo anotador; por tanto \textbf{no hay $\kappa$}. Esa plantilla ya está generada a partir de este run; el porcentaje se añadirá cuando el autor rellene las notas.
 
-\section{Discusión}
-En \texttt{run\_20260819T165515Z} RAG mejora exactitud ($+1{,}14$) y reduce la marca binaria de alucinación ($0{,}314\rightarrow 0{,}086$) frente al mismo LLM sin contexto. El patrón no es ``el híbrido falla en spanning'': en este banco \texttt{spanning} es sólido. El hueco empírico es \textbf{trazabilidad} (número de registro, URL de un año concreto): el top-$k$ trae el documento o un vecino, no el identificador, y el generador completa con un código o un enlace verosímil. El juez 1--5 no es una auditoría legal: el caso H1 lo demuestra. RAG desplaza parte del riesgo de alucinación al retriever; no lo suprime. Graph RAG y visión end-to-end no forman parte de esta evaluación; el bucle LangGraph (grader y reescritura) orquesta el chat, pero la corrida congelada mide el retriever híbrido con top-$k$ fijo.
+\section{Discusión y análisis de los resultados}
+Los datos apoyan la hipótesis operativa del TFM: enriquecer el prompt con evidencia recuperada \textbf{mitiga} alucinaciones factuales frente a un LLM autónomo en un dominio normativo denso. La mejora en exhaustividad ($+1{,}60$) es especialmente coherente con la lógica RAG: sin contexto, el modelo omite requisitos, plazos o cifras; con fragmentos, completa mejor la respuesta.
+
+Respecto a la utilidad del recuperador, un MRR $\approx 0{,}81$ indica que, de media, el primer documento útil aparece pronto en el ranking. La cobertura de keywords alta ($0{,}96$) sugiere buena alineación léxica con el banco. El punto débil es la \textbf{trazabilidad} (identificadores MAPA, URLs, códigos): el top-$k$ puede traer el documento vecino y el generador «completa» con un código verosímil. Ese fallo es a la vez de retrieval y de grounding, y marca una línea de mejora (chunking tabular, citas estrictas, abstención si no hay match de identificador).
+
+Los resultados justifican mantener el RAG híbrido como núcleo del producto y orientar el trabajo siguiente a: (a)~reforzar categorías débiles (trazabilidad); (b)~cerrar el ciclo HITL $\rightarrow$ banco de oro; (c)~congelar configs por organización; (d)~ampliar el banco y, si procede, una auditoría RAGAS/humana. En términos de producto, la reducción de alucinación del $31{,}4\,\%$ al $8{,}6\,\%$ es el argumento empírico frente al tribunal: RAG no es magia, pero sí un mecanismo medible de anclaje.
+
+La tabla~\ref{tab:origen-metricas} debe leerse junto con las definiciones del Capítulo~\ref{ch:estado-arte}. Correspondencia con lo pedido por la revisión:
+
+\begin{itemize}
+  \item \textbf{Faithfulness / exactitud factual:} proxy = exactitud del juez y \texttt{is\_hallucination} (no hay score RAGAS de fidelidad en esta corrida).
+  \item \textbf{Answer relevancy:} proxy = relevancia 1--5 del juez.
+  \item \textbf{Context precision:} proxy = MRR (el nDCG del harness no se cita).
+  \item \textbf{Context recall:} proxy = cobertura de palabras clave.
+  \item \textbf{Tasa de alucinaciones:} $0{,}314$ sin RAG frente a $0{,}086$ con RAG.
+  \item \textbf{Calidad de citas:} cualitativa (documento + sección + chunk en la UI); los fallos H1--H2 muestran citas vecinas e identificadores inventados.
+\end{itemize}
+
+No se afirma que RAG reduzca las alucinaciones ``a niveles cercanos a cero'': el 8{,}6\,\% residual y el caso AGROIL lo contradicen.

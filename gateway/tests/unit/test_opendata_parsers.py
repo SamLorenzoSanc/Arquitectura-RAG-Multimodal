@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from services.opendata_parsers import (
+from opendata.parsers import (
     filter_sat_rows,
     normalize_sat_row,
     parse_istac_sheet_rows,

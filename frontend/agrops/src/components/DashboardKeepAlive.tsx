@@ -2,14 +2,16 @@ import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import DocumentsPage from "@/pages/DocumentsPage";
-import EvaluationPage from "@/pages/EvalutionPage";
+import EvaluationPage from "@/pages/EvaluationPage";
 import HelpDocsPage from "@/pages/HelpDocsPage";
 import KnowledgeGraphPage from "@/pages/KnowledgeGraphPage";
 import OrganizationPage from "@/pages/OrganizationPage";
 import RagPipelinePage from "@/pages/RagPipelinePage";
+import RagProbePage from "@/pages/RagProbePage";
 import SettingsPage from "@/pages/SettingsPage";
 import SupportPage from "@/pages/SupportPage";
 import ValidacionHumanaPage from "@/pages/ValidacionHumanaPage";
+import UserHistoryPage from "@/pages/UserHistoryPage";
 import DashboardOverview from "@/pages/Dashboard";
 
 type DashRoute = {
@@ -24,6 +26,8 @@ export const DASHBOARD_ROUTES: DashRoute[] = [
   { path: "/dashboard/documentos", Component: DocumentsPage },
   { path: "/dashboard/embeddings", Component: KnowledgeGraphPage },
   { path: "/dashboard/flujo-rag", Component: RagPipelinePage },
+  { path: "/dashboard/lab-retrieval", Component: RagProbePage },
+  { path: "/dashboard/historial", Component: UserHistoryPage },
   { path: "/dashboard/evaluacion", Component: EvaluationPage },
   { path: "/dashboard/validacion", Component: ValidacionHumanaPage },
   { path: "/dashboard/organization", Component: OrganizationPage },
@@ -63,10 +67,6 @@ export default function DashboardKeepAlive() {
 
   if (current === "/dashboard/guardrails") {
     return <Navigate to="/dashboard/evaluacion" replace />;
-  }
-
-  if (current === "/dashboard/chat") {
-    return <Navigate to={DEFAULT_DASHBOARD} replace />;
   }
 
   if (!known.has(current)) {

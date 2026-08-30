@@ -1,0 +1,186 @@
+% -*- coding: utf-8 -*-
+\chapter{Evaluación, resultados y discusión}
+\label{ch:evaluacion}
+
+Este capítulo presenta el análisis, los resultados y la discusión del protocolo experimental. La muestra no es una encuesta sociodemográfica de usuarios, sino un \textbf{banco de evaluación versionado} diseñado para simular consultas técnicas sobre normativa agraria canaria. Las cifras proceden de la corrida congelada \texttt{run\_20260819T165515Z} ($N=35$, 35/35 sin error de ejecución, duración total $\approx 289{,}6$\,s), persistida en \texttt{docs/evaluation\_runs/run\_20260819T165515Z/}. Misma pregunta \emph{sin} contexto y \emph{con} recuperador híbrido (denso + BM25 + RRF, \texttt{RAG\_USE\_RERANKER=false}, chunk 1400/120, \texttt{final\_k}=8). RAGAS \textbf{no} se ejecutó. No se citan medias exploratorias de corridas previas.
+
+\section{Unidad de análisis y variables}
+Cada ítem del banco incluye pregunta, respuesta de referencia, palabras clave, categoría tipológica y anclaje a un fichero fuente del corpus \texttt{asesor-canarias} (markdown de asesoría: POSEI, GIP, cuarentena, dossiers de cultivo, etc.). El índice asociado comprende \textbf{1289} chunks. Hay cinco ítems por cada una de las siete categorías (tabla~\ref{tab:mrr-cat}).
+
+Las variables consideradas son:
+
+\begin{itemize}
+  \item \textbf{De recuperación:} posición del primer fragmento útil (MRR) y cobertura de palabras clave. El nDCG del harness \textbf{no} se cita como canónico en esta corrida: produjo valores anómalos $>1$ en \textbf{21 de 35} filas (no en 160).
+  \item \textbf{De generación} (LLM-as-a-Judge, escala 1--5): exactitud, exhaustividad y relevancia; además, tasa binaria de alucinación (\texttt{is\_hallucination}).
+  \item \textbf{De contraste experimental:} misma pregunta y modelo (\texttt{llama3.2:latest}) \emph{con} RAG (híbrido denso + BM25 + RRF, sin reranker) frente a \emph{sin} RAG (generación autónoma).
+\end{itemize}
+
+\section{Configuración congelada}
+La tabla~\ref{tab:eval-config} resume \texttt{config.json} de esa corrida. En esta ejecución la temperatura \textbf{no se envió} en el payload (default de Ollama). El laboratorio React posterior sí la expone y la manda (\texttt{RAG\_TEMPERATURE}=0).
+
+\begin{table}[htbp]
+\centering
+\caption{Configuración de \texttt{run\_20260819T165515Z} (\texttt{config.json}).}
+\label{tab:eval-config}
+\begin{tabular}{ll}
+\toprule
+\textbf{Parámetro} & \textbf{Valor} \\
+\midrule
+\texttt{run\_id} & \texttt{run\_20260819T165515Z} \\
+Generador & \texttt{llama3.2:latest} \\
+Embedder & \texttt{nomic-embed-text:latest} \\
+Chunk / solape & 1400 / 120 caracteres \\
+Retrieve & denso $k{=}10$ + BM25 $k{=}10$ + RRF ($k{=}60$), \texttt{final\_k}=8 \\
+Reranker & \texttt{false} \\
+Temperatura (esta corrida) & no enviada (default Ollama) \\
+Corpus & \texttt{knowledge-base/asesor-canarias/**/*.md} (1289 chunks) \\
+RAGAS & no ejecutado \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Resultados de recuperación (IR)}
+Métricas propias sobre palabras clave del ítem y los fragmentos recuperados (no RAGAS).
+
+\begin{itemize}
+  \item MRR global: $0{,}8108$
+  \item Cobertura de keywords: $0{,}9643$
+\end{itemize}
+
+Por categoría, el MRR más alto se observa en \texttt{relationship} ($0{,}933$) y \texttt{temporal} ($0{,}900$); el más bajo, en \texttt{traceability} ($0{,}667$).
+
+\begin{table}[htbp]
+\centering
+\caption{MRR del recuperador híbrido por categoría (\texttt{run\_20260819T165515Z}).}
+\label{tab:mrr-cat}
+\begin{tabular}{llr}
+\toprule
+\textbf{Categoría} & \textbf{N} & \textbf{MRR} \\
+\midrule
+\texttt{relationship} & 5 & 0{,}933 \\
+\texttt{temporal} & 5 & 0{,}900 \\
+\texttt{spanning} & 5 & 0{,}867 \\
+\texttt{regulatory\_fact} & 5 & 0{,}833 \\
+\texttt{regulatory\_compliance} & 5 & 0{,}747 \\
+\texttt{direct\_fact} & 5 & 0{,}729 \\
+\texttt{traceability} & 5 & 0{,}667 \\
+\midrule
+Global & 35 & 0{,}811 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/metricas-mrr-categorias.png}
+\caption{Esquema de MRR por categoría. Valores numéricos: Tabla~\ref{tab:mrr-cat} (\texttt{run\_20260819T165515Z}).}
+\label{fig:mrr-cat}
+\end{figure}
+
+\section{Calidad de generación con RAG (LLM-as-a-Judge)}
+El juez ($1$--$5$) es el mismo modelo generador. Medias con RAG:
+
+\begin{itemize}
+  \item Exactitud: $4{,}46$
+  \item Exhaustividad: $4{,}06$
+  \item Relevancia: $4{,}00$
+\end{itemize}
+
+Estas notas no se mezclan con las métricas de IR ni con RAGAS.
+
+\section{Comparación sin RAG frente a con RAG}
+Misma pregunta, mismo modelo (\texttt{llama3.2:latest}) y mismo juez. Sin RAG no hay fidelidad a un contexto recuperado.
+
+\begin{table}[htbp]
+\centering
+\caption{LLM autónomo frente a RAG híbrido ($N=35$, \texttt{run\_20260819T165515Z}).}
+\label{tab:rag-vs-norag}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Métrica} & \textbf{Sin RAG} & \textbf{Con RAG} & \textbf{Dif.} \\
+\midrule
+Exactitud (1--5) & 3{,}31 & 4{,}46 & $+1{,}14$ \\
+Exhaustividad (1--5) & 2{,}46 & 4{,}06 & $+1{,}60$ \\
+Relevancia (1--5) & 3{,}06 & 4{,}00 & $+0{,}94$ \\
+Tasa \texttt{is\_hallucination} (juez) & 0{,}314 & 0{,}086 & $-0{,}229$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/metricas-rag-vs-norag.png}
+\caption{Esquema visual de la comparación. Valores numéricos: Tabla~\ref{tab:rag-vs-norag}.}
+\label{fig:rag-vs-norag}
+\end{figure}
+
+El RAG mejora las tres dimensiones del juez y reduce la tasa binaria de alucinación aproximadamente a una cuarta parte ($0{,}314 \rightarrow 0{,}086$), \textbf{sin eliminarla}. Por tipología, \texttt{spanning} y \texttt{regulatory\_compliance} alcanzan exactitud $5{,}00$ y alucinación $0{,}00$ en el agregado de cinco ítems; \texttt{direct\_fact}, \texttt{temporal} y \texttt{traceability} concentran la residual ($0{,}20$).
+
+\begin{table}[htbp]
+\centering
+\caption{MRR, exactitud del juez y alucinación por categoría (misma corrida).}
+\label{tab:by-cat}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Categoría} & \textbf{N} & \textbf{MRR} & \textbf{Acc.\ juez} & \textbf{Halluc.} \\
+\midrule
+\texttt{direct\_fact} & 5 & 0{,}729 & 4{,}40 & 0{,}20 \\
+\texttt{temporal} & 5 & 0{,}900 & 4{,}00 & 0{,}20 \\
+\texttt{relationship} & 5 & 0{,}933 & 4{,}20 & 0{,}00 \\
+\texttt{spanning} & 5 & 0{,}867 & 5{,}00 & 0{,}00 \\
+\texttt{regulatory\_compliance} & 5 & 0{,}747 & 5{,}00 & 0{,}00 \\
+\texttt{regulatory\_fact} & 5 & 0{,}833 & 4{,}00 & 0{,}00 \\
+\texttt{traceability} & 5 & 0{,}667 & 4{,}60 & 0{,}20 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Origen de las métricas reportadas}
+\begin{table}[htbp]
+\centering
+\caption{Origen de cada métrica citada en este capítulo.}
+\label{tab:origen-metricas}
+\begin{tabular}{p{4.4cm}p{4.0cm}p{5.4cm}}
+\toprule
+\textbf{Métrica} & \textbf{Origen} & \textbf{Dónde se calcula} \\
+\midrule
+MRR y cobertura de keywords & Función propia & \texttt{results.csv} de \texttt{run\_20260819T165515Z} \\
+nDCG del harness & Función propia, \textbf{no citada} & 21/35 filas $>1$; no es nDCG canónico \\
+Exactitud, exhaustividad, relevancia 1--5, \texttt{is\_hallucination} & LLM-as-a-Judge & Mismo CSV; no es juicio humano \\
+RAGAS & No aplica & No se ejecutó \\
+Acuerdo autor--juez ($\pm 1$) & Pendiente de anotación & \texttt{author\_scorecard.csv} (21 ítems) \\
+$\kappa$ de Cohen & No aplica & Un solo anotador humano \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Fallos de trazabilidad (dos casos del CSV)}
+Recortados de \texttt{failures.json} de la misma corrida (peores \texttt{traceability} por MRR).
+
+\begin{quote}
+\textbf{Fallo H1 (ítem 34, \texttt{traceability}, MRR $0{,}000$).}\\
+\textit{Pregunta:} ¿Cuál es el número de registro de AGROIL para araña roja en platanera?\\
+\textit{Referencia:} AGROIL figura con el n.º 22319 (\texttt{cultivos/platanera.md}).\\
+\textit{Fragmentos recuperados:} GIP/regfiweb, papaya, intro de platanera, berenjena, aguacate, forrajes, FAQ, olivo. El dossier de platanera entra en el top-$k$, pero el chunk con \texttt{22319} no.\\
+\textit{Respuesta RAG:} inventa el registro \texttt{ES-01744}.\\
+\textit{Causa:} fallo de recuperación sobre un identificador puntual en un dossier largo; el generador no se abstiene y alucina un código plausible. El juez asignó exactitud $5{,}00$ pese al error: hay \emph{leakage} del juez (ve la referencia y puntúa el tema, no el dígito).
+
+\textbf{Fallo H2 (ítem 35, \texttt{traceability}, MRR $0{,}333$).}\\
+\textit{Pregunta:} ¿Cuál es la URL del texto consolidado POSEI Canarias 2026 citada en el corpus?\\
+\textit{Referencia:} \ldots\texttt{POSEI-Canarias-texto-consolidado-2026-30-12-2025.pdf}.\\
+\textit{Fragmentos:} README, \texttt{02\_posei\_marco.md} (varias veces) e índice. El preview incluye también el PDF de \textbf{2025}.\\
+\textit{Respuesta RAG:} devuelve la URL de 2025, no la de 2026.\\
+\textit{Causa:} homonimia léxica (mismo path, distinto año). BM25/denso recuperan el marco; el generador elige el enlace equivocado.
+\end{quote}
+
+\section{Concordancia experto--juez}
+Protocolo: el autor puntúa a ciegas los 21 ítems de \texttt{author\_scorecard.csv} (rúbrica 1--5 de exactitud) \emph{sin} abrir las columnas del juez, y luego se calcula el acuerdo $\pm 1$ con \texttt{scripts/score\_human\_agreement.py}. No hay segundo anotador; por tanto \textbf{no hay $\kappa$}. Esa plantilla ya está generada a partir de este run; el porcentaje se añadirá cuando el autor rellene las notas.
+
+\section{Discusión y análisis de los resultados}
+Los datos apoyan la hipótesis operativa del TFM: enriquecer el prompt con evidencia recuperada \textbf{mitiga} alucinaciones factuales frente a un LLM autónomo en un dominio normativo denso. La mejora en exhaustividad ($+1{,}60$) es especialmente coherente con la lógica RAG: sin contexto, el modelo omite requisitos, plazos o cifras; con fragmentos, completa mejor la respuesta.
+
+Respecto a la utilidad del recuperador, un MRR $\approx 0{,}81$ indica que, de media, el primer documento útil aparece pronto en el ranking. La cobertura de keywords alta ($0{,}96$) sugiere buena alineación léxica con el banco. El punto débil es la \textbf{trazabilidad} (identificadores MAPA, URLs, códigos): el top-$k$ puede traer el documento vecino y el generador «completa» con un código verosímil. Ese fallo es a la vez de retrieval y de grounding, y marca una línea de mejora (chunking tabular, citas estrictas, abstención si no hay match de identificador).
+
+Los resultados justifican mantener el RAG híbrido como núcleo del producto y orientar el trabajo siguiente a: (a)~reforzar categorías débiles (trazabilidad); (b)~cerrar el ciclo HITL $\rightarrow$ banco de oro; (c)~congelar configs por organización; (d)~ampliar el banco y, si procede, una auditoría RAGAS/humana. En términos de producto, la reducción de alucinación del $31{,}4\,\%$ al $8{,}6\,\%$ es el argumento empírico frente al tribunal: RAG no es magia, pero sí un mecanismo medible de anclaje.
+
+En síntesis, en \texttt{run\_20260819T165515Z} RAG mejora exactitud ($+1{,}14$) y reduce la marca binaria de alucinación ($0{,}314\rightarrow 0{,}086$) frente al mismo LLM sin contexto. El patrón no es «el híbrido falla en spanning»: en este banco \texttt{spanning} es sólido. El hueco empírico es trazabilidad. El juez 1--5 no es una auditoría legal: el caso H1 lo demuestra. RAG desplaza parte del riesgo de alucinación al retriever; no lo suprime. Graph RAG y visión end-to-end no forman parte de esta evaluación; el bucle LangGraph orquesta el chat, pero la corrida congelada mide el retriever híbrido con top-$k$ fijo.

@@ -7,6 +7,7 @@ from services.agent_graph import (
     parse_binary_grade,
     route_after_retrieve,
     route_on_plan,
+    should_fast_abstain,
 )
 
 pytestmark = pytest.mark.unit
@@ -44,6 +45,15 @@ def test_route_after_retrieve_fast_path_does_not_loop(monkeypatch):
     assert (
         route_after_retrieve({"grade": "no", "rewrite_count": 0}) == "generate_answer"
     )
+
+
+def test_should_fast_abstain_on_negative_grade(monkeypatch):
+    monkeypatch.setattr("services.agent_graph.FAST_ABSTAIN", True)
+    assert should_fast_abstain({"grade": "no"}) is True
+    assert should_fast_abstain({"grade": "yes"}) is False
+    assert should_fast_abstain({}) is False
+    monkeypatch.setattr("services.agent_graph.FAST_ABSTAIN", False)
+    assert should_fast_abstain({"grade": "no"}) is False
 
 
 def test_sql_only_plan_does_not_need_document_grade():

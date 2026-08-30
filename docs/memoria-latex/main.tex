@@ -12,6 +12,7 @@
 \usepackage{setspace}
 \onehalfspacing
 \usepackage{graphicx}
+\usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{array}
@@ -22,6 +23,11 @@
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric,arrows.meta,positioning,calc,fit,decorations.pathreplacing}
 \usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\floatname{algorithm}{Algoritmo}
+\renewcommand{\algorithmicrequire}{\textbf{Entrada:}}
+\renewcommand{\algorithmicensure}{\textbf{Salida:}}
 \setlength{\headheight}{18pt}
 \addtolength{\topmargin}{-6pt}
 
@@ -76,7 +82,38 @@ Máster Universitario en Inteligencia Artificial\par}
 \clearpage
 \pagenumbering{arabic}
 
-\input{chapters/00_resumen.tex}
+% Si falta chapters/00_resumen.tex en Overleaf, se usa el bloque embebido.
+\IfFileExists{chapters/00_resumen.tex}{%
+  \input{chapters/00_resumen.tex}%
+}{%
+\begin{abstract}
+Los modelos de lenguaje de gran tamaño (LLM) producen respuestas fluidas que, en dominios normativos, pueden fabricar hechos, importes o referencias no ancladas a un expediente. Este Trabajo de Fin de Máster diseña, implementa y evalúa \textbf{AgroPS}, un prototipo de asistente documental agrícola basado en Generación Aumentada por Recuperación (RAG), con el objetivo de medir en qué medida anclar la generación a evidencia recuperada \textbf{mitiga} ---sin eliminar--- las alucinaciones factuales frente a un LLM sin recuperación.
+
+El artefacto es un MVP contenedorizado: autenticación, ingestión de documentos, chat con citación de fuentes y laboratorios de retrieval y evaluación. El backend sigue una arquitectura hexagonal sobre FastAPI, PostgreSQL/\texttt{pgvector}, recuperación híbrida (embeddings densos + BM25 + Reciprocal Rank Fusion) y generación local con Ollama (\texttt{llama3.2:latest}, embeddings \texttt{nomic-embed-text}). El front-end se implementa con React, Vite y Tailwind CSS. El orquestador agéntico (LangGraph) está presente en el producto; la evaluación cuantitativa principal de este trabajo mide el recuperador híbrido con top-$k$ fijo.
+
+El protocolo experimental utiliza un banco de oro versionado de $N=35$ preguntas (siete categorías $\times$ cinco ítems) anclado al corpus \texttt{asesor-canarias}. En la corrida congelada \texttt{run\_20260819T165515Z} (35/35 sin error), el recuperador híbrido obtuvo MRR $0{,}8108$ y cobertura de palabras clave $0{,}9643$. El mismo modelo, juzgado por un LLM-as-a-Judge local (escala 1--5), pasó de exactitud media $3{,}31$ sin RAG a $4{,}46$ con RAG, y de tasa binaria de alucinación $0{,}314$ a $0{,}086$. RAGAS no se ejecutó en esa corrida. El punto débil empírico observado es la trazabilidad de identificadores puntuales, no las consultas transversales.
+
+Las conclusiones se limitan al alcance del MVP y a esa corrida: RAG \textbf{reduce} el riesgo de alucinación extrínseca en los casos evaluados, pero no lo erradica; el juez automático no sustituye una auditoría humana ni una certificación de producción.
+\end{abstract}
+
+\renewcommand{\abstractname}{Abstract}
+\begin{abstract}
+Large language models (LLMs) can produce fluent answers that, in regulatory domains, invent facts, figures or references not grounded in a case file. This Master's Thesis designs, implements and evaluates \textbf{AgroPS}, a prototype agricultural document assistant based on Retrieval-Augmented Generation (RAG), in order to measure the extent to which grounding generation in retrieved evidence \textbf{mitigates}---without eliminating---factual hallucinations relative to an LLM without retrieval.
+
+The artefact is a containerised MVP: authentication, document ingest, chat with source citations, and retrieval/evaluation labs. The backend follows a hexagonal architecture on FastAPI, PostgreSQL/\texttt{pgvector}, hybrid retrieval (dense embeddings + BM25 + Reciprocal Rank Fusion) and local generation via Ollama (\texttt{llama3.2:latest}, \texttt{nomic-embed-text} embeddings). The frontend uses React, Vite and Tailwind CSS. An agentic orchestrator (LangGraph) is part of the product; the main quantitative evaluation in this work measures the hybrid retriever with a fixed top-$k$.
+
+The experimental protocol uses a versioned gold bank of $N=35$ questions (seven categories $\times$ five items) anchored to the \texttt{asesor-canarias} corpus. In the frozen run \texttt{run\_20260819T165515Z} (35/35 successful), the hybrid retriever achieved MRR $0.8108$ and keyword coverage $0.9643$. Judged by a local LLM-as-a-Judge (1--5 scale), mean accuracy rose from $3.31$ without RAG to $4.46$ with RAG, and the binary hallucination rate fell from $0.314$ to $0.086$. RAGAS was not run in that experiment. The empirical weak spot was identifier-level traceability rather than spanning queries.
+
+Conclusions are scoped to the MVP and that run: RAG \textbf{reduces} extrinsic hallucination risk in the evaluated cases but does not eradicate it; an automatic judge is not a substitute for human audit or production certification.
+\end{abstract}
+
+\section*{Palabras clave}
+Generación Aumentada por Recuperación (RAG); alucinaciones en LLM; recuperación híbrida; Reciprocal Rank Fusion (RRF); PostgreSQL/\texttt{pgvector}; arquitectura hexagonal; evaluación de sistemas RAG; dominio agrario (PAC/POSEI).
+
+\section*{Keywords}
+Retrieval-Augmented Generation (RAG); LLM hallucinations; hybrid retrieval; Reciprocal Rank Fusion (RRF); PostgreSQL/\texttt{pgvector}; hexagonal architecture; RAG evaluation; agricultural domain (CAP/POSEI).
+}
+
 \clearpage
 
 \input{chapters/01_introduccion.tex}

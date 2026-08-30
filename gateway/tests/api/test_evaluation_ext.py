@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from main import app
-from services.ragas_service import run_ragas_evaluation
+from evaluation.ragas import run_ragas_evaluation
 
 pytestmark = pytest.mark.api
 
@@ -47,7 +47,7 @@ def test_ragas_run_with_fallback(authenticated_client):
         ]
 
     with patch(
-        "evaluation.adapters.inbound.lab.run_ragas_evaluation",
+        "evaluation.http.run_ragas_evaluation",
         side_effect=lambda samples, evaluator=None: run_ragas_evaluation(
             samples, evaluator=fake_evaluator
         ),

@@ -170,7 +170,7 @@ La figura~\ref{fig:rag-hexagon} particulariza el mismo diseño en notación hexa
 \midrule
 Domain & \texttt{rag/domain} & Entidades, \texttt{rrf\_fusion}, \texttt{expand\_agro\_query}, protocolos de puerto \\
 Application & \texttt{rag/application} & Casos de uso: \texttt{AnswerQuestion}, \texttt{HybridRetrieve}, \texttt{IngestDocument} \\
-Framework / Adapter In & \texttt{routes/*}, \texttt{services/} & FastAPI, \texttt{RAGService}, \texttt{AgenticRAGService} \\
+Framework / Adapter In & \texttt{chat/http.py}, \texttt{catalog/http.py}, \texttt{services/} & FastAPI, \texttt{RAGService}, \texttt{AgenticRAGService} \\
 Framework / Adapter Out & \texttt{rag/adapters/outbound} & pgvector, BM25, Ollama, Cross-Encoder \\
 Cableado & \texttt{rag/composition.py} & \texttt{build\_rag\_container} (inyección de adaptadores) \\
 \bottomrule
@@ -340,20 +340,41 @@ La figura~\ref{fig:flujo-e2e} describe el recorrido de una pregunta. El usuario 
 
 \section{Capturas del prototipo AgroPS}
 
-Las figuras~\ref{fig:ui-docs} y~\ref{fig:ui-chat} muestran las dos vistas del MVP: el catálogo documental y el asistente con citas.
+Las figuras siguientes documentan las funcionalidades principales del MVP frente al tribunal: autenticación implícita en el panel, gestión documental, asistente RAG, visualización del espacio de embeddings, organización multi-tenant y orquestación del pipeline. Un guion completo de capturas adicionales (evaluación, HITL, tools, landing) se mantiene en \texttt{docs/CAPTURAS\_UI.md}.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/ui-documentos.png}
-\caption{Vista de documentos del MVP: listado del corpus, estado de indexado y alta de ficheros PDF o texto.}
+\caption{Vista de documentos: listado del corpus por organización, estado de indexado y alta de ficheros.}
 \label{fig:ui-docs}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
+\includegraphics[width=\textwidth]{figures/ui-ingesta.png}
+\caption{Flujo de ingesta documental en el prototipo: carga y preparación del material para chunking y embeddings.}
+\label{fig:ui-ingesta}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
 \includegraphics[width=\textwidth]{figures/ui-chat.png}
-\caption{Asistente RAG agéntico: pregunta en lenguaje natural, respuesta anclada y panel de evidencia recuperada.}
+\caption{Asistente RAG agéntico: pregunta en lenguaje natural, respuesta anclada y evidencia recuperada (fuentes).}
 \label{fig:ui-chat}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/ui-grafo.png}
+\caption{Visualización del espacio de embeddings (proyección tipo grafo/UMAP). Es una ayuda exploratoria; el chat no recorre un grafo de conocimiento.}
+\label{fig:ui-grafo}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/ui-organizacion.png}
+\caption{Gestión de organización: selección de cooperativa/empresa, departamentos y contexto multi-tenant del corpus.}
+\label{fig:ui-org}
 \end{figure}
 
 \section{Alcance del prototipo}
@@ -362,18 +383,223 @@ El MVP opera sobre texto y embeddings persistidos. El corpus puede proceder de P
 \section{Pipeline híbrido de recuperación (detalle de implementación)}
 El chat de demostración no recorre un grafo de conocimiento. El caso de uso \texttt{HybridRetrieve} concatena, cuando procede, cuatro listas de candidatos y las fusiona con Reciprocal Rank Fusion (RRF, $k=60$): búsqueda densa en \texttt{pgvector} (similitud coseno sobre \texttt{nomic-embed-text}), búsqueda léxica BM25 por tenant, y las mismas dos vías sobre la consulta expandida con un léxico agrario (sinónimos y formas de cultivo, ayuda, plaga, recinto). Si la pregunta supera un umbral de complejidad (\texttt{should\_rewrite\_query}), un LLM reescribe la consulta; esa reescritura no se aplica a todas las preguntas cortas de hecho directo.
 
+El algoritmo de respuesta (\texttt{AnswerQuestion}) orquesta ese retrieve y la generación: con la pregunta $q$, el historial $H$ y el tenant $t$, recupera el top-$k$ de fragmentos, abstiene con plantilla \emph{out-of-knowledge} si no hay evidencia (sin llamar al LLM) y, en caso contrario, construye un prompt de sistema con el contexto documental recortado, invoca Llama~3.2 vía Ollama y devuelve la respuesta $a$ junto con las fuentes citables $C$. El modo \texttt{hybrid} del API sigue ese camino fijo; el modo \texttt{agentic} añade un grafo LangGraph (planificar herramientas, recuperar, puntuar relevancia y reescribir como máximo una vez) que, cuando busca en la base de conocimiento, reutiliza el mismo recuperador híbrido. La figura~\ref{fig:respuesta-rag} resume ambos caminos; la evaluación cuantitativa del Capítulo~\ref{ch:evaluacion} mide el híbrido fijo.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/diagrama-respuesta-rag.png}
+\caption{Pipeline de respuesta RAG en AgroPS: camino \texttt{hybrid} (\texttt{AnswerQuestion} + dens+BM25+RRF + generación) y rama alternativa \texttt{agentic} (LangGraph).}
+\label{fig:respuesta-rag}
+\end{figure}
+
 El reranker \texttt{BAAI/bge-reranker-v2-m3} está cableado como adaptador, pero la variable \texttt{RAG\_USE\_RERANKER} vale \texttt{false} en la demo: las ablaciones de laboratorio mostraron que cargar el Cross-Encoder dispara la latencia (decenas de segundos) y puede hundir Recall@1. El contexto que llega al generador es, por tanto, el top-$k$ fusionado por RRF, recortado a unos 1400 caracteres por fragmento, con $k$ final 8 en el chat.
 
 La fachada \texttt{AgenticRAGService} orquesta un grafo LangGraph: el nodo \texttt{generate\_query\_or\_respond} decide si llamar a herramientas (corpus híbrido, SQL acotado o memoria) o responder directo; tras recuperar, \texttt{grade\_documents} puntúa relevancia y, si falla, \texttt{rewrite\_question} reintenta una vez. El planificador pide JSON a Ollama y, si el parseo falla, cae a pistas léxicas. Las búsquedas invocan el mismo \texttt{\_search} híbrido. El modo \texttt{hybrid} del API omite el grafo y llama directamente a \texttt{RAGService.answer}.
+
+Los algoritmos~\ref{alg:rag-hibrido}, \ref{alg:hybrid-retrieve} y \ref{alg:rag-agentic} formalizan, respectivamente, la respuesta híbrida end-to-end, la recuperación denso+BM25+RRF y el camino agéntico (LangGraph) del chat. La tubería de indexación se formaliza en los algoritmos~\ref{alg:rag-ingest}, \ref{alg:extract-pdf}, \ref{alg:split-chunks} y \ref{alg:embed-store}.
+
+\begin{algorithm}[htbp]
+\caption{Respuesta RAG híbrida (modo \texttt{hybrid})}
+\label{alg:rag-hibrido}
+\begin{algorithmic}[1]
+\Require Pregunta $q$, historial $H$, tenant $t$, parámetros $k_{\mathrm{ret}}, k_{\mathrm{final}}$, flags de reescritura y rerank
+\Ensure Respuesta $a$ y fragmentos citados $C$
+\State $C,\,q' \gets \textsc{HybridRetrieve}(q,t)$ \Comment{Alg.~\ref{alg:hybrid-retrieve}}
+\If{$C = \emptyset$ \textbf{and} abstención rápida activa}
+  \State \Return plantilla \emph{out-of-knowledge} (sin llamar al LLM)
+\EndIf
+\State $P \gets \textsc{BuildPrompt}(q, H, C)$ \Comment{sistema + contexto documental + usuario}
+\State $a \gets \textsc{Generate}(P)$ \Comment{LLM local vía Ollama}
+\State \Return $a,\,C$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[htbp]
+\caption{Recuperación híbrida dens+BM25+RRF}
+\label{alg:hybrid-retrieve}
+\begin{algorithmic}[1]
+\Require Pregunta $q$, tenant $t$
+\Ensure Lista ordenada de chunks $C$ y consulta efectiva $q'$
+\State $q' \gets q$
+\If{\textsc{ShouldRewrite}($q$)}
+  \State $q' \gets \textsc{RewriteWithLLM}(q)$ \Comment{opcional; no en todas las consultas cortas}
+\EndIf
+\State $q_{\mathrm{exp}} \gets \textsc{ExpandAgroLexicon}(q')$ \Comment{sinónimos de cultivo, ayuda, plaga\ldots}
+\State $D \gets \textsc{DenseSearch}(\mathrm{embed}(q'), t, k_{\mathrm{ret}})$ \Comment{pgvector / coseno}
+\State $B \gets \textsc{Bm25Search}(q', t, k_{\mathrm{bm25}})$
+\State $D_{\mathrm{exp}} \gets \textsc{DenseSearch}(\mathrm{embed}(q_{\mathrm{exp}}), t, k_{\mathrm{ret}})$
+\State $B_{\mathrm{exp}} \gets \textsc{Bm25Search}(q_{\mathrm{exp}}, t, k_{\mathrm{bm25}})$
+\State $U \gets \textsc{RRF}(D, B, D_{\mathrm{exp}}, B_{\mathrm{exp}};\, k_{\mathrm{rrf}}{=}60)$
+\If{rerank activo}
+  \State $U \gets \textsc{CrossEncoderRerank}(q', U)$
+\EndIf
+\State $C \gets \textsc{TopK}(U, k_{\mathrm{final}})$
+\State \Return $C,\,q'$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[htbp]
+\caption{Respuesta Agentic RAG (LangGraph)}
+\label{alg:rag-agentic}
+\begin{algorithmic}[1]
+\Require Pregunta $q$, historial $H$, tenant $t$, $\textit{maxRewrites}$
+\Ensure Respuesta $a$, traza de tools y chunks $C$
+\State $q_{\mathrm{act}} \gets q$;\; $r \gets 0$;\; $C \gets \emptyset$
+\State $\textit{intent} \gets \textsc{ClassifyIntent}(q)$
+\State $\textit{plan} \gets \textsc{PlanTools}(q_{\mathrm{act}}, \textit{intent})$ \Comment{heurística (rápido) o LLM JSON}
+\If{$\textit{plan} = \emptyset$}
+  \State $a \gets \textsc{Generate}(\textsc{SynthPrompt}(\textit{intent}, \emptyset), q, H)$
+  \State \Return $a$ \Comment{saludo / respuesta directa sin retrieve}
+\EndIf
+\Repeat
+  \State Ejecutar cada tool de $\textit{plan}$ (KB híbrida, SQL, memoria, inventario\ldots)
+  \State $C,\,\textit{ctx} \gets$ evidencia acumulada
+  \If{el plan usó búsqueda documental}
+    \State $\textit{grade} \gets \textsc{Grade}(q, \textit{ctx})$ \Comment{heurística o LLM binario}
+  \Else
+    \State $\textit{grade} \gets \texttt{yes}$
+  \EndIf
+  \If{$\textit{grade} = \texttt{no}$ \textbf{and} $r < \textit{maxRewrites}$}
+    \State $q_{\mathrm{act}} \gets \textsc{RewriteQuestion}(q_{\mathrm{act}})$;\; $r \gets r+1$
+    \State $\textit{plan} \gets$ plan de reintento (p.\ ej.\ \texttt{search\_knowledge\_base})
+  \EndIf
+\Until{$\textit{grade} = \texttt{yes}$ \textbf{or} $r \ge \textit{maxRewrites}$}
+\If{$\textit{grade} = \texttt{no}$ \textbf{and} abstención rápida}
+  \State \Return plantilla \emph{out-of-knowledge}
+\EndIf
+\State $a \gets \textsc{Generate}(\textsc{SynthPrompt}(\textit{intent}, \textit{ctx}), q, H)$
+\State \Return $a,\,C$
+\end{algorithmic}
+\end{algorithm}
 
 Los embeddings se calculan sobre el campo \texttt{content} del chunk; el retriever denso y BM25 puntúan la concatenación headline + summary + content. Esa asimetría es una limitación del prototipo: el vector no representa exactamente el texto que se busca. Los vectores Nomic (~768 dimensiones) se almacenan en una columna de 4096 con relleno de ceros, restricción del esquema pgvector heredado.
 
 Esta descripción justifica, frente al tribunal, qué hay de RAG ``de libro'' (Lewis et al., 2020) y qué es ingeniería del MVP: fusión híbrida real, orquestación LangGraph sobre esas mismas herramientas, grafo de conocimiento solo como visualización UMAP, evaluación textual.
 
 \section{Ingesta documental, OCR y persistencia}
-El flujo de alta de un documento es el siguiente. El usuario autenticado selecciona una organización y, en su caso, un proyecto o base de conocimiento. El fichero se guarda bajo \texttt{DOCUMENT\_STORAGE\_ROOT} con un identificador opaco (UUID), no con el nombre original como única clave, para evitar colisiones entre tenants. Un worker de ingesta extrae texto: PDF nativo, PDF escaneado con OCR si \texttt{RAG\_PDF\_OCR=true} (escala \texttt{RAG\_PDF\_OCR\_SCALE}, tope \texttt{RAG\_PDF\_MAX\_PAGES}), CSV (filas como unidades tabulares) o Markdown. El texto se parte en ventanas de 1400 caracteres con solape 120. Cada fragmento recibe metadatos de documento, página cuando el parser la conoce, y un embedding \texttt{nomic-embed-text}. El índice BM25 del tenant se reconstruye o actualiza para que la vía léxica vea los mismos chunks.
+\label{sec:ingesta-rag}
 
-Ese OCR no convierte al sistema en un modelo multimodal de visión: el píxel se descarta tras la transcripción. Si el OCR confunde un ``0'' con una ``O'' en una tabla de importes, el error se propaga al vector y al generador. Por eso las limitaciones de tablas del Capítulo~\ref{ch:evaluacion} no son solo un problema de retrieval: empiezan en la extracción.
+La ingesta es el proceso que transforma un fichero subido por el usuario en unidades recuperables: filas \texttt{chunks} (texto) y \texttt{embeddings} (vectores), más un índice léxico BM25 por tenant. En el monolito, el camino vivo es \texttt{POST /api/v1/documents} $\rightarrow$ almacenamiento local $\rightarrow$ tarea asíncrona \texttt{ingest\_uploaded\_document} $\rightarrow$ \texttt{reindex\_embeddings} / \texttt{ensure\_document\_chunks} $\rightarrow$ caso de uso hexagonal \texttt{IngestDocument} (rebuild BM25 e invalidación de caché). La extracción, el cortado y el embedding viven en la capa \texttt{services/}; el hexágono RAG solo cierra la vía léxica. La figura~\ref{fig:ingesta-rag} resume ese flujo.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/diagrama-ingesta-rag.png}
+\caption{Pipeline de ingesta RAG en AgroPS: aceptación HTTP síncrona, extracción tipada (con OCR selectivo en PDF), fragmentación 1400/120, embeddings densos y reconstrucción BM25 del tenant.}
+\label{fig:ingesta-rag}
+\end{figure}
+
+\subsection*{Fase A --- Aceptación HTTP (síncrona)}
+El usuario autenticado elige organización (tenant) y base de conocimiento. El cuerpo multipart se lee en memoria con tope \texttt{MAX\_UPLOAD\_BYTES} (100\,MiB). \texttt{LocalFileStorage.save\_bytes} escribe el binario bajo \texttt{DOCUMENT\_STORAGE\_ROOT}/\{tenant\}/\{kb\}/\{uuid\}\_\{filename\}. Se insertan \texttt{documents} (incl.\ \texttt{file\_hash} SHA-256, que se persiste pero \textbf{no} deduplica) y \texttt{processing\_jobs} con estado \texttt{running}. La API responde \texttt{accepted} y encola \texttt{asyncio.create\_task} (mismo proceso; no hay cola Redis).
+
+\subsection*{Fase B --- Extracción tipada}
+\texttt{extract\_index\_text} despacha por extensión/MIME: texto plano y Markdown (UTF-8, tope $400{,}000$ caracteres); DOCX/PPTX vía XML del ZIP Office; PDF con \texttt{extract\_pdf\_text} (Alg.~\ref{alg:extract-pdf}); vídeo/audio con Whisper. En PDF, cada página obtiene primero texto nativo (pypdfium2). Si \texttt{RAG\_PDF\_OCR} está activo y el texto no supera \texttt{is\_readable\_text} (ratio latino, basura Unicode, ausencia de vocales, detección de streams internos), se rasteriza a escala \texttt{RAG\_PDF\_OCR\_SCALE} y se aplica RapidOCR. El píxel se descarta tras la transcripción: no hay razonamiento visual.
+
+\subsection*{Fase C --- Fragmentación}
+\texttt{split\_into\_chunks} (Alg.~\ref{alg:split-chunks}) normaliza saltos de línea y corta ventanas de tamaño $S$ (por defecto $1400$) con solape $O$ ($120$), preferiendo cortar en \texttt{\textbackslash n\textbackslash n}, luego \texttt{\textbackslash n}, luego espacio, siempre que el corte caiga al menos al $40\%$ de $S$. Cada pieza legible ($\ge 24$ caracteres según la misma heurística) se persiste como \texttt{Chunk}: \texttt{position}, \texttt{headline} (primera línea, máx.\ 200), \texttt{summary} (primeros 280 caracteres) y \texttt{content} (cuerpo completo). Si ya existían chunks legibles y no hay \texttt{force\_rebuild}, se reutilizan; si el muestreo parece corrupto, se borran embeddings+chunks y se reextrae.
+
+\subsection*{Fase D --- Embedding y cierre léxico}
+Para el modelo por defecto (\texttt{nomic-embed-text}), se embebe solo el \texttt{content} en lotes de tamaño \texttt{RAG\_EMBED\_BATCH\_SIZE} (64). Los vectores se rellenan (\emph{pad}) a 4096 dimensiones y se insertan en \texttt{embeddings} con unicidad $(chunk\_id, model)$. Tras indexar, \texttt{IngestDocument} invalida y reconstruye el BM25 del tenant (texto indexado $=$ headline + summary + content) e invalida la caché de retrieval. Esa asimetría embedding/BM25 es una limitación del prototipo (el vector no representa exactamente el texto que BM25 puntúa).
+
+Los algoritmos~\ref{alg:rag-ingest}--\ref{alg:embed-store} formalizan el pipeline completo. Un error de OCR (``0'' vs ``O'' en una tabla de importes) se propaga al vector y al generador: las fallas de tablas del Capítulo~\ref{ch:evaluacion} empiezan aquí.
+
+\begin{algorithm}[htbp]
+\caption{Ingesta RAG end-to-end (\texttt{ingest\_uploaded\_document})}
+\label{alg:rag-ingest}
+\begin{algorithmic}[1]
+\Require Fichero $F$, tenant $t$, base de conocimiento $b$, modelo de embedding $m$, flags $\textit{force}$
+\Ensure Filas \texttt{chunks}/\texttt{embeddings}, índice BM25 de $t$, job en estado final
+\State $p \gets \textsc{SaveBytes}(F, t, b)$ \Comment{disco: UUID + nombre seguro}
+\State $h \gets \textsc{SHA256}(F)$
+\State $d \gets \textsc{InsertDocument}(p, h, t, b)$;\; $j \gets \textsc{InsertJob}(d, \texttt{running})$
+\State Responder HTTP \texttt{accepted}; encolar tarea asíncrona
+\State $\textit{stage} \gets \texttt{extract}$
+\State $n \gets \textsc{EnsureDocumentChunks}(d, \textit{force})$ \Comment{Alg.~\ref{alg:split-chunks} tras extracción}
+\State $\textsc{EmbedAndStore}(d, t, b, m)$ \Comment{Alg.~\ref{alg:embed-store}}
+\State $\textsc{RebuildBm25}(t)$;\; $\textsc{InvalidateRetrievalCache}(t)$
+\State Marcar $j$ como \texttt{completed} (o \texttt{failed} si alguna fase lanza error)
+\State \Return $n$ fragmentos indexados
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[htbp]
+\caption{Extracción de texto PDF (nativo + OCR selectivo)}
+\label{alg:extract-pdf}
+\begin{algorithmic}[1]
+\Require Bytes PDF $B$, $\textit{maxPages}$, $\textit{maxChars}$, flag OCR
+\Ensure Texto plano $T$ (truncado a $\textit{maxChars}$)
+\State $P \gets \textsc{OpenPdf}(B)$;\; $L \gets \emptyset$
+\For{$i \gets 0$ \textbf{to} $\min(|P|, \textit{maxPages})-1$}
+  \State $n \gets \textsc{NativePageText}(P_i)$
+  \If{OCR activo \textbf{and} $\neg\,\textsc{IsReadable}(n)$}
+    \State $s \gets \textsc{RapidOcr}(\textsc{Rasterize}(P_i, \textit{scale}))$
+    \If{$\textsc{IsReadable}(s)$ \textbf{or} $\textsc{LatinRatio}(s) > \textsc{LatinRatio}(n)$}
+      \State $c \gets s$
+    \ElsIf{$\textsc{IsReadable}(n;\,\textit{minChars}{=}12)$}
+      \State $c \gets n$
+    \Else
+      \State \textbf{continue} \Comment{página descartada}
+    \EndIf
+  \ElsIf{$\textsc{IsReadable}(n;\,\textit{minChars}{=}12)$}
+    \State $c \gets n$
+  \Else
+    \State \textbf{continue}
+  \EndIf
+  \State $L \gets L \cup \{c\}$
+\EndFor
+\State \Return truncar$(\textsc{Join}(L,\texttt{\textbackslash n\textbackslash n}),\,\textit{maxChars})$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[htbp]
+\caption{Fragmentación con solape (\texttt{split\_into\_chunks})}
+\label{alg:split-chunks}
+\begin{algorithmic}[1]
+\Require Texto $T$, tamaño de ventana $S$ (def.\ $1400$), solape $O$ (def.\ $120$)
+\Ensure Lista de piezas legibles $C = (c_0,\ldots,c_{n-1})$
+\State $T \gets$ normalizar CRLF y colapsar $\ge 3$ saltos de línea
+\If{$|T| \le S$}
+  \State \Return $\{T\}$ si $\textsc{IsReadable}(T)$ else $\emptyset$
+\EndIf
+\State $C \gets \emptyset$;\; $\textit{start} \gets 0$
+\While{$\textit{start} < |T|$}
+  \State $\textit{end} \gets \min(|T|, \textit{start}+S)$
+  \If{$\textit{end} < |T|$}
+    \State Buscar corte en $[\textit{start},\textit{end})$: preferir \texttt{\textbackslash n\textbackslash n}, luego \texttt{\textbackslash n}, luego espacio
+    \If{posición de corte $\ge 0{,}4\,S$}
+      \State $\textit{end} \gets \textit{start} + \textit{cut}$
+    \EndIf
+  \EndIf
+  \State $p \gets T[\textit{start}:\textit{end}]$ recortado
+  \If{$\textsc{IsReadable}(p;\,\textit{minChars}{=}24)$}
+    \State $C \gets C \cup \{p\}$
+  \EndIf
+  \If{$\textit{end} \ge |T|$} \textbf{break} \EndIf
+  \State $\textit{start} \gets \max(\textit{end}-O,\, \textit{start}+1)$
+\EndWhile
+\State Persistencia: $\forall\, p_i \in C$ insertar \texttt{Chunk}$(i,\,\textit{headline},\textit{summary},\textit{content}{=}p_i)$
+\State \Return $C$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[htbp]
+\caption{Embedding por lotes y persistencia pgvector}
+\label{alg:embed-store}
+\begin{algorithmic}[1]
+\Require Documento $d$, tenant $t$, KB $b$, modelo $m$, tamaño de lote $B_s$
+\Ensure Vectores en \texttt{embeddings} para pares $(chunk\_id, m)$ pendientes
+\State Asegurar esquema multi-modelo (unicidad $(chunk\_id, model)$)
+\State $Q \gets$ chunks de $d$ (o de $b$/$t$) sin embedding para $m$
+\State $\textsc{EnsureModelAvailable}(m)$ \Comment{\texttt{ollama pull} si falta}
+\For{cada lote $X \subset Q$ de tamaño $\le B_s$}
+  \State $U \gets \{\textsc{EmbeddingPayload}(x.\textit{content}) \mid x \in X\}$
+  \State $V \gets \textsc{OllamaEmbed}(m, U)$ \Comment{fallback OpenAI-compatible si falla}
+  \State $\forall\, v \in V:\; v \gets \textsc{Pad}(v, 4096)$
+  \State Insertar filas \texttt{Embedding}$(chunk\_id, m, v)$; commit del lote
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Los parámetros operativos por defecto son $S{=}1400$, $O{=}120$, $B_s{=}64$, $m{=}\texttt{nomic-embed-text}$, OCR activo, máximo $120$ páginas PDF y $400{,}000$ caracteres indexables. El \texttt{file\_hash} no evita reindexar un mismo PDF subido dos veces: cada upload crea un documento nuevo.
 
 \section{Interfaz, autenticación y laboratorio de evaluación}
 El front-end (React 19, Vite, Tailwind 4) expone el MVP: registro e inicio de sesión, listado de documentos, chat con panel de fuentes y un laboratorio de evaluación (banco, experimentos, auditoría). La sesión viaja como JWT en las llamadas a \texttt{/api/v1}. El chat no envía al modelo el historial completo de la organización: envía la pregunta actual y el contexto recuperado, más una plantilla de sistema que prohíbe inventar cifras ausentes de los fragmentos.

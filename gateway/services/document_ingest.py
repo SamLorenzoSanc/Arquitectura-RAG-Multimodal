@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from services.database import AsyncSessionLocal
 from services.embedding_reindex import record_reindex_on_job, reindex_embeddings
+from services.embedding_indexer import enqueue_document, mark_indexed_for_runtime
 from services.ingest_progress import set_progress
 from services.rag_service import DEFAULT_EMBEDDING_MODEL, RAGService
 
@@ -46,6 +47,22 @@ async def ingest_uploaded_document(
             )
             await db.commit()
 
+            try:
+                file_hash_row = await db.execute(
+                    text("SELECT file_hash FROM documents WHERE id = :id"),
+                    {"id": document_id},
+                )
+                file_hash = file_hash_row.scalar()
+                await enqueue_document(
+                    db,
+                    document_id=document_id,
+                    source_hash=str(file_hash) if file_hash else None,
+                    force=force_rebuild,
+                )
+                await db.commit()
+            except Exception:
+                logger.exception("No se pudo encolar el indexador de embeddings")
+
             async def on_progress(event: dict) -> None:
                 set_progress(document_id, status="running", error=None, **event)
 
@@ -66,9 +83,24 @@ async def ingest_uploaded_document(
                 result=result,
             )
             try:
-                from catalog.application.ingest import CatalogIngest
+                file_hash_row = await db.execute(
+                    text("SELECT file_hash FROM documents WHERE id = :id"),
+                    {"id": document_id},
+                )
+                file_hash = file_hash_row.scalar()
+                await mark_indexed_for_runtime(
+                    db,
+                    document_id=document_id,
+                    runtime_model_id=DEFAULT_EMBEDDING_MODEL,
+                    source_hash=str(file_hash) if file_hash else None,
+                )
+                await db.commit()
+            except Exception:
+                logger.exception("No se pudo marcar el modelo por defecto como indexado")
+            try:
+                from rag.composition import build_rag_container
 
-                await CatalogIngest().after_upload(str(tenant_id))
+                await build_rag_container().ingest.execute(str(tenant_id))
             except Exception:
                 logger.exception("Post-ingesta del catálogo falló")
             try:

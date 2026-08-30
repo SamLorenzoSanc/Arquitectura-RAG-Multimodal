@@ -21,6 +21,9 @@ from .document import Document
 from .document_version import DocumentVersion
 from .tag import Tag
 from .processing_job import ProcessingJob
+from .embedding import Embedding
+from .embedding_model import EmbeddingModel
+from .embedding_index_state import EmbeddingIndexState
 from .conversation import Conversation
 from .message import Message
 from .message_source import MessageSource
@@ -41,6 +44,9 @@ __all__ = [
     "DocumentVersion",
     "Tag",
     "ProcessingJob",
+    "Embedding",
+    "EmbeddingModel",
+    "EmbeddingIndexState",
     "Conversation",
     "Message",
     "MessageSource",

@@ -1,0 +1,86 @@
+{
+  "run_id": "run_20260820T185427Z",
+  "bank_path": "C:\\Users\\Usuario\\Desktop\\MasterIA\\Asignaturas\\Segundo_Cuatrimestre\\TFM\\Arquitectura-RAG-Multimodal\\gateway\\routes\\tests.jsonl",
+  "corpus_dir": "C:\\Users\\Usuario\\Desktop\\MasterIA\\Asignaturas\\Segundo_Cuatrimestre\\TFM\\Arquitectura-RAG-Multimodal\\knowledge-base",
+  "retriever": "local_hybrid",
+  "note": "Misma receta que el chat (denso+BM25+RRF, reranker off). RAGAS no se ejecuta en esta corrida.",
+  "ragas": "not_run",
+  "generation_model": "llama3.2:latest",
+  "embedding_model": "nomic-embed-text",
+  "chunk_size_chars": 1400,
+  "chunk_overlap_chars": 120,
+  "dense_k": 10,
+  "bm25_k": 10,
+  "rrf_k": 60,
+  "final_k": 8,
+  "reranker": false,
+  "temperature": 0.0,
+  "n_gold": 150,
+  "ollama": {
+    "ok": true,
+    "models": [
+      {
+        "name": "nomic-embed-text:latest",
+        "digest": "0a109f422b47e3a30ba2b10eca18548e944e8a23073ee3f3e947efcf3c45e59f",
+        "size": 274302450
+      },
+      {
+        "name": "qwen3-embedding:latest",
+        "digest": "64b933495768fbd3b87c20583d379728a07471e0c66733a9df87cd1901b3c44b",
+        "size": 4676805193
+      },
+      {
+        "name": "llama3.2:latest",
+        "digest": "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+        "size": 2019393189
+      },
+      {
+        "name": "llama3.2-vision:latest",
+        "digest": "6f2f9757ae97e8a3f8ea33d6adb2b11d93d9a35bef277cd2c0b1b5af8e8d0b1e",
+        "size": 7816589186
+      },
+      {
+        "name": "qwen3-embedding:8b",
+        "digest": "64b933495768fbd3b87c20583d379728a07471e0c66733a9df87cd1901b3c44b",
+        "size": 4676805193
+      },
+      {
+        "name": "llama3:latest",
+        "digest": "365c0bd3c000a25d28ddbf732fe1c6add414de7275464c4e4d1c3b5fcb5d8ad1",
+        "size": 4661224676
+      },
+      {
+        "name": "deepseek-r1:1.5b",
+        "digest": "e0979632db5a88d1a53884cb2a941772d10ff5d055aabaa6801c4e36f3a6c2d7",
+        "size": 1117322768
+      },
+      {
+        "name": "gpt-oss:latest",
+        "digest": "17052f91a42e97930aa6e28a6c6c06a983e6a58dbb00434885a0cf5313e376f7",
+        "size": 13793441244
+      },
+      {
+        "name": "phi3:latest",
+        "digest": "4f222292793889a9a40a020799cfd28d53f3e01af25d48e06c5e708610fc47e9",
+        "size": 2176178913
+      },
+      {
+        "name": "gemma3:270m",
+        "digest": "e7d36fb2c3b3293cfe56d55889867a064b3a2b22e98335f2e6e8a387e081d6be",
+        "size": 291554930
+      },
+      {
+        "name": "all-minilm:latest",
+        "digest": "1b226e2802dbb772b5fc32a58f103ca1804ef7501331012de126ab22f67475ef",
+        "size": 45960996
+      },
+      {
+        "name": "gemma3:4b",
+        "digest": "a2af6cc3eb7fa8be8504abaf9b04e88f17a119ec3f04a3addf55f92841195f5a",
+        "size": 3338801804
+      }
+    ]
+  },
+  "started_utc": "2026-08-20T18:54:27.875393+00:00",
+  "finished_utc": "2026-08-20T19:35:29.954424+00:00"
+}

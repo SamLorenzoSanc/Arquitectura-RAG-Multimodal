@@ -94,8 +94,8 @@ def test_upload_persists_when_storage_fails(authenticated_client, override_db):
     override_db.flush = AsyncMock()
     override_db.commit = AsyncMock()
     override_db.refresh = AsyncMock()
-    with patch("catalog.adapters.inbound.documents._validate_kb_access", AsyncMock()), patch(
-        "catalog.adapters.inbound.documents._storage.save_bytes",
+    with patch("catalog.http._validate_kb_access", AsyncMock()), patch(
+        "catalog.http._storage.save_bytes",
         AsyncMock(side_effect=OSError("disco lleno")),
     ):
         response = authenticated_client.post(
@@ -126,8 +126,8 @@ def test_delete_document_endpoint(authenticated_client, override_db):
     override_db.execute = AsyncMock()
     override_db.delete = AsyncMock()
     override_db.commit = AsyncMock()
-    with patch("catalog.adapters.inbound.documents._validate_kb_access", AsyncMock()), patch(
-        "catalog.adapters.inbound.documents.RAGService.invalidate_retrieval_cache", return_value=0
+    with patch("catalog.http._validate_kb_access", AsyncMock()), patch(
+        "catalog.http.RAGService.invalidate_retrieval_cache", return_value=0
     ):
         response = authenticated_client.delete(
             f"/api/v1/documents/{VALID_UUID}",
@@ -155,7 +155,7 @@ def test_list_document_chunks(authenticated_client, override_db):
     override_db.scalars = AsyncMock(return_value=MagicMock(all=lambda: [chunk]))
     override_db.execute = AsyncMock(return_value=[])
     with patch(
-        "catalog.adapters.inbound.documents._validate_kb_access", AsyncMock()
+        "catalog.http._validate_kb_access", AsyncMock()
     ):
         response = authenticated_client.get(
             f"/api/v1/documents/{VALID_UUID}/chunks",

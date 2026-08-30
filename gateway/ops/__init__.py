@@ -1,0 +1,1 @@
+"""Salud, métricas y esquema."""

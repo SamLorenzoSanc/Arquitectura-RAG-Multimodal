@@ -168,6 +168,7 @@ class EvaluationHistoryItem(BaseModel):
 
 class ExperimentRunRequest(BaseModel):
     embedding_model: str = "nomic-embed-text"
+    embedding_models: list[str] | None = None
     distance_metric: Literal[
         "cosine",
         "euclidean",

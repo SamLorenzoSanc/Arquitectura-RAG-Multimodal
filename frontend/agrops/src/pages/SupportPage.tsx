@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useOrganization } from "@/context/OrganizationContext";
+import { useOrganization } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
-import AccountService, {
+import {
+  AccountService,
   type OrgAdmin,
   type SupportTicket,
-} from "@/services/account.service";
+} from "@/services";
 
 function formatDate(value?: string) {
   if (!value) return "—";

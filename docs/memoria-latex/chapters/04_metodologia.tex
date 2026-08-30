@@ -50,21 +50,60 @@ La arquitectura hexagonal, o \emph{Ports and Adapters} (Cockburn, 2005), se empl
 
 En síntesis, el hexágono de AgroPS separa el problema agrícola de la tecnología que lo sirve. El dominio fija qué es una evidencia normativa trazable; la aplicación describe qué hay que hacer para responder, ingestiar o evaluar, a través de casos de uso y puertos; los adaptadores traducen esas operaciones a React, FastAPI, PostgreSQL, BM25 y Ollama. Esa separación permite cambiar el modelo o la base vectorial, probar el núcleo sin infraestructura y comparar el modo híbrido con el agéntico sin reescribir las reglas de citación.
 
-\section{Población y muestra}
-En la evaluación de sistemas de recuperación de información e inteligencia artificial, la población no corresponde a sujetos humanos, sino al universo informacional y normativo que constituye la base de conocimiento (knowledge base) de la especialidad.
+\section{Población, muestra y corpus documental}
 
-La población está integrada por la totalidad de las disposiciones legales, circulares técnicas, manuales de procedimiento, catálogos de condicionalidad reforzada y registros oficiales de productos fitosanitarios publicados por la Unión Europea, el Ministerio de Agricultura, Pesca y Alimentación (MAPA) de España, el Fondo Español de Garantía Agraria (FEGA) y la Autoridad Europea de Seguridad Alimentaria (EFSA) para el periodo normativo 2023--2026.
+La \emph{población teórica} es el conjunto de disposiciones PAC/POSEI, condicionalidad y sanidad vegetal publicadas por la UE, el MAPA, el FEGA y el Gobierno de Canarias en el periodo 2023--2026. Este TFM \textbf{no} evalúa ese universo (no hay 1760 documentos ni 2845 páginas en las tablas de resultados).
 
-La población está constituida por el conjunto de disposiciones legales, manuales de procedimiento, bases de datos de productos fitosanitarios y directrices de condicionalidad emitidas por la Unión Europea, el Ministerio de Agricultura, Pesca y Alimentación (MAPA) de España, el Fondo Español de Garantía Agraria (FEGA) y la Autoridad Europea de Seguridad Alimentaria (EFSA).
+La \emph{muestra experimental} es el corpus \texttt{knowledge-base/asesor-canarias}: 14 ficheros de marco (\texttt{00}--\texttt{13}) y 15 dossiers de cultivo, en Markdown. Esos textos destilan consolidados POSEI y fichas de sanidad vegetal. La corrida congelada indexa ese markdown en \textbf{1289 fragmentos}. Criterios de inclusión: (i)~vigencia 2023--2026; (ii)~relevancia para un asesor canario (ayudas POSEI, GIP, cuarentena, cuaderno REAC/CUE); (iii)~posibilidad de anclar una pregunta a un fichero y una sección; (iv)~exclusión de anexos con listados de beneficiarios y del JSON masivo del vademécum.
 
-La \emph{población teórica} es ese universo institucional. La \emph{muestra experimental} de este TFM no es un corpus de 1760 documentos ni de 2845 páginas: es el conjunto de demostración indexado en el prototipo (del orden de $N=20$ ficheros PDF, CSV y Markdown ---POSEI, vademécum y fichas de ejemplo---, unas cincuenta páginas equivalentes). Los criterios de inclusión de la demo son vigencia aproximada 2023--2026, presencia de tablas o listas normativas y criticidad de cumplimiento (ayudas, condicionalidad, fitosanitarios). Un crawling masivo sobre \texttt{sources.json} queda descrito como capacidad del prototipo, no como el dataset sobre el que se publican las tablas del Capítulo~\ref{ch:evaluacion}.
+\begin{table}[htbp]
+\centering
+\caption{Corpus usado en la evaluación (fuentes y destilación a Markdown).}
+\label{tab:corpus}
+\small
+\begin{tabular}{p{4.4cm}p{2.2cm}p{7.0cm}}
+\toprule
+\textbf{Documento / conjunto} & \textbf{Fecha / vigencia} & \textbf{Uso} \\
+\midrule
+\texttt{POSEI-Canarias-texto-consolidado-21-01-2025} (PDF) & consolidado 21-01-2025 & Fuente; destilado en \texttt{02}/\texttt{03} \\
+\texttt{POSEI-Canarias-texto-consolidado-2026-30-12-2025} (PDF) & rige 01-01-2026 & Fuente de presupuesto, medidas I--III \\
+Resolución de publicidad POSEI 2026 (PDF) & 02-03-2026 & Convocatoria; no se evalúa el censo de beneficiarios \\
+Marco \texttt{asesor-canarias/00}--\texttt{13.md} (14 ficheros) & 2025--2026 & Índice, rol del asesor, POSEI, GIP, filoxera, Panamá, REAC, laboratorio \\
+Dossiers \texttt{cultivos/*.md} (15 cultivos) & usos MAPA vigentes al generar & Platanera, vid, papa, aguacate, etc. \\
+PDF fitosanitarios (filoxera, FOC, GIP platanera, BOE 1987) & 1987--2025 & Fuente de \texttt{04}--\texttt{08}; no se reindexan en la corrida de oro \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+El banco de evaluación (\texttt{knowledge-base/gold\_tests.jsonl}, $N=35$) fija para cada ítem: pregunta, respuesta esperada, palabras clave, categoría, \texttt{source\_file} y sección (\texttt{page}). La tabla~\ref{tab:banco-muestra} muestra un extracto representativo; el resto está versionado en ese JSONL.
+
+\begin{table}[htbp]
+\centering
+\caption{Extracto del banco de oro: pregunta, respuesta esperada y fuente.}
+\label{tab:banco-muestra}
+\small
+\begin{tabular}{p{4.2cm}p{4.6cm}p{4.8cm}}
+\toprule
+\textbf{Pregunta} & \textbf{Respuesta esperada} & \textbf{Fuente} \\
+\midrule
+¿Qué significa la sigla POSEI? & Programa de Opciones Específicas por el Alejamiento y la Insularidad. & \texttt{02\_posei\_marco.md}, sección marco \\
+¿De cuántos millones de euros dispone POSEI Canarias 2026? & 243,96 (206,32 UE + 37,63 ficha adicional). & \texttt{02\_posei\_marco.md}, presupuesto 2026 \\
+¿Desde qué fecha rige el consolidado POSEI 2026? & 1 de enero de 2026. & \texttt{02\_posei\_marco.md} \\
+¿Qué distinguen REAC, CUE y REA? & Explotación; cuaderno digital; régimen de abastecimiento. & \texttt{10\_cuaderno\_reac.md} \\
+¿Qué enfermedad amenaza el 70\,\% de referencia del plátano IGP? & Fusarium (mal de Panamá). & \texttt{07\_mal\_de\_panama.md} \\
+¿En qué orden se aplica la GIP antes del químico? & Prevención, seguimiento, no químico, luego químico autorizado. & \texttt{05\_gip\_y\_fitosanitarios.md} \\
+¿El aguacate tiene medida POSEI propia? & No; entra en la Acción I.1. & \texttt{02\_posei\_marco.md} \\
+¿N.º de registro de AGROIL (araña roja, platanera)? & 22319. & \texttt{cultivos/platanera.md} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Objetivos de investigación}
-El propósito central de la fase experimental es evaluar cuantitativamente el impacto de la arquitectura RAG \textbf{textual} ---con ingesta de PDF y, en su caso, texto extraído por OCR--- en la mitigación de la tasa de alucinación y el incremento de la fidelidad informativa frente a un LLM en modo autónomo (\emph{standalone}). El prototipo no ejecuta un razonamiento visual end-to-end: las métricas de este capítulo se calculan sobre texto y embeddings, no sobre píxeles.
+El propósito de la fase experimental es evaluar el impacto del \textbf{RAG textual modular híbrido} en la mitigación de alucinaciones frente a un LLM autónomo. No se evalúa razonamiento visual, GraphRAG ni el bucle agéntico.
 
 De manera específica, la experimentación persigue:
 
-Determinar la variación cuantitativa en la métrica Faithfulness (Fidelidad) al pasar de un LLM autónomo a la arquitectura RAG propuesta (AgroRAG).
+Determinar la variación en fidelidad / tasa de alucinación al pasar de un LLM autónomo al RAG textual modular de AgroPS.
 
 Evaluar el impacto de la preservación de maquetación (Docling) y la fragmentación contextual sobre la precisión de recuperación de datos numéricos tabulares.
 
@@ -73,7 +112,7 @@ Registrar, con honestidad metodológica, que no existe en esta edición un estud
 \section{Variables intervinientes e instrumentos de evaluación}
 Para llevar a cabo la medición objetiva y reproducible de las variables dependientes, se desarrollaron dos herramientas específicas basadas en el lenguaje Python:
 
-Dashboard de Control y Auditoría (Gradio Framework): Se diseñó un panel de control interactivo mediante la librería Gradio para la ejecución, monitoreo en tiempo real y visualización analítica de los procesos de evaluación. El dashboard automatiza la lectura secuencial del banco de pruebas (tests.jsonl), gestiona las llamadas asíncronas a los modelos y genera métricas agregadas por categoría documental, visualizando las desviaciones mediante gráficos de barras interactivos (gr.BarPlot) y semáforos de calidad basados en umbrales prefijados.
+Laboratorio de evaluación en React (no Gradio): el prototipo expone el banco, la comparación vanilla/RAG y el juez local en la interfaz de AgroPS. La corrida canónica se congela con \texttt{scripts/freeze\_eval\_run.py} sobre el markdown de \texttt{asesor-canarias}, no sobre un dashboard Gradio.
 
 Evaluador basado en LLM como juez: la calidad de las respuestas se audita con el mismo runtime Ollama que el generador (\texttt{llama3.2:latest}), a través del adaptador de inferencia del gateway, no mediante un proxy LiteLLM. Se pide al modelo un JSON con notas 1--5 (exactitud, exhaustividad, relevancia) y se parsea en el servicio de evaluación. Esa salida es un juicio automático, no una rúbrica humana.
 
@@ -146,12 +185,8 @@ Hexágono propio (FastAPI) & Python & Núcleo evaluado \\
 
 Juicio de expertos: no se constituyó un panel de inspectores PAC. El comentario 12 del tutor exige tamaño de muestra revisada y acuerdo con el juez; esa evidencia no existe en el repositorio. La validación del banco es de autor (contraste de la referencia con el texto fuente). Un estudio interanotador queda fuera de esta edición.
 
-\section{Modelo de análisis de datos}
-La presente investigación adopta un enfoque empírico-analítico de carácter experimental y transversal. El procedimiento metodológico se articula secuencialmente en cuatro fases interconectadas, orientadas a garantizar la reproducibilidad técnica y el rigor estadístico en la evaluación de la arquitectura AgroRAG.
-
-En esta fase inicial, la muestra de demostración (del orden de $N=20$ documentos PDF PAC/POSEI y fichas fitosanitarias, no 1760) se fragmenta e indexa de forma densa en PostgreSQL/\texttt{pgvector} con \texttt{nomic-embed-text}, más un índice léxico BM25 por tenant. No se compara de forma experimental un baseline de extracción plana frente a Docling en las tablas de resultados: esa ablación queda descrita como diseño, no como resultado publicado.
-
-Para validar la capacidad de recuperación y generación, se estructuró un conjunto de datos de prueba compuesto por consultas técnicas sintéticas y reales. El banco de pruebas simula las situaciones operativas habituales a las que se enfrenta un inspector o gestor de expedientes PAC/POSEI.El dataset abarca tres niveles de complejidad tipológica: Consultas Factuales Directas (30\%): Búsqueda de definiciones normativas, plazos administrativos y requisitos de admisibilidad. Consultas de Extracción Tabular (40\%): Requerimiento de valores numéricos específicos, coeficientes de admisibilidad de pastos (CAP) o límites máximos de residuos (LMR). Consultas de Razonamiento Cruzado (30\%): Preguntas que exigen relacionar información dispersa entre múltiples anexos o disposiciones reglamentarias normativas.
+\section{Comparación LLM sin RAG frente a LLM con RAG}
+El factor experimental es binario y pareado: misma pregunta, mismo generador (\texttt{llama3.2:latest}), mismo juez. \textbf{Sin RAG} el modelo solo ve la pregunta y la instrucción de sistema. \textbf{Con RAG} ve además los fragmentos del híbrido (denso + BM25 + RRF, \texttt{final\_k}=8, sin reranker). La tabla de resultados es la~\ref{tab:rag-vs-norag}. No se reutilizan corridas exploratorias previas.
 
 
 \section{Configuración experimental del prototipo}

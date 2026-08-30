@@ -46,9 +46,9 @@ def test_preview_requires_auth(client):
 
 
 def test_list_datasets_filters_by_dataset_department_not_knowledge_base():
-    from routes import datasets as datasets_route
+    from evaluation.http import list_datasets
     import inspect
 
-    source = inspect.getsource(datasets_route.list_datasets)
+    source = inspect.getsource(list_datasets)
     assert "FROM rag_dataset_departments" in source
     assert "FROM department_knowledge_bases" not in source

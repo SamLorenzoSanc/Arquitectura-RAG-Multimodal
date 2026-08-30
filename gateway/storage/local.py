@@ -6,7 +6,20 @@ import os
 import uuid
 from pathlib import Path
 
-from storage.base import FileStorage
+from abc import ABC, abstractmethod
+
+
+class FileStorage(ABC):
+    @abstractmethod
+    async def save(self, file, tenant_id, knowledge_base_id) -> str: ...
+
+    @abstractmethod
+    async def delete(self, path: str): ...
+
+    @abstractmethod
+    async def load(self, path: str):
+        ...
+
 
 # Fuera del paquete Python para no mezclar código y binarios de upload.
 DEFAULT_ROOT = Path(

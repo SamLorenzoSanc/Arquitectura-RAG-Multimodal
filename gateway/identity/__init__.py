@@ -1,1 +1,1 @@
-"""Hexágono de identidad: usuarios, sesión y cuenta."""
+"""Identidad, autenticación y cuenta."""

@@ -9,28 +9,28 @@ El presente capítulo tiene como finalidad establecer de forma clara y precisa l
 El objetivo general de este Trabajo de Fin de Máster es:
 
 \begin{itemize}
-  \item Diseñar, implementar y evaluar un MVP de asistente documental basado en RAG agéntico que mejore la precisión, la relevancia y la trazabilidad de las respuestas generadas por un LLM local sobre un corpus agrícola y normativo. (Li, 2025)
+  \item Diseñar, implementar y evaluar un prototipo de asistente documental basado en \textbf{RAG textual modular} (recuperación híbrida denso + BM25 + RRF) que permita \textbf{medir} si anclar la generación a evidencia recuperada reduce las alucinaciones factuales de un LLM local, frente al mismo modelo sin recuperación, sobre un corpus agrícola y normativo (PAC/POSEI).
 \end{itemize}
 
-Este objetivo engloba la finalidad última del proyecto: un prototipo mínimo usable ---autenticación, ingesta de documentos y chat con citas--- con el que medir si anclar la generación a evidencia recuperada reduce las alucinaciones frente a un LLM sin recuperación.
+El MVP usable ---autenticación, ingesta y chat con fuentes--- es el vehículo experimental, no un segundo objetivo paralelo. El modo agéntico, el OCR de ingesta, el despliegue local y el laboratorio de métricas se documentan como ingeniería del prototipo; \textbf{no} se reclaman como hipótesis cuantitativas salvo lo que mida el Capítulo~\ref{ch:evaluacion}.
 
 \section{Objetivos específicos}
 
 Para alcanzar el objetivo general, el trabajo se ha subdividido en los siguientes objetivos específicos, cada uno de los cuales representa una épica que contribuye al cumplimiento del objetivo final:
 
 \begin{enumerate}[label=\textbf{OE\arabic*.}, leftmargin=*, itemsep=0.55em]
-  \item Analizar el estado del arte en arquitecturas RAG, sistemas agénticos y aplicaciones de inteligencia artificial en el sector agrario, identificando las limitaciones de las soluciones existentes y las oportunidades de mejora.
-        Este objetivo se corresponde con el marco teórico y el estado del arte desarrollado en el Capítulo~\ref{ch:estado-arte}.
+  \item Analizar de forma crítica ---no solo descriptiva--- el estado del arte en alucinaciones de LLM, arquitecturas RAG (naive, modular, agéntica, GraphRAG) y su evaluación en dominios regulados, justificando qué se implementa y qué queda fuera.
+        Este objetivo se corresponde con el Capítulo~\ref{ch:estado-arte}.
 
-  \item Diseñar la arquitectura del sistema, definiendo los componentes de ingestación de datos, recuperación semántica, orquestación agéntica, generación de respuestas y presentación de la información.
-        Este objetivo se desarrolla en el Capítulo~\ref{ch:implementacion}, donde se describen las decisiones de arquitectura y los componentes del sistema.
+  \item Diseñar la arquitectura del sistema como RAG textual modular: ingesta a texto, recuperación híbrida, generación anclada y citación; el grafo agéntico es una capa opcional del producto.
+        Este objetivo se desarrolla en el Capítulo~\ref{ch:implementacion}.
 
   \item Implementar el prototipo funcional, integrando la base de datos vectorial (PostgreSQL/\texttt{pgvector}), el modelo de lenguaje (Llama~3.2 a través de Ollama), el núcleo RAG en FastAPI con arquitectura hexagonal y la interfaz de usuario desarrollada con React, Vite y Tailwind CSS.
         Este objetivo se aborda en los Capítulos~\ref{ch:implementacion} y~\ref{ch:despliegue}.
 
-  \item Desarrollar el módulo de trazabilidad y citación automática, garantizando que cada respuesta incluya la referencia exacta al documento y la página de donde se extrajo la información. Este módulo es fundamental para reducir las alucinaciones y facilitar la verificación por parte del técnico.
+  \item Desarrollar la trazabilidad de cada respuesta: documento de origen, sección o página cuando el parser la conserve, e identificador del fragmento recuperado, visibles en el chat y en las trazas de evaluación. No se afirma certificación de cumplimiento normativo.
 
-  \item Evaluar el rendimiento del sistema en términos de fidelidad, relevancia, latencia y uso de recursos, utilizando \textbf{métricas propias de recuperación}, un \textbf{LLM-as-a-judge} local y, de forma opcional, un adaptador RAGAS (con fallback heurístico si la librería no está operativa), así como comparar el LLM sin RAG frente al prototipo con RAG.
+  \item Comparar de forma pareada el LLM \emph{sin} RAG frente al LLM \emph{con} RAG sobre el banco de oro, con métricas de recuperación (MRR, cobertura de palabras clave, precisión/exhaustividad de contexto cuando estén definidas) y de generación (exactitud factual del juez, relevancia, tasa binaria de alucinación y calidad de citas cuando el metadato exista). RAGAS queda como adaptador opcional: \textbf{no} es entregable de esta edición si no hay corrida.
         Este objetivo se cumple en el Capítulo~\ref{ch:evaluacion}.
 
   \item Documentar el proceso de desarrollo, las decisiones de diseño y los resultados obtenidos, proporcionando un prototipo funcional y una guía de implementación que pueda servir como referencia para futuros trabajos en el ámbito de la inteligencia artificial aplicada al sector agrario.
@@ -136,4 +136,4 @@ OE6 & Tarea 7 & Memoria, anexos y defensa \\
 \end{tabular}
 \end{table}
 
-Quedan fuera de alcance de esta edición el razonamiento visual end-to-end, la certificación industrial del despliegue, el reentrenamiento del LLM, y los módulos de organización, cuaderno de campo, OpenData y laboratorio de evaluación en la interfaz.
+Quedan \textbf{fuera del objeto experimental} (aunque algunos existan en el código): GraphRAG operativo, RAG multimodal end-to-end, ablación dens vs híbrido vs reranker vs agente, certificación de cumplimiento, panel de inspectores, y una corrida RAGAS oficial. El despliegue local es el entorno del prototipo, no una hipótesis a demostrar.

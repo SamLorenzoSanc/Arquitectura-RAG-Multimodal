@@ -1,14 +1,27 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { Loader2, MessageCircle, Send, Sparkles, X } from "lucide-react";
+import { Loader2, MessageCircle, Send, X } from "lucide-react";
 
-import { CanaryFlag } from "@/components/BrandMark";
-import { useOrganization } from "@/context/OrganizationContext";
+import { useOrganization } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
-import ChatService from "@/services/chat.service";
+import { ChatService } from "@/services";
 import { useSyncedTemperature } from "@/components/evaluation/FrozenRagConfigBar";
-import type { AgentTraceStep, Message } from "@/types/chat";
+import AgentToolsCatalog from "@/components/AgentToolsCatalog";
+import LiveReasoningPanel from "@/components/LiveReasoningPanel";
+import {
+  advanceFlowNodes,
+  markFlowDone,
+  toolToFlowNodes,
+} from "@/components/LiveRagFlowDiagram";
+import type {
+  AgentTraceStep,
+  ChatStreamEvent,
+  LiveProcessStep,
+  Message,
+  RagFlowNodeId,
+  RagFlowNodeState,
+} from "@/types";
 
 function relatedFromResponse(
   related?: string[] | null,
@@ -30,7 +43,14 @@ export default function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [thinking, setThinking] = useState("");
   const [relatedQuestions, setRelatedQuestions] = useState<string[]>([]);
-  const [trace, setTrace] = useState<AgentTraceStep[]>([]);
+  const [agentTrace, setAgentTrace] = useState<AgentTraceStep[] | null>(null);
+  const [liveSteps, setLiveSteps] = useState<LiveProcessStep[]>([]);
+  const [draftAnswer, setDraftAnswer] = useState("");
+  const [flowNodes, setFlowNodes] = useState<
+    Partial<Record<RagFlowNodeId, RagFlowNodeState>>
+  >({});
+  const [flowCaption, setFlowCaption] = useState("");
+  const [processOpen, setProcessOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { temperature } = useSyncedTemperature();
 
@@ -48,7 +68,6 @@ export default function ChatWidget() {
     setMessages([]);
     setConversationId(null);
     setRelatedQuestions([]);
-    setTrace([]);
   }, [selectedOrg?.id]);
 
   useEffect(() => {
@@ -62,8 +81,92 @@ export default function ChatWidget() {
     setMessages([]);
     setConversationId(null);
     setRelatedQuestions([]);
-    setTrace([]);
     setThinking("");
+    setAgentTrace(null);
+    setLiveSteps([]);
+    setDraftAnswer("");
+    setFlowNodes({});
+    setFlowCaption("");
+  };
+
+  const upsertLiveStep = (
+    id: string,
+    patch: Partial<LiveProcessStep> & { label?: string },
+  ) => {
+    setLiveSteps((prev) => {
+      const idx = prev.findIndex((step) => step.id === id);
+      if (idx < 0) {
+        return [
+          ...prev,
+          {
+            id,
+            label: patch.label || id,
+            detail: patch.detail,
+            status: patch.status || "running",
+          },
+        ];
+      }
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...patch };
+      return next;
+    });
+  };
+
+  const applyStreamEvent = (event: ChatStreamEvent) => {
+    if (event.type === "meta" && event.conversation_id) {
+      setConversationId(event.conversation_id);
+    }
+    if ("message" in event && event.message) {
+      setThinking(event.message);
+      setFlowCaption(event.message);
+    }
+    if (event.type === "status" || event.type === "intent" || event.type === "plan") {
+      const phase = event.type === "status" ? event.phase || "status" : event.type;
+      upsertLiveStep(phase, {
+        label: event.message || phase,
+        status: phase === "generate" ? "running" : "done",
+      });
+      setFlowNodes((prev) => advanceFlowNodes(prev, "agente", ["pregunta"]));
+    }
+    if (event.type === "tool_start") {
+      const mapped = toolToFlowNodes(event.tool);
+      upsertLiveStep(`tool-${event.tool || "unknown"}`, {
+        label: event.tool || "tool",
+        detail: event.reason || event.message,
+        status: "running",
+      });
+      setFlowNodes((prev) => advanceFlowNodes(prev, mapped, ["pregunta", "agente"]));
+    }
+    if (event.type === "tool_end") {
+      upsertLiveStep(`tool-${event.tool || "unknown"}`, {
+        label: event.tool || "tool",
+        detail: event.summary || event.message,
+        status: event.ok === false ? "error" : "done",
+      });
+      setAgentTrace((prev) => [
+        ...(prev || []),
+        {
+          tool: event.tool || "tool",
+          reason: event.reason,
+          ok: event.ok,
+          latency_ms: event.latency_ms,
+          summary: event.summary,
+          n_chunks: event.n_chunks,
+        },
+      ]);
+      const mapped = toolToFlowNodes(event.tool);
+      setFlowNodes((prev) =>
+        event.ok === false
+          ? Object.fromEntries(
+              Object.entries({ ...prev }).concat(mapped.map((n) => [n, "error"])),
+            )
+          : markFlowDone(prev, mapped),
+      );
+    }
+    if (event.type === "token" && event.delta) {
+      setDraftAnswer((prev) => prev + event.delta);
+      setFlowNodes((prev) => advanceFlowNodes(prev, "generate", ["pregunta", "agente"]));
+    }
   };
 
   const ask = async (rawQuestion: string) => {
@@ -87,27 +190,47 @@ export default function ChatWidget() {
     setInputValue("");
     setIsLoading(true);
     setRelatedQuestions([]);
-    setTrace([]);
     setThinking(t("widget.searching"));
+    setAgentTrace([]);
+    setLiveSteps([
+      { id: "start", label: t("widget.searching"), status: "running" },
+    ]);
+    setDraftAnswer("");
+    setFlowNodes({ pregunta: "active" });
+    setFlowCaption(t("widget.searching"));
+    setProcessOpen(true);
 
     try {
-      const response = await ChatService.send({
-        question,
-        conversation_id: conversationId,
-        history: nextMessages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        organization_id: selectedOrg.id,
-        organization_name: selectedOrg.name,
-        use_rag: true,
-        rag_mode: "agentic",
-        use_query_rewrite: false,
-        use_reranking: false,
-        retrieval_k: 12,
-        final_k: 8,
-        temperature,
-      });
+      const response = await ChatService.stream(
+        {
+          question,
+          conversation_id: conversationId,
+          history: nextMessages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+          organization_id: selectedOrg.id,
+          organization_name: selectedOrg.name,
+          use_rag: true,
+          rag_mode: "agentic",
+          agent_mode: "agent",
+          use_query_rewrite: false,
+          use_reranking: false,
+          retrieval_k: 12,
+          final_k: 8,
+          temperature,
+        },
+        { onEvent: applyStreamEvent },
+      );
+      if (response.agent_trace?.length) {
+        setAgentTrace(response.agent_trace);
+      }
+      setFlowNodes((prev) =>
+        markFlowDone(advanceFlowNodes(prev, "respuesta", ["generate"]), [
+          "respuesta",
+          "generate",
+        ]),
+      );
       if (response.conversation_id) {
         setConversationId(response.conversation_id);
       }
@@ -127,7 +250,6 @@ export default function ChatWidget() {
           pendingReview: Boolean(response.review_id),
         },
       ]);
-      setTrace(response.agent_trace ?? []);
       setRelatedQuestions(
         relatedFromResponse(response.related_questions, response.retrieval_details),
       );
@@ -160,25 +282,14 @@ export default function ChatWidget() {
     <div className="pointer-events-none fixed right-4 bottom-4 z-[1200] flex flex-col items-end gap-3 sm:right-6 sm:bottom-6">
       {open && (
         <section className="pointer-events-auto flex h-[min(640px,calc(100vh-7rem))] w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-[color:var(--agro-border)] bg-white shadow-2xl shadow-slate-900/20">
-          <div className="agro-flag-bar" aria-hidden>
-            <span />
-            <span />
-            <span />
-          </div>
           <header className="flex items-start justify-between gap-3 bg-[color:var(--agro-primary)] px-4 py-3 text-white">
-            <div className="flex min-w-0 items-start gap-2.5">
-              <CanaryFlag className="mt-0.5 h-6 w-9 shrink-0 border-white/30" />
-              <div className="min-w-0">
-                <p className="flex items-center gap-1.5 text-sm font-bold">
-                  <Sparkles size={15} />
-                  {t("widget.title")}
-                </p>
-                <p className="mt-0.5 truncate text-[11px] text-white/80">
-                  {selectedOrg
-                    ? t("chat.allDocs", { org: selectedOrg.name })
-                    : t("common.selectOrganization")}
-                </p>
-              </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold">{t("widget.title")}</p>
+              <p className="mt-0.5 truncate text-[11px] text-white/80">
+                {selectedOrg
+                  ? t("chat.allDocs", { org: selectedOrg.name })
+                  : t("common.selectOrganization")}
+              </p>
             </div>
             <div className="flex shrink-0 gap-1">
               <button
@@ -199,7 +310,12 @@ export default function ChatWidget() {
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[color:var(--agro-canvas)] px-3 py-3">
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-white px-3 py-3">
+            <AgentToolsCatalog
+              agentTrace={agentTrace}
+              onPickExample={(q) => void ask(q)}
+              compact={messages.length > 0}
+            />
             {messages.length === 0 && (
               <div className="rounded-xl border border-[color:var(--agro-border)] bg-white p-3">
                 <p className="text-xs font-semibold text-slate-800">
@@ -209,6 +325,17 @@ export default function ChatWidget() {
                   {t("widget.askHint")}
                 </p>
               </div>
+            )}
+            {(isLoading || liveSteps.length > 0) && (
+              <LiveReasoningPanel
+                steps={liveSteps}
+                draftAnswer={draftAnswer}
+                open={processOpen}
+                onToggle={() => setProcessOpen((v) => !v)}
+                flowMode="agentic"
+                flowNodes={flowNodes}
+                flowCaption={flowCaption || thinking}
+              />
             )}
 
             {messages.map((msg) => (
@@ -238,19 +365,6 @@ export default function ChatWidget() {
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <Loader2 size={14} className="animate-spin text-[color:var(--agro-primary)]" />
                 {thinking || t("widget.inferring")}
-              </div>
-            )}
-
-            {!isLoading && trace.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {trace.map((step, idx) => (
-                  <span
-                    key={`${step.tool}-${idx}`}
-                    className="rounded-full bg-[color:var(--agro-pill)] px-2 py-0.5 text-[10px] font-semibold text-[color:var(--agro-primary)]"
-                  >
-                    {step.tool}
-                  </span>
-                ))}
               </div>
             )}
             <div ref={messagesEndRef} />

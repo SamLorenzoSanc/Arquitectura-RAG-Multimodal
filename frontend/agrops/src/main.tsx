@@ -4,7 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import "./index.css";
 import App from "./App.tsx";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "./context";
 import { I18nProvider } from "./i18n/I18nProvider";
 import { queryClient } from "./lib/queryClient";
 

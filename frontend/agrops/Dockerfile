@@ -6,10 +6,13 @@ WORKDIR /app
 ARG VITE_API_URL=/api/v1
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm install -g pnpm
+# Pin a pnpm 10: `npm i -g pnpm` instala 11+, que falla con ERR_PNPM_IGNORED_BUILDS
+# si Cypress (e2e local) no está en allowBuilds. Aquí no se usa su binario.
+RUN npm install -g pnpm@10
 
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
+ENV CYPRESS_INSTALL_BINARY=0
+RUN pnpm install --frozen-lockfile --config.strict-dep-builds=false
 
 COPY . .
 RUN pnpm run build

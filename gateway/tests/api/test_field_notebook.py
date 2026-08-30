@@ -44,7 +44,7 @@ def test_list_entries(authenticated_client, override_db):
         )
     )
     with patch(
-        "notebook.adapters.inbound.http.init_field_notebook_table", new=AsyncMock()
+        "notebook.http.init_field_notebook_table", new=AsyncMock()
     ):
         response = authenticated_client.get("/api/v1/field-notebook/")
     assert response.status_code == 200
@@ -74,7 +74,7 @@ def test_create_entry(authenticated_client, override_db):
     override_db.commit = AsyncMock()
 
     with patch(
-        "notebook.adapters.inbound.http.init_field_notebook_table", new=AsyncMock()
+        "notebook.http.init_field_notebook_table", new=AsyncMock()
     ):
         response = authenticated_client.post(
             "/api/v1/field-notebook/",
@@ -96,7 +96,7 @@ def test_delete_missing_entry(authenticated_client, override_db):
     override_db.execute = AsyncMock(return_value=missing)
     override_db.rollback = AsyncMock()
     with patch(
-        "notebook.adapters.inbound.http.init_field_notebook_table", new=AsyncMock()
+        "notebook.http.init_field_notebook_table", new=AsyncMock()
     ):
         response = authenticated_client.delete("/api/v1/field-notebook/no-existe")
     assert response.status_code == 404

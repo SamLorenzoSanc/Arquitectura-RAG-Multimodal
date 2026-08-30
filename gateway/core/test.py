@@ -7,6 +7,7 @@ from services.evaluation_metrics import normalize_text
 
 DEFAULT_TEST_FILE = Path(__file__).parent / "tests.jsonl"
 TEST_FILE = Path(os.getenv("EVALUATION_DATASET_PATH", DEFAULT_TEST_FILE))
+# Copia antigua; solo se carga si el banco principal no existe.
 LEGACY_TEST_FILE = Path(__file__).parent.parent / "routes" / "tests.jsonl"
 
 
@@ -110,8 +111,9 @@ def load_tests(
 ) -> list[TestQuestion]:
     """Carga el banco de oro versionado en JSON/JSONL."""
     sources = [Path(path or TEST_FILE)]
-    uses_default_bank = path is None and TEST_FILE == DEFAULT_TEST_FILE
-    if uses_default_bank and LEGACY_TEST_FILE.exists():
+    uses_default_bank = path is None and Path(TEST_FILE) == DEFAULT_TEST_FILE
+    # Evitar fusionar legacy si el banco principal ya existe (antes duplicaba basura).
+    if uses_default_bank and not DEFAULT_TEST_FILE.exists() and LEGACY_TEST_FILE.exists():
         sources.append(LEGACY_TEST_FILE)
 
     tests: list[TestQuestion] = []

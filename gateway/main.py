@@ -1,28 +1,44 @@
 import os
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from rag.composition import build_rag_container as compose_rag_hexagon
 from composition import build_app_container
-from routes.chat import lab_router as chat_lab_router
-from routes.chat import router as chat_router
-from routes.documents import lab_router as document_lab_router
-from routes.documents import router as document_router
-from routes.health import router as health_router
-from routes.auth import router as auth_router
-from routes.knowledge import router as knowledge_router
-from routes.organization import router as organization_router
-from routes.department import router as department_router
-from routes.account import router as account_router
-from routes.user import router as user_router
-from routes.evaluation_ext import router as evaluation_router
-from routes.datasets import router as datasets_router
-from routes.human_validation import router as human_validation_router
+from chat.http import lab_router as chat_lab_router
+from chat.http import router as chat_router
+from catalog.http import lab_router as document_lab_router
+from catalog.http import router as document_router
+from ops.http import health_router
+from identity.http import router as auth_router
+from tenancy.http import knowledge_router
+from tenancy.http import organization_router
+from tenancy.http import department_router
+from identity.http import account_router
+from identity.http import user_router
+from evaluation.http import lab_router as evaluation_router
+from evaluation.http import datasets_router
+from evaluation.http import hitl_router as human_validation_router
 import models as models
 from middleware.timing import register_logging_middleware
+from services.inference_warmup import schedule_warmup
+from services.embedding_indexer import schedule_indexer
 
-app = FastAPI(title="AgroPS Gateway", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Inferencia automática: calienta embed + LLM al arrancar (no bloquea /health).
+    app.state.warmup_task = schedule_warmup()
+    app.state.indexer_task = schedule_indexer()
+    yield
+    for name in ("warmup_task", "indexer_task"):
+        task = getattr(app.state, name, None)
+        if task is not None and not task.done():
+            task.cancel()
+
+
+app = FastAPI(title="AgroPS Gateway", version="1.0.0", lifespan=lifespan)
 app.state.compose_rag = compose_rag_hexagon
 app.state.container = build_app_container()
 register_logging_middleware(app)

@@ -1,0 +1,26 @@
+[
+  {
+    "item_id": 137,
+    "category": "spanning",
+    "question": "¿Qué socio usa cuaderno digital AgroLLM y prefiere alertas de audio?",
+    "retrieved_sources": "knowledge-base/asesor-canarias/10_cuaderno_reac.md | knowledge-base/empleados/Jose Arcadio.md | knowledge-base/asesor-canarias/01_rol_del_asesor.md | knowledge-base/asesor-canarias/09_laboratorio_y_residuos.md | knowledge-base/asesor-canarias/01_rol_del_asesor.md | knowledge-base/asesor-canarias/13_preguntas_frecuentes.md | knowledge-base/productos/Aguallm.md | knowledge-base/asesor-canarias/00_indice.md",
+    "retrieved_preview": "# REAC, cuaderno digital (CUE) y REA de insumos Tres siglas que el agricultor confunde: 1. **REAC**: Registro de Explotaciones Agrícolas de Canarias. Quién eres y qué parcelas tienes. 2. **CUE**: Cuaderno digital de explotación. Qué haces e || co:** Cooperó con el Ingeniero Agrónomo de la cooperativa (**Covalle**) para monitorizar el estrés hídrico de la parcela de Tazacorte, logrando mantener el calibre comercial (Extra) a pesar de las restricciones de agua en verano. - **Campañ || de 12 de marzo de 1987). - «¿Qué ayuda me corresponde?»: identificar medida POSEI (I vegetal, II plátano IGP, III animal) y la convocatoria del año. El pago suele ir por OPP o sede electrónica. - «¿Cómo lo apunto?»: REAC (registro de la exp",
+    "rag_answer": "El Ingeniero Agrónomo de la cooperativa Covalle.",
+    "reference_answer": "Jose Arcadio Lorenzo usa el cuaderno digital y prefiere alertas de audio o resúmenes de texto.",
+    "mrr": "0.0000",
+    "rag_accuracy": 5.0,
+    "cause_hint": "recuperación débil"
+  },
+  {
+    "item_id": 129,
+    "category": "spanning",
+    "question": "¿Quién recertificó fincas tras la ceniza y en qué isla trabaja?",
+    "retrieved_sources": "knowledge-base/asesor-canarias/07_mal_de_panama.md | knowledge-base/asesor-canarias/09_laboratorio_y_residuos.md | knowledge-base/asesor-canarias/04_sanidad_tercer_pais.md | knowledge-base/asesor-canarias/11_riego_salinidad_viento.md | knowledge-base/empleados/Alejandro Castro.md | knowledge-base/asesor-canarias/12_cadena_frio.md | knowledge-base/empleados/Alejandro Castro.md | knowledge-base/asesor-canarias/06_filoxera.md",
+    "retrieved_preview": "*. - Prohibida tierra adherida a vegetales. Portal: https://www.gobiernodecanarias.org/agricultura/temas/sanidad_vegetal/maldepanama/ ## Bioseguridad en finca (vale para RST4 y para excluir RT4) - No aceptar hijuelos, cormos ni plantas de o || lo / raíces si se sospecha nematodo o Fusarium: seguir la ficha oficial, no un puñado suelto en un saco usado. ## Laboratorio de residuos de productos fitosanitarios Polígono de Arinaga, calle Los Cactus nº 68, Agüimes (Gran Canaria), en el ||  los requisitos del país de destino (declaración adicional al certificado). El agricultor o la OPP no improvisan el certificado: lo tramita la inspección fronteriza con esa declaración. ## Competencia y vigilancia La Ley 43/2002 de sanidad ",
+    "rag_answer": "Alejandro Castro, Ingeniero Agrónomo y Director Técnico de Campo, lideró con éxito la recertificación de las fincas de los socios tras las complicaciones derivadas de la ceniza volcánica en la isla de La Palma.",
+    "reference_answer": "Alejandro Castro, en Los Llanos de Aridane (La Palma), lideró la recertificación tras la ceniza volcánica.",
+    "mrr": "0.1429",
+    "rag_accuracy": 5.0,
+    "cause_hint": "recuperación débil"
+  }
+]

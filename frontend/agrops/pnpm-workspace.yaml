@@ -1,2 +1,4 @@
+# Cypress es e2e local. En Docker su postinstall se ignora (CYPRESS_INSTALL_BINARY=0).
+# `true` evita ERR_PNPM_IGNORED_BUILDS con pnpm 10/11; `false` bloquearía el binario local.
 allowBuilds:
   cypress: true

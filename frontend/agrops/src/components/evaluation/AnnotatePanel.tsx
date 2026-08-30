@@ -1,9 +1,9 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/api";
-import { queryKeys } from "@/lib/queryKeys";
-import { useKnowledgeBases } from "@/hooks/useCachedApi";
-import { useOrganization } from "@/context/OrganizationContext";
+import { queryKeys } from "@/lib/app";
+import { useKnowledgeBases } from "@/hooks";
+import { useOrganization } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
 import { categoryLabel } from "@/components/evaluation/labels";
 

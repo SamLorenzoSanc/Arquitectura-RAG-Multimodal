@@ -4,10 +4,10 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Plus, Search } from "lucide-react";
 import api from "@/api";
 import { NewOrgModal } from "@/components/NewOrgModal";
-import { useOrganization } from "@/context/OrganizationContext";
+import { useOrganization } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
-import { roleGuide, type RoleGuide } from "@/lib/roles";
-import DepartmentService from "@/services/department.service";
+import { roleGuide, type RoleGuide } from "@/lib/app";
+import { DepartmentService } from "@/services";
 
 interface Organization {
     id: string;

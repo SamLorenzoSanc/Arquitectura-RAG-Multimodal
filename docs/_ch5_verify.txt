@@ -1,0 +1,37 @@
+478|Heading 1|Capítulo 5: Presentación de análisis, resultados y discusión
+479|Normal|Este capítulo presenta el análisis, los resultados y la discusión del protocolo experimental. La muestra no es una encuesta sociodemográfica
+480|Título Apartado|Unidad de análisis y variables
+481|Normal|Cada ítem del banco incluye pregunta, respuesta de referencia, palabras clave y categoría tipológica. El índice se construyó sobre knowledge
+482|Normal|Las variables consideradas son:
+483|List Paragraph|De recuperación: posición del primer fragmento útil (MRR) y cobertura de palabras clave. El nDCG del harness no se cita como canónico: produ
+484|List Paragraph|De generación (LLM-as-a-Judge, escala 1–5): exactitud, exhaustividad y relevancia; además, tasa binaria de alucinación (is_hallucination).
+485|List Paragraph|De contraste experimental: misma pregunta y modelo (llama3.2:latest) con RAG (híbrido denso + BM25 + RRF, sin reranker) frente a sin RAG (ge
+486|Título Apartado|Configuración congelada
+487|Normal|La tabla siguiente resume config.json de esa corrida. En esta ejecución la temperatura no se envió en el payload (default de Ollama). El lab
+488|Normal|Tabla 1. Configuración de la ejecución de la evaluación del RAG
+490|Título Apartado|Resultados de recuperación (IR)
+491|Normal|Métricas propias sobre palabras clave del ítem y los fragmentos recuperados (no RAGAS).
+492|List Bullet|MRR global: 0,5773
+493|List Bullet|Cobertura de keywords: 0,9490
+494|Normal|Por categoría, el MRR más alto se observa en holistic (0,661) y el más bajo en numerical (0,473).
+495|Normal|Tabla 2. MRR del recuperador híbrido por categoría (run_20260820T185427Z).
+497|IMG|
+498|Normal|Figura 1. MRR por categoría. Valores numéricos: Tabla 2 (N=150).
+499|Título subapartado|Calidad de generación con RAG (LLM-as-a-Judge)
+500|Normal|El juez (1–5) es el mismo modelo generador. Medias con RAG:
+501|List Bullet|Exactitud: 3,94
+502|List Bullet|Exhaustividad: 3,63
+503|List Bullet|Relevancia: 3,93
+504|Normal|Estas notas no se mezclan con las métricas de IR ni con RAGAS.
+505|Título subapartado|Comparación sin RAG frente a con RAG
+506|Normal|Misma pregunta, mismo modelo (llama3.2:latest) y mismo juez. Sin RAG no hay fidelidad a un contexto recuperado.
+507|Normal|Tabla 3. LLM autónomo frente a RAG híbrido (N=150; 147 con juez; run_20260820T185427Z).
+508|IMG|
+509|Normal|Figura 2. Comparación sin RAG vs con RAG. Valores numéricos: Tabla 3.
+510|Normal|El RAG mejora las tres dimensiones del juez (exactitud 3,46→3,94; exhaustividad 2,03→3,63; relevancia 2,42→3,93) y reduce la tasa binaria de
+511|Normal|Tabla 4. MRR, exactitud del juez y alucinación por categoría (misma corrida).
+512|IMG|
+513|Normal|Figura 3. Exactitud del juez por tipología (RAG vs sin RAG). Valores numéricos: Tabla 4.
+514|Título Apartado|Origen de las métricas reportadas
+515|Normal|Tabla 5. Origen de cada métrica citada en este capítulo.
+520|Heading 1|Capítulo 6: Consideraciones Finales

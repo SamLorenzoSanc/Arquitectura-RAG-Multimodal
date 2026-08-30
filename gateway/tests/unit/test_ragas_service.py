@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from services.ragas_service import (
+from evaluation.ragas import (
     RagasSample,
     aggregate_ragas_scores,
     build_ragas_records,

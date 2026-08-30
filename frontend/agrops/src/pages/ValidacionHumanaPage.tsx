@@ -8,17 +8,17 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useOrganization } from "@/context/OrganizationContext";
+import { useOrganization } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
 import {
   decideHumanReview,
   extractMissingQuestions,
   fetchHumanReviews,
   type HumanReview,
-} from "@/services/validation.service";
+} from "@/services";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { categoryLabel, reviewStatusLabel, EVAL_CATEGORIES } from "@/components/evaluation/labels";
-import { queryKeys } from "@/lib/queryKeys";
+import { queryKeys } from "@/lib/app";
 
 type SourceFilter = "document_question" | "synthetic_dataset" | "chat" | "all";
 

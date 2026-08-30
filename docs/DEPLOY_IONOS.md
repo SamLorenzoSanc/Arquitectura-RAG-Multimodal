@@ -32,12 +32,17 @@ POSTGRES_DB=agrops
 DATABASE_URL=postgresql+asyncpg://postgres:CAMBIAR_PASSWORD_FUERTE@postgres:5432/agrops
 SECRET_KEY=CAMBIAR_SECRET_LARGO_ALEATORIO
 OLLAMA_API_KEY=ollama
-DOCKERHUB_USER=TU_USUARIO_DOCKERHUB
+DOCKERHUB_USER=samuelzo
 IMAGE_TAG=latest
 RAG_GENERATION_MODEL=llama3.2:latest
 RAG_EMBEDDING_MODEL=qwen3-embedding:latest
 CORS_ORIGINS=http://TU_IP_O_DOMINIO
 ```
+
+Imágenes en Docker Hub:
+
+- https://hub.docker.com/repository/docker/samuelzo/agrops-api
+- https://hub.docker.com/repository/docker/samuelzo/agrops-frontend
 
 ## Arranque único del VPS
 

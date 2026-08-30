@@ -6,7 +6,7 @@ import Landing from "@/pages/Landing";
 import AboutProductPage from "@/pages/AboutProductPage";
 import PrivacyPolicyPage from "@/pages/PrivacyPolicyPage";
 import SustainabilityPage from "@/pages/SustainabilityPage";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context";
 
 /** Solo distingue usuario autenticado vs no autenticado. */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

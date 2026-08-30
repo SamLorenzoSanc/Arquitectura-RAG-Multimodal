@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Camera, Copy, Search, Trash2 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { useOrganization } from "@/context/OrganizationContext";
+import { useAuth } from "@/context";
+import { useOrganization } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
-import { SETTINGS_TAB_KEYS, type SettingsTab } from "@/lib/nav";
-import AccountService, {
+import { SETTINGS_TAB_KEYS, type SettingsTab } from "@/lib/app";
+import {
+  AccountService,
   type AccessTokenItem,
   type AccountUsage,
   type ManagedUser,
   type UserProfile,
-} from "@/services/account.service";
+} from "@/services";
 import { UserAvatar } from "@/components/UserAvatar";
 
 const ISLANDS = [

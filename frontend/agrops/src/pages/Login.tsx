@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Lock, Mail } from "lucide-react";
 import bgFarm from "@/assets/login-bg.png";
 import { BrandMark } from "@/components/BrandMark";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
 
 interface LoginForm {

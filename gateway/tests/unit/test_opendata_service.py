@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from services import opendata_service
+from opendata import service as opendata_service
 
 pytestmark = pytest.mark.unit
 

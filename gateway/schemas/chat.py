@@ -56,8 +56,8 @@ class ChatRequest(BaseModel):
     department_id: Optional[str] = None
     organization_id: Optional[str] = None
     organization_name: Optional[str] = None
-    retrieval_k: int = 12
-    final_k: int = 8
+    retrieval_k: int = 8
+    final_k: int = 5
     model: str | None = None
     temperature: float = 0
     # Reescritura solo se dispara si la pregunta es compleja (should_rewrite_query).
@@ -65,6 +65,8 @@ class ChatRequest(BaseModel):
     use_reranking: bool = False
     use_rag: bool = True
     rag_mode: Literal["hybrid", "agentic", "compare"] = "agentic"
+    # Modos estilo Cursor: agent | plan | debug | multitask (preferido sobre rag_mode).
+    agent_mode: Literal["agent", "plan", "debug", "multitask"] | None = None
 
 
 class ModeComparisonSide(BaseModel):
@@ -87,6 +89,7 @@ class ChatResponse(BaseModel):
     retrieval_details: dict | None = None
     related_questions: list[str] = Field(default_factory=list)
     rag_mode: str | None = None
+    agent_mode: str | None = None
     architecture: str | None = None
     agent_trace: list[dict] | None = None
     comparison: dict[str, Any] | None = None

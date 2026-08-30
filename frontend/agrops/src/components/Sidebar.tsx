@@ -11,9 +11,11 @@ import {
   ClipboardCheck,
   FileText,
   GitFork,
+  History,
   LayoutDashboard,
   LifeBuoy,
   Plus,
+  Radar,
   Settings,
   ShieldAlert,
   X,
@@ -21,8 +23,8 @@ import {
 
 import { BrandMark, CanaryFlag } from "@/components/BrandMark";
 import { NewOrgModal } from "@/components/NewOrgModal";
-import { useOrganization } from "@/context/OrganizationContext";
-import { useShell } from "@/context/ShellContext";
+import { useOrganization } from "@/context";
+import { useShell } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
 
 type NavItem = {
@@ -66,6 +68,8 @@ export default function Sidebar() {
           { to: "/dashboard/documentos", labelKey: "nav.documents", icon: FileText },
           { to: "/dashboard/embeddings", labelKey: "nav.embeddings", icon: Boxes },
           { to: "/dashboard/flujo-rag", labelKey: "nav.ragFlow", icon: GitFork },
+          { to: "/dashboard/lab-retrieval", labelKey: "nav.ragProbe", icon: Radar },
+          { to: "/dashboard/historial", labelKey: "nav.userHistory", icon: History },
           { to: "/dashboard/organization", labelKey: "nav.organization", icon: Building2 },
         ],
       },

@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import { useOrganization } from "@/context/OrganizationContext";
-import { useKnowledgeBases, useKnowledgeMap } from "@/hooks/useCachedApi";
+import { useOrganization } from "@/context";
+import { useKnowledgeBases, useKnowledgeMap } from "@/hooks";
 import EmbeddingCloud3D from "@/components/EmbeddingCloud3D";
 import { useTranslation } from "@/i18n/I18nProvider";
 

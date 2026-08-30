@@ -160,53 +160,56 @@ def _pack_question(
     }
 
 
+def is_template_eval_question(
+    question: str,
+    *,
+    rationale: str = "",
+    reference_answer: str = "",
+) -> bool:
+    """Detecta plantillas genéricas del fallback heurístico (no deben aprobarse)."""
+    q = (question or "").casefold()
+    blob = f"{rationale} {reference_answer}".casefold()
+    if "pregunta de evaluación derivada del documento" in blob:
+        return True
+    patterns = (
+        "cuál es el hecho principal descrito en ",
+        "qué fechas o plazos relevantes establece ",
+        "qué relación existe entre los elementos principales de ",
+        "qué procedimiento describe ",
+        "qué requisitos de cumplimiento establece ",
+        "qué dato normativo concreto recoge ",
+        "en qué página, anexo o sección de ",
+    )
+    return any(p in q for p in patterns)
+
+
 def heuristic_questions(
     text: str, filename: str, limit: int = 6
 ) -> list[dict[str, Any]]:
+    """Solo preguntas que ya aparecen en el documento (con '?').
+
+    Ya no se inventan plantillas por nombre de archivo: ensuciaban la cola HITL
+    y el banco de evaluación.
+    """
+    _ = filename
     questions: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for match in re.findall(r"[^.!\n]{12,180}\?", text):
+    for match in re.findall(r"[^.!\n]{12,180}\?", text or ""):
         packed = _pack_question(match, rationale="Aparece en el documento")
+        if is_template_eval_question(
+            packed["question"],
+            rationale=packed.get("rationale") or "",
+            reference_answer=packed.get("reference_answer") or "",
+        ):
+            continue
         key = packed["question"].lower()
         if key in seen:
             continue
         seen.add(key)
         questions.append(packed)
         if len(questions) >= limit:
-            return questions
-
-    topic = (
-        re.sub(r"[_-]+", " ", (filename or "el documento")).rsplit(".", 1)[0].strip()
-    )
-    fallbacks = [
-        (f"¿Cuál es el hecho principal descrito en {topic}?", "direct_fact"),
-        (f"¿Qué fechas o plazos relevantes establece {topic}?", "temporal"),
-        (
-            f"¿Qué relación existe entre los elementos principales de {topic}?",
-            "relationship",
-        ),
-        (f"¿Qué procedimiento describe {topic} y en qué orden se aplica?", "spanning"),
-        (
-            f"¿Qué requisitos de cumplimiento establece {topic}?",
-            "regulatory_compliance",
-        ),
-        (f"¿Qué dato normativo concreto recoge {topic}?", "regulatory_fact"),
-        (
-            f"¿En qué página, anexo o sección de {topic} se encuentra la información principal?",
-            "traceability",
-        ),
-    ]
-    for item, category in fallbacks:
-        if len(questions) >= limit:
             break
-        questions.append(
-            _pack_question(
-                item,
-                rationale="Pregunta de evaluación derivada del documento",
-                category=category,
-            )
-        )
-    return questions[:limit]
+    return questions
 
 
 def _parse_llm_questions(raw: str) -> list[dict[str, Any]]:
@@ -272,6 +275,7 @@ Cada pregunta debe pertenecer exactamente a una de estas categorías:
 
 No inventes nombres, cifras, fechas ni respuestas. Evita preguntas duplicadas. La respuesta
 de referencia debe ser autosuficiente y estar respaldada literalmente por el documento.
+Prohibido generar plantillas genéricas del tipo «hecho principal descrito en <archivo>».
 Responde SOLO JSON válido:
 {{"questions": [{{"question": "...", "category": "direct_fact", "keywords": ["..."], "reference_answer": "...", "rationale": "por qué evalúa calidad"}}]}}
 Categorías permitidas: {categories}
@@ -290,8 +294,17 @@ Documento:
         )
         raw = response.choices[0].message.content or ""
         parsed = _parse_llm_questions(raw)
-        if parsed:
-            return parsed
+        cleaned = [
+            item
+            for item in parsed
+            if not is_template_eval_question(
+                item.get("question") or "",
+                rationale=item.get("rationale") or "",
+                reference_answer=item.get("reference_answer") or "",
+            )
+        ]
+        if cleaned:
+            return cleaned
     except Exception:
         logger.exception("Fallo al extraer preguntas con el LLM")
     return heuristic_questions(snippet, filename)

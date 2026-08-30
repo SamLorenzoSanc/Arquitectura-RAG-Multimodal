@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from services.human_validation import coerce_keywords, save_document_questions
+from evaluation.hitl import coerce_keywords, save_document_questions
 from services.question_extraction import (
     EVAL_CATEGORIES,
     _parse_llm_questions,
@@ -28,6 +28,24 @@ def test_heuristic_questions_from_text():
     assert any("dosis" in q["question"].lower() for q in out)
     assert all(q["category"] in EVAL_CATEGORIES for q in out)
     assert len(out) >= 2
+
+
+def test_heuristic_questions_does_not_invent_filename_templates():
+    out = heuristic_questions("Sin signos de interrogación en el texto.", "sobre_nosotros.md")
+    assert out == []
+
+
+def test_is_template_eval_question_detects_generic_patterns():
+    from services.question_extraction import is_template_eval_question
+
+    assert is_template_eval_question(
+        "¿Cuál es el hecho principal descrito en sobre nosotros?",
+        rationale="Pregunta de evaluación derivada del documento",
+    )
+    assert not is_template_eval_question(
+        "¿Qué medida del POSEI cubre el plátano IGP?",
+        reference_answer="La Medida II.",
+    )
 
 
 def test_parse_llm_questions_json():
@@ -93,7 +111,7 @@ def test_list_reviews(authenticated_client, override_db):
     override_db.execute = AsyncMock(return_value=result)
     override_db.commit = AsyncMock()
     with patch(
-        "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+        "evaluation.hitl.init_human_validation_tables", new=AsyncMock()
     ):
         response = authenticated_client.get("/api/v1/human-validation/reviews")
     assert response.status_code == 200
@@ -106,7 +124,7 @@ def test_list_reviews_defaults_to_document_questions(authenticated_client, overr
     override_db.execute = AsyncMock(return_value=result)
     override_db.commit = AsyncMock()
     with patch(
-        "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+        "evaluation.hitl.init_human_validation_tables", new=AsyncMock()
     ):
         response = authenticated_client.get("/api/v1/human-validation/reviews")
     assert response.status_code == 200
@@ -128,10 +146,10 @@ def test_decide_review(authenticated_client, override_db):
     override_db.commit = AsyncMock()
     with (
         patch(
-            "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+            "evaluation.hitl.init_human_validation_tables", new=AsyncMock()
         ),
         patch(
-            "evaluation.application.hitl.promote_review_to_evaluation_bank",
+            "evaluation.hitl.promote_review_to_evaluation_bank",
             new=AsyncMock(),
         ) as promote,
     ):
@@ -162,9 +180,9 @@ def test_decide_review_promotes_approved_document_question(
     override_db.execute = AsyncMock(side_effect=[update, select, question_update])
     override_db.commit = AsyncMock()
     with (
-        patch("evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()),
+        patch("evaluation.hitl.init_human_validation_tables", new=AsyncMock()),
         patch(
-            "evaluation.application.hitl.promote_review_to_evaluation_bank",
+            "evaluation.hitl.promote_review_to_evaluation_bank",
             new=AsyncMock(),
         ) as promote,
     ):
@@ -202,10 +220,10 @@ def test_decide_synthetic_review_updates_dataset_row(authenticated_client, overr
     override_db.commit = AsyncMock()
     with (
         patch(
-            "evaluation.application.hitl.init_human_validation_tables", new=AsyncMock()
+            "evaluation.hitl.init_human_validation_tables", new=AsyncMock()
         ),
         patch(
-            "evaluation.application.hitl.promote_review_to_evaluation_bank",
+            "evaluation.hitl.promote_review_to_evaluation_bank",
             new=AsyncMock(),
         ),
     ):

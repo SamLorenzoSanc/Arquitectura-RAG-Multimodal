@@ -114,8 +114,8 @@ def main():
 
     for i, name in enumerate(
         [
-            "${DOCKERHUB_USER}/agrops-api:latest",
-            "${DOCKERHUB_USER}/agrops-frontend:latest",
+            "samuelzo/agrops-api:latest",
+            "samuelzo/agrops-frontend:latest",
         ]
     ):
         yy = y_top + 60 + i * 70

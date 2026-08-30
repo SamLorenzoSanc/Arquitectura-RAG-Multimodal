@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import time
 from collections import OrderedDict
 from threading import Lock
@@ -16,8 +17,8 @@ from rag.domain.ports import (
 )
 
 _RETRIEVAL_CACHE: OrderedDict[str, tuple[float, RetrievalBundle]] = OrderedDict()
-_RETRIEVAL_CACHE_TTL = 120
-_RETRIEVAL_CACHE_MAX_SIZE = 256
+_RETRIEVAL_CACHE_TTL = max(30, int(os.getenv("RAG_RETRIEVAL_CACHE_TTL", "180")))
+_RETRIEVAL_CACHE_MAX_SIZE = max(32, int(os.getenv("RAG_RETRIEVAL_CACHE_SIZE", "256")))
 _RETRIEVAL_CACHE_LOCK = Lock()
 
 

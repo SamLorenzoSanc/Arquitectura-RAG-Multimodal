@@ -1,0 +1,95 @@
+{
+  "run_id": "run_20260820T185427Z",
+  "bank": "gateway/routes/tests.jsonl (150 sinteticas AgroLLM+POSEI)",
+  "n_total": 150,
+  "n_ok_no_error": 147,
+  "n_error": 3,
+  "errors": [
+    [
+      "10",
+      "timed out"
+    ],
+    [
+      "45",
+      "timed out"
+    ],
+    [
+      "57",
+      "timed out"
+    ]
+  ],
+  "n_with_rag_judge": 147,
+  "n_with_vanilla_judge": 147,
+  "global": {
+    "mrr": 0.5773285714285714,
+    "ndcg": 0.768795918367347,
+    "coverage": 0.9489795918367347,
+    "ndcg_gt1": 33,
+    "rag_accuracy": 3.9435374149659865,
+    "rag_completeness": 3.63265306122449,
+    "rag_relevance": 3.925170068027211,
+    "vanilla_accuracy": 3.45578231292517,
+    "vanilla_completeness": 2.0272108843537415,
+    "vanilla_relevance": 2.421768707482993,
+    "rag_hallucination_rate": 0.19047619047619047,
+    "vanilla_hallucination_rate": 0.23129251700680273
+  },
+  "by_category": {
+    "comparative": {
+      "n": 10,
+      "n_judge": 10,
+      "mrr": 0.55374,
+      "rag_accuracy": 4.4,
+      "vanilla_accuracy": 4.0,
+      "rag_hallucination_rate": 0.0
+    },
+    "direct_fact": {
+      "n": 70,
+      "n_judge": 67,
+      "mrr": 0.6043492537313433,
+      "rag_accuracy": 3.9402985074626864,
+      "vanilla_accuracy": 3.5074626865671643,
+      "rag_hallucination_rate": 0.19402985074626866
+    },
+    "holistic": {
+      "n": 10,
+      "n_judge": 10,
+      "mrr": 0.6611100000000001,
+      "rag_accuracy": 4.0,
+      "vanilla_accuracy": 2.5,
+      "rag_hallucination_rate": 0.2
+    },
+    "numerical": {
+      "n": 10,
+      "n_judge": 10,
+      "mrr": 0.47262000000000004,
+      "rag_accuracy": 4.0,
+      "vanilla_accuracy": 3.7,
+      "rag_hallucination_rate": 0.3
+    },
+    "relationship": {
+      "n": 10,
+      "n_judge": 10,
+      "mrr": 0.5875,
+      "rag_accuracy": 4.6,
+      "vanilla_accuracy": 3.1,
+      "rag_hallucination_rate": 0.1
+    },
+    "spanning": {
+      "n": 20,
+      "n_judge": 20,
+      "mrr": 0.57965,
+      "rag_accuracy": 3.7,
+      "vanilla_accuracy": 3.7,
+      "rag_hallucination_rate": 0.2
+    },
+    "temporal": {
+      "n": 20,
+      "n_judge": 20,
+      "mrr": 0.50166,
+      "rag_accuracy": 3.585,
+      "vanilla_accuracy": 3.3,
+      "rag_hallucination_rate": 0.25
+    }
+  }
+}

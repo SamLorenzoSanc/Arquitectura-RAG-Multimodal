@@ -9,7 +9,7 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from identity.adapters.inbound.auth import get_current_user
+from identity.http import get_current_user
 from services.database import get_db, AsyncSessionLocal
 from models.user import User
 

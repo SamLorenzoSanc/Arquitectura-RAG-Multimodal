@@ -5,10 +5,10 @@ import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { UserAvatar } from "@/components/UserAvatar";
-import { useAuth } from "@/context/AuthContext";
-import { useShell } from "@/context/ShellContext";
+import { useAuth } from "@/context";
+import { useShell } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
-import { routeLabel, settingsTabLabel } from "@/lib/nav";
+import { routeLabel, settingsTabLabel } from "@/lib/app";
 
 export default function Header() {
   const { t } = useTranslation();

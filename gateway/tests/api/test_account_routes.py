@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 import uuid
 
-from routes.auth import get_current_user
+from identity.http import get_current_user
 from main import app
 
 
@@ -135,7 +135,7 @@ def test_create_support_ticket(authenticated_client, override_db):
     override_db.execute = AsyncMock()
     override_db.commit = AsyncMock()
     with patch(
-        "identity.adapters.outbound.postgres.PostgresIdentityRepository.ensure_tables",
+        "identity.postgres.PostgresIdentityRepository.ensure_tables",
         AsyncMock(),
     ):
         response = authenticated_client.post(

@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/api";
-import { queryKeys } from "@/lib/queryKeys";
-import { useOrganization } from "@/context/OrganizationContext";
-import { useEvaluationTests } from "@/hooks/useCachedApi";
+import { queryKeys } from "@/lib/app";
+import { useOrganization } from "@/context";
+import { useEvaluationTests } from "@/hooks";
 import { useTranslation } from "@/i18n/I18nProvider";
 import { categoryLabel } from "@/components/evaluation/labels";
 
@@ -51,6 +51,8 @@ export default function BankPanel() {
   const { data, isLoading, refetch } = useEvaluationTests();
   const tests = (data as BankItem[] | undefined) ?? [];
 
+  const [purging, setPurging] = useState(false);
+
   const upload = async (file: File) => {
     if (!selectedOrg?.id) {
       setError(t("evalExtended.selectOrgFirst"));
@@ -89,6 +91,65 @@ export default function BankPanel() {
     }
   };
 
+  const purgePending = async () => {
+    if (!selectedOrg?.id || purging) return;
+    setPurging(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { data } = await api.post(
+        "/chat/evaluation/purge-pending-tests",
+        null,
+        { params: { organization_id: selectedOrg.id } },
+      );
+      await qc.invalidateQueries({ queryKey: queryKeys.evaluationTests });
+      await refetch();
+      setMessage(
+        t("evalExtended.purgePendingDone", { deleted: data.deleted ?? 0 }),
+      );
+    } catch (err: any) {
+      setError(
+        err.response?.data?.detail ||
+          err.message ||
+          t("evalExtended.purgePendingFailed"),
+      );
+    } finally {
+      setPurging(false);
+    }
+  };
+
+  const resetToGold = async () => {
+    if (!selectedOrg?.id || purging) return;
+    const ok = window.confirm(t("evalExtended.resetGoldConfirm"));
+    if (!ok) return;
+    setPurging(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { data } = await api.post(
+        "/chat/evaluation/reset-to-gold",
+        null,
+        { params: { organization_id: selectedOrg.id } },
+      );
+      await qc.invalidateQueries({ queryKey: queryKeys.evaluationTests });
+      await refetch();
+      setMessage(
+        t("evalExtended.resetGoldDone", {
+          deleted: data.deleted ?? 0,
+          imported: data.imported ?? 0,
+        }),
+      );
+    } catch (err: any) {
+      setError(
+        err.response?.data?.detail ||
+          err.message ||
+          t("evalExtended.resetGoldFailed"),
+      );
+    } finally {
+      setPurging(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -124,10 +185,31 @@ export default function BankPanel() {
           >
             {t("evalExtended.refresh")}
           </button>
+          <button
+            type="button"
+            onClick={() => void purgePending()}
+            disabled={purging || !selectedOrg?.id}
+            className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 disabled:opacity-50"
+          >
+            {purging
+              ? t("evalExtended.purgingPending")
+              : t("evalExtended.purgePending")}
+          </button>
+          <button
+            type="button"
+            onClick={() => void resetToGold()}
+            disabled={purging || !selectedOrg?.id}
+            className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900 disabled:opacity-50"
+          >
+            {t("evalExtended.resetGold")}
+          </button>
           <span className="text-xs text-slate-500">
             {t("evalExtended.bankCount", { count: tests.length })}
           </span>
         </div>
+        <p className="mt-2 text-xs text-slate-400">
+          {t("evalExtended.bankGoldHint")}
+        </p>
       </div>
 
       {error && (

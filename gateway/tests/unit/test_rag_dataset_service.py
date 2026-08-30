@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 
-from services.rag_dataset_service import (
+from evaluation.rag_dataset import (
     add_llm_column,
     append_rows,
     delete_dataset,
@@ -121,7 +121,7 @@ def test_alias_mapping_accepts_spanish_columns():
 
 
 def test_log_lines_and_demo_catalog_are_importable():
-    from services.rag_dataset_service import demo_catalog, demo_rows, parse_content
+    from evaluation.rag_dataset import demo_catalog, demo_rows, parse_content
 
     rows, info = parse_content(
         "inferencias.log",
@@ -196,7 +196,7 @@ def test_unmapped_columns_are_kept_in_metadata():
 
 def test_video_preview_uses_transcribed_segments(monkeypatch):
     monkeypatch.setattr(
-        "services.rag_dataset_service._video_segments",
+        "evaluation.rag_dataset._video_segments",
         lambda *_args, **_kwargs: [
             "[0.0s–2.1s] Revisa el filtro de malla.",
             "[2.1s–5.0s] Sustituye goteros ciegos.",
@@ -252,7 +252,7 @@ async def test_synthetic_rows_are_queued_for_human_validation():
 
 @pytest.mark.asyncio
 async def test_init_tables_skips_external_sql_when_already_present(monkeypatch):
-    import services.rag_dataset_service as module
+    import evaluation.rag_dataset as module
 
     monkeypatch.setattr(module, "_TABLES_READY", False)
     db = AsyncMock()
@@ -285,7 +285,7 @@ async def test_delete_dataset_removes_ingest_after_scope_check(monkeypatch):
     db.execute = AsyncMock(return_value=result)
     db.commit = AsyncMock()
     monkeypatch.setattr(
-        "services.rag_dataset_service._notify_index", AsyncMock()
+        "evaluation.rag_dataset._notify_index", AsyncMock()
     )
 
     out = await delete_dataset(
@@ -318,10 +318,10 @@ async def test_update_dataset_writes_name_and_departments(monkeypatch):
     db.execute = AsyncMock(return_value=result)
     db.commit = AsyncMock()
     monkeypatch.setattr(
-        "services.rag_dataset_service._notify_index", AsyncMock()
+        "evaluation.rag_dataset._notify_index", AsyncMock()
     )
     monkeypatch.setattr(
-        "services.rag_dataset_service.associate_dataset_departments",
+        "evaluation.rag_dataset.associate_dataset_departments",
         AsyncMock(),
     )
 
@@ -365,7 +365,7 @@ async def test_append_rows_reuses_existing_schema_mapping(monkeypatch):
     db.execute = AsyncMock(return_value=result)
     db.scalar = AsyncMock(return_value=2)
     db.commit = AsyncMock()
-    monkeypatch.setattr("services.rag_dataset_service._notify_index", AsyncMock())
+    monkeypatch.setattr("evaluation.rag_dataset._notify_index", AsyncMock())
 
     out = await append_rows(
         db,

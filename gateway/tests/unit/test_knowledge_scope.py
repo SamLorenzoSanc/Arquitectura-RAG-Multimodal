@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 
-from utils.knowledge_scope import (
+from utils.scope import (
     KnowledgeScope,
     resolve_knowledge_collections,
     resolve_knowledge_scope,

@@ -8,14 +8,15 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { useAuth } from "@/context/AuthContext";
-import { useOrganization } from "@/context/OrganizationContext";
+import { useAuth } from "@/context";
+import { useOrganization } from "@/context";
 import { useTranslation } from "@/i18n/I18nProvider";
-import { queryKeys } from "@/lib/queryKeys";
-import AccountService, {
-  type AnalyticsEvent,
+import { queryKeys } from "@/lib/app";
+import {
+  AccountService,
   type AccountAnalytics,
-} from "@/services/account.service";
+  type AnalyticsEvent,
+} from "@/services";
 
 const emptyAnalytics: AccountAnalytics = {
   user_id: "",
@@ -157,6 +158,12 @@ export default function DashboardOverview() {
             className="rounded-full bg-[color:var(--agro-pill)] px-3 py-1 font-semibold text-[color:var(--agro-primary)] hover:underline"
           >
             {t("dashboard.ragFlow")}
+          </Link>
+          <Link
+            to="/dashboard/lab-retrieval"
+            className="rounded-full bg-[color:var(--agro-pill)] px-3 py-1 font-semibold text-[color:var(--agro-primary)] hover:underline"
+          >
+            {t("nav.ragProbe")}
           </Link>
         </div>
       </section>
@@ -313,7 +320,15 @@ export default function DashboardOverview() {
           </section>
 
           <section className="rounded-xl border border-[color:var(--agro-border)] bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-bold text-slate-900">{t("dashboard.recentQueries")}</h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-bold text-slate-900">{t("dashboard.recentQueries")}</h2>
+              <Link
+                to="/dashboard/historial"
+                className="text-[11px] font-semibold text-[color:var(--agro-primary)] hover:underline"
+              >
+                {t("nav.userHistory")}
+              </Link>
+            </div>
             {data.recent_conversations.length === 0 ? (
               <p className="py-8 text-center text-sm text-slate-400">
                 {t("dashboard.noAssistantYet")}
@@ -321,23 +336,25 @@ export default function DashboardOverview() {
             ) : (
               <ul className="mt-3 space-y-2">
                 {data.recent_conversations.map((chat) => (
-                  <li
-                    key={chat.id}
-                    className="flex items-center justify-between gap-2 px-1 py-1.5"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium text-slate-800">
-                        {chat.title}
+                  <li key={chat.id}>
+                    <Link
+                      to="/dashboard/historial"
+                      className="flex items-center justify-between gap-2 rounded-lg px-1 py-1.5 hover:bg-slate-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-slate-800">
+                          {chat.title}
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {chat.message_count === 1
+                            ? t("dashboard.messageSingular", { count: chat.message_count })
+                            : t("dashboard.messagePlural", { count: chat.message_count })}
+                        </span>
                       </span>
-                      <span className="text-[11px] text-slate-400">
-                        {chat.message_count === 1
-                          ? t("dashboard.messageSingular", { count: chat.message_count })
-                          : t("dashboard.messagePlural", { count: chat.message_count })}
+                      <span className="shrink-0 text-[11px] text-slate-500">
+                        {relativeTime(chat.updated_at)}
                       </span>
-                    </span>
-                    <span className="shrink-0 text-[11px] text-slate-500">
-                      {relativeTime(chat.updated_at)}
-                    </span>
+                    </Link>
                   </li>
                 ))}
               </ul>

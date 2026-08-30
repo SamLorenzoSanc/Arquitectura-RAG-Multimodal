@@ -2,8 +2,8 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import DashboardKeepAlive from "./DashboardKeepAlive";
 import ChatWidget from "./ChatWidget";
-import { OrganizationProvider } from "@/context/OrganizationContext";
-import { ShellProvider } from "@/context/ShellContext";
+import { OrganizationProvider } from "@/context";
+import { ShellProvider } from "@/context";
 
 function DashboardShell() {
   return (

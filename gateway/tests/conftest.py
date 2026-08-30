@@ -1,4 +1,7 @@
 from uuid import uuid4
+import os
+
+os.environ.setdefault("EMBEDDING_INDEXER_ENABLED", "false")
 
 import pytest
 from sqlalchemy.ext.asyncio import (
@@ -16,7 +19,7 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock, MagicMock
 
 from main import app
-from routes.auth import get_current_user
+from identity.http import get_current_user
 from services.database import get_db
 
 DATABASE_URL = "sqlite+aiosqlite:///:memory:"

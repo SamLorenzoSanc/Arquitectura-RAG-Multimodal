@@ -190,6 +190,22 @@ export const API_ENDPOINTS: ApiEndpoint[] = [
     },
   },
   {
+    method: "POST",
+    path: "/chat/stream",
+    tag: "Chat",
+    summary: "Chat con SSE: proceso del agente + tokens en tiempo real",
+    auth: true,
+    body: {
+      question: "¿Qué requisitos POSEI aplica al plátano?",
+      use_rag: true,
+      rag_mode: "agentic",
+      model: "llama3.2:latest",
+    },
+    response: {
+      note: "text/event-stream con eventos meta|status|intent|plan|tool_*|grade|token|done|error",
+    },
+  },
+  {
     method: "GET",
     path: "/chat/conversations",
     tag: "Chat",

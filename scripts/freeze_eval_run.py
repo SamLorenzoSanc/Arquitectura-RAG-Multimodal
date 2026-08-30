@@ -21,8 +21,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 KB = ROOT / "knowledge-base"
-GOLD = KB / "gold_tests.jsonl"
+GOLD = Path(os.getenv("EVAL_BANK_PATH", str(KB / "gold_tests.jsonl")))
+if not GOLD.is_absolute():
+    GOLD = ROOT / GOLD
 OUT_ROOT = ROOT / "docs" / "evaluation_runs"
+# asesor-canarias = oro TFM; knowledge-base = banco sintético AgroLLM (routes/tests.jsonl)
+CORPUS_DIR = Path(os.getenv("EVAL_CORPUS_DIR", str(KB / "asesor-canarias")))
+if not CORPUS_DIR.is_absolute():
+    CORPUS_DIR = ROOT / CORPUS_DIR
 
 OLLAMA = os.getenv("OLLAMA_API_BASE", "http://127.0.0.1:11434").rstrip("/")
 GEN_MODEL = os.getenv("RAG_GENERATION_MODEL", "llama3.2:latest")
@@ -123,11 +129,16 @@ def load_gold() -> list[dict]:
 
 
 def load_kb_chunks() -> list[dict]:
-    """Solo asesor-canarias: el oro de la memoria está anclado a POSEI/GIP/vademécum de cultivo."""
+    """Indexa markdown bajo EVAL_CORPUS_DIR (por defecto asesor-canarias)."""
     chunks = []
-    corpus = KB / "asesor-canarias"
+    corpus = CORPUS_DIR
+    if not corpus.exists():
+        raise FileNotFoundError(f"Corpus no encontrado: {corpus}")
     for path in sorted(corpus.rglob("*.md")):
-        rel = path.relative_to(ROOT).as_posix()
+        try:
+            rel = path.relative_to(ROOT).as_posix()
+        except ValueError:
+            rel = path.as_posix()
         raw = path.read_text(encoding="utf-8", errors="replace")
         for idx, piece in enumerate(chunk_text(raw, CHUNK_SIZE, CHUNK_OVERLAP)):
             chunks.append({"id": f"{rel}#{idx}", "source": rel, "text": piece})
@@ -296,8 +307,10 @@ def main() -> None:
     ollama_info = snapshot_ollama()
     config = {
         "run_id": run_id,
-        "retriever": "local_hybrid_asesor_canarias",
-        "note": "Misma receta que el chat (denso+BM25+RRF, reranker off) sobre knowledge-base/asesor-canarias. No es Graph RAG ni visión. RAGAS no se ejecuta en esta corrida.",
+        "bank_path": str(GOLD),
+        "corpus_dir": str(CORPUS_DIR),
+        "retriever": "local_hybrid",
+        "note": "Misma receta que el chat (denso+BM25+RRF, reranker off). RAGAS no se ejecuta en esta corrida.",
         "ragas": "not_run",
         "generation_model": GEN_MODEL,
         "embedding_model": EMB_MODEL,

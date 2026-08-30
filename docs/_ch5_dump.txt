@@ -1,0 +1,172 @@
+---478|Heading 1---
+Capítulo 5: Presentación de análisis, resultados y discusión
+---479|Normal---
+Este capítulo presenta el análisis, los resultados y la discusión del protocolo experimental. La muestra no es una encuesta sociodemográfica de usuarios, sino un banco de evaluación versionado diseñado para simular consultas técnicas sobre normativa agraria canaria. Las cifras proceden de la ejecución congelada (N=150, 150/150 sin error de ejecución, duración total ≈ 289,6 s). Misma pregunta sin contexto y con recuperador híbrido (denso + BM25 + RRF, RAG_USE_RERANKER=false, chunk 1400/120, final_k=8). RAGAS no se ejecutó. 
+---480|Título Apartado---
+Unidad de análisis y variables
+---481|Normal---
+Cada ítem del banco incluye pregunta, respuesta de referencia, palabras clave, categoría tipológica y anclaje a un fichero fuente del corpus asesor-canarias (markdown de asesoría: POSEI, GIP, cuarentena, dossiers de cultivo, etc.). El índice asociado comprende 1289 chunks. Hay cinco ítems por cada una de las siete categorías.
+---482|Normal---
+Las variables consideradas son:
+---483|List Paragraph---
+De recuperación: posición del primer fragmento útil (MRR) y cobertura de palabras clave. El nDCG del harness no se cita como canónico en esta corrida: produjo valores anómalos >1 en 21 de 35 filas (no en 160).
+---484|List Paragraph---
+De generación (LLM-as-a-Judge, escala 1–5): exactitud, exhaustividad y relevancia; además, tasa binaria de alucinación (is_hallucination).
+---485|List Paragraph---
+De contraste experimental: misma pregunta y modelo (llama3.2:latest) con RAG (híbrido denso + BM25 + RRF, sin reranker) frente a sin RAG (generación autónoma).
+---486|Título Apartado---
+Configuración congelada
+---487|Normal---
+La tabla siguiente resume config.json de esa corrida. En esta ejecución la temperatura no se envió en el payload (default de Ollama). El laboratorio React posterior sí la expone y la manda (RAG_TEMPERATURE=0).
+---488|Normal---
+Tabla 1. Configuración de la ejecución de la evaluación del RAG
+---489|Título Apartado---
+
+---490|Título Apartado---
+Resultados de recuperación (IR)
+---491|Normal---
+Métricas propias sobre palabras clave del ítem y los fragmentos recuperados (no RAGAS).
+---492|List Bullet---
+MRR global: 0,8108
+---493|List Bullet---
+Cobertura de keywords: 0,9643
+---494|Normal---
+Por categoría, el MRR más alto se observa en relationship (0,933) y temporal (0,900); el más bajo, en traceability (0,667).
+---495|Normal---
+Tabla 2. MRR del recuperador híbrido por categoría 
+---496|Normal---
+
+---497|Normal---
+
+---498|Normal---
+Figura 1. Esquema de MRR por categoría. Valores numéricos: Tabla 2.
+---499|Título subapartado---
+Calidad de generación con RAG (LLM-as-a-Judge)
+---500|Normal---
+El juez (1–5) es el mismo modelo generador. Medias con RAG:
+---501|List Bullet---
+Exactitud: 4,46
+---502|List Bullet---
+Exhaustividad: 4,06
+---503|List Bullet---
+Relevancia: 4,00
+---504|Normal---
+Estas notas no se mezclan con las métricas de IR ni con RAGAS.
+---505|Título subapartado---
+Comparación sin RAG frente a con RAG
+---506|Normal---
+Misma pregunta, mismo modelo (llama3.2:latest) y mismo juez. Sin RAG no hay fidelidad a un contexto recuperado.
+---507|Normal---
+Tabla 3. LLM autónomo frente a RAG híbrido (N=35, run_20260819T165515Z).
+---508|Normal---
+
+---509|Normal---
+Figura 2. Esquema visual de la comparación. Valores numéricos: Tabla 3.
+---510|Normal---
+El RAG mejora las tres dimensiones del juez y reduce la tasa binaria de alucinación aproximadamente a una cuarta parte (0,314 → 0,086), sin eliminarla. Por tipología, spanning y regulatory_compliance alcanzan exactitud 5,00 y alucinación 0,00 en el agregado de cinco ítems; direct_fact, temporal y traceability concentran la residual (0,20).
+---511|Normal---
+Tabla 4. MRR, exactitud del juez y alucinación por categoría (misma corrida).
+---512|Título Apartado---
+
+---513|Título Apartado---
+Origen de las métricas reportada
+---514|Normal---
+Tabla 5. Origen de cada métrica citada en este capítulo.
+---515|Normal---
+
+---516|Normal---
+
+---517|Normal---
+
+---518|Normal---
+
+
+==== ALL TABLES ====
+
+## Table 0 (8x3)
+Criterio | Por qué se eligió este modelo | Impacto en la recuperación semántica
+Idioma del corpus | El corpus es español técnico PAC/POSEI, no inglés de los MTEB clásicos. Qwen3 cubre más de cien idiomas; MiniLM y bge-large-en están sesgados al inglés; no existe un bge-large-es oficial. | Acerca paráfrasis del agricultor o del gestor —«prima de arranque»— al tenor literal del boletín y eleva el recall@k del retriever denso.
+Runtime del prototipo | Inferencia local unificada en Ollama, junto al modelo de lenguaje. E5 y Sentence Transformers exigirían un stack Hugging Face paralelo. | Misma GPU o CPU, misma API de embeddings y reindexado reproducible sin servicios en la nube.
+Asimetría consulta/documento | Qwen3 es instruction-aware. E5 también lo es, pero BGE-M3 ya no exige prefijos y MiniLM trata por igual la pregunta y el pasaje. | Mejora el ranking cuando la pregunta es corta y el fragmento es un artículo largo, caso típico de la consulta normativa.
+Dimensionalidad | Hasta 4096 dimensiones, de las que se indexan 2000 en HNSW. MiniLM usa 384; E5 y BGE-M3, 1024. | Espacio más expresivo para matices —excepciones, anexos, ecorregímenes— sin reentrenar. El recorte Matryoshka conserva la geometría semántica.
+Ventana de contexto | 32.000 tokens frente a 512 de MiniLM o BGE-en y 8192 de BGE-M3. Los fragmentos del prototipo tienen 1000 caracteres. | El embedding captura el artículo completo y no un recorte a 512 tokens que parte tablas de LMR o listas PAC.
+Papel de BGE en el sistema | BGE no se usa como embedder por defecto. Se usa como Cross-Encoder bge-reranker-v2-m3 sobre los candidatos ya fusionados. | La recuperación semántica gana en dos tiempos: Qwen3 amplía el recall denso y BGE reordena la precisión en el top-k final.
+Complemento léxico | El retriever denso no sustituye a BM25. Los códigos del tipo «Orden APA/102/2024» siguen yendo al índice léxico. | Menos desajuste a nivel de documento: sinonimia por la vía densa, identificador exacto por BM25 y fusión mediante RRF.
+
+## Table 1 (13x8)
+Solución | Tipo | Sector | RAG | Agéntico | Citación | Open-source | Aplicabilidad al sector agrario
+Azure AI Search + OpenAI | Plataforma empresarial | General | Sí | No | Parcial | No | Media
+Amazon Kendra + Bedrock | Plataforma empresarial | General | Sí | No | Parcial | No | Media
+Google Vertex AI Search | Plataforma empresarial | General | Sí | No | Parcial | No | Media
+AgroAI | Solución específica | Agrario | No | No | No | No | Alta (pero limitada)
+FarmWave | Solución específica | Agrario | No | No | No | No | Baja (mercado US)
+Climate Corporation | Solución específica | Agrario | No | No | No | No | Baja (no normativas)
+LawDroid | Asistente de normativa | Legal | Sí | No | Sí | No | Baja (dominio diferente)
+Compliance.ai | Monitorización normativa | Financiero | Sí | No | Sí | No | Baja (dominio diferente)
+LangChain + LlamaIndex | Framework open-source | General | Sí | Sí | Sí | Sí | Media (requiere desarrollo)
+Dify.ai | Plataforma open-source | General | Sí | Parcial | Parcial | Sí | Media (requiere adaptación)
+Flowise | Herramienta visual | General | Sí | Parcial | Parcial | Sí | Media (requiere adaptación)
+Propuesta TFM (AgroPS) | Asistente RAG agéntico | Agrario | Sí | Sí | Sí | Sí | Alta
+
+## Table 2 (4x3)
+Origen | Contenido | Rol en la evaluación
+Corporativo / demo | compañia/, empleados/, productos/ | Empresa, plantilla, contratos, precios de planes, roadmap
+Normativo-agrario canario | asesor-canarias/, Vademécum MAPA | POSEI, GIP, REAC/CUE, filoxera, mal de Panamá, dossiers de cultivo
+Corporativo / demo | compañia/, empleados/, productos/ | Empresa, plantilla, contratos, precios de planes, roadmap
+
+## Table 3 (6x4)
+Categoría (ES) | Clave técnica | N | Qué exige al sistema
+Hecho directo | direct_fact | 70 | Hecho literal (quién, cuánto, dónde, definición)
+Temporal | temporal | 20 | Fechas, periodos, vigencia, hoja de ruta
+Multidocumento / cruce | spanning | 20 | Cruce entre entidades o documentos (empleado×módulo×salario, plaga×ayuda POSEI…)
+Comparativa | comparative | 10 | Comparación de magnitudes o entidades
+Numérica | numerical | 10 | Cifras, presupuestos, contadores
+
+## Table 4 (10x2)
+Parámetro | Valor
+run_id | run_20260819T165515Z
+Generador | llama3.2:latest
+Embedder | nomic-embed-text:latest
+Chunk / solape | 1400 / 120 caracteres
+Retrieve | denso k=10 + BM25 k=10 + RRF (k=60), final_k=8
+Reranker | false
+Temperatura (esta corrida) | no enviada (default Ollama)
+Corpus | knowledge-base/asesor-canarias/**/*.md (1289 chunks)
+RAGAS | no ejecutado
+
+## Table 5 (9x3)
+Categoría | N | MRR
+relationship | 5 | 0,933
+temporal | 5 | 0,900
+spanning | 5 | 0,867
+regulatory_fact | 5 | 0,833
+regulatory_compliance | 5 | 0,747
+direct_fact | 5 | 0,729
+traceability | 5 | 0,667
+Global | 35 | 0,811
+
+## Table 6 (5x4)
+Métrica | Sin RAG | Con RAG | Dif.
+Exactitud (1–5) | 3,31 | 4,46 | +1,14
+Exhaustividad (1–5) | 2,46 | 4,06 | +1,60
+Relevancia (1–5) | 3,06 | 4,00 | +0,94
+Tasa is_hallucination (juez) | 0,314 | 0,086 | −0,229
+
+## Table 7 (8x5)
+Categoría | N | MRR | Acc. juez | Halluc.
+direct_fact | 5 | 0,729 | 4,40 | 0,20
+temporal | 5 | 0,900 | 4,00 | 0,20
+relationship | 5 | 0,933 | 4,20 | 0,00
+spanning | 5 | 0,867 | 5,00 | 0,00
+regulatory_compliance | 5 | 0,747 | 5,00 | 0,00
+regulatory_fact | 5 | 0,833 | 4,00 | 0,00
+traceability | 5 | 0,667 | 4,60 | 0,20
+
+## Table 8 (7x3)
+Métrica | Origen | Dónde se calcula
+MRR y cobertura de keywords | Función propia | results.csv de run_20260819T165515Z
+nDCG del harness | Función propia, no citada | 21/35 filas >1; no es nDCG canónico
+Exactitud, exhaustividad, relevancia 1–5, is_hallucination | LLM-as-a-Judge | Mismo CSV; no es juicio humano
+RAGAS | No aplica | No se ejecutó
+Acuerdo autor–juez (±1) | Pendiente de anotación | author_scorecard.csv (21 ítems)
+κ de Cohen | No aplica | Un solo anotador humano

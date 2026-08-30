@@ -17,6 +17,17 @@ class LlmPort(Protocol):
         model: str,
         messages: list[dict[str, str]],
         temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str: ...
+
+    async def stream(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        on_token: Any | None = None,
     ) -> str: ...
 
     async def parse(
@@ -35,6 +46,8 @@ class ChunkRepository(Protocol):
         k: int,
         distance_metric: str = "cosine",
         embedding_model: str | None = None,
+        exclude_chunk_ids: list[str] | None = None,
+        exclude_document_ids: list[str] | None = None,
     ) -> list[RetrievedChunk]: ...
 
 

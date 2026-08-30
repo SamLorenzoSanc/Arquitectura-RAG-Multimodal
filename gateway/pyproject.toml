@@ -77,7 +77,12 @@ markers = [
 branch = true
 source = [
     "services",
-    "routes",
+    "identity",
+    "tenancy",
+    "catalog",
+    "chat",
+    "evaluation",
+    "ops",
     "schemas",
     "middleware",
     "rag",

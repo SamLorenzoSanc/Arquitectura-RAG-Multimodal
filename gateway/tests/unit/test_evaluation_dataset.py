@@ -4,7 +4,7 @@ import pytest
 
 from core.test import load_tests, merge_test_banks, TestQuestion, upsert_test_question_jsonl
 from schemas.evaluation import SimulatorSaveRequest
-from services.evaluation_dataset import CREATE_EXPERIMENT_RUNS_SQL
+from evaluation.dataset_schema import CREATE_EXPERIMENT_RUNS_SQL
 
 pytestmark = pytest.mark.unit
 
@@ -44,22 +44,22 @@ def test_loader_accepts_jsonl_deduplicates_and_assigns_splits(tmp_path):
 
 def test_default_question_bank_has_gold_schema():
     tests = load_tests()
-    assert len(tests) >= 21
+    assert len(tests) == 35
     categories = {item.category for item in tests}
-    # Taxonomía del banco amplio versionado en gateway/core/tests.jsonl
     required = {
         "direct_fact",
         "temporal",
         "relationship",
         "spanning",
-        "comparative",
-        "numerical",
-        "holistic",
+        "regulatory_compliance",
+        "regulatory_fact",
+        "traceability",
     }
-    assert required <= categories
+    assert categories == required
     from collections import Counter
-    counts = Counter(item.category for item in tests if item.category in required)
-    assert all(n >= 3 for n in counts.values()), counts
+
+    counts = Counter(item.category for item in tests)
+    assert all(n == 5 for n in counts.values()), counts
     for item in tests:
         assert item.question.strip()
         assert item.keywords

@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock
 
-from services.evaluation_dataset import safe_rollback
+from evaluation.dataset_schema import safe_rollback
 
 
 @pytest.mark.asyncio

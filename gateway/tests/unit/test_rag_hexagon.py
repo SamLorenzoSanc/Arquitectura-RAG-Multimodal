@@ -41,6 +41,8 @@ class FakeChunks:
         k,
         distance_metric="cosine",
         embedding_model=None,
+        exclude_chunk_ids=None,
+        exclude_document_ids=None,
     ):
         self.calls.append((question, tenant_id, collections))
         kb = (collections or ["all"])[0]
@@ -70,8 +72,16 @@ class FakeLlm:
         self.complete_calls = []
         self.parse_calls = []
 
-    async def complete(self, model, messages, temperature=None):
+    async def complete(self, model, messages, temperature=None, max_tokens=None):
         self.complete_calls.append((model, messages, temperature))
+        return self.answer
+
+    async def stream(self, model, messages, *, temperature=None, max_tokens=None, on_token=None):
+        self.complete_calls.append((model, messages, temperature))
+        if on_token is not None:
+            maybe = on_token(self.answer)
+            if maybe is not None and hasattr(maybe, "__await__"):
+                await maybe
         return self.answer
 
     async def parse(self, model, messages, response_format):
@@ -140,6 +150,47 @@ async def test_hybrid_retrieve_and_answer_use_fake_ports_without_io():
     assert result["answer"] == "Diagnóstico: riego."
     assert llm.complete_calls
     assert result["chunks"][0].page_content == "riego-kb-a"
+
+
+@pytest.mark.asyncio
+async def test_answer_skips_llm_when_no_chunks():
+    class EmptyChunks:
+        async def retrieve_dense(self, *args, **kwargs):
+            return []
+
+    class EmptyLexical:
+        async def retrieve(self, *args, **kwargs):
+            return []
+
+        async def rebuild(self, tenant_id: str) -> None:
+            return None
+
+        def invalidate(self, tenant_id=None) -> None:
+            return None
+
+    llm = FakeLlm(answer="no debería usarse")
+    retrieve = HybridRetrieve(
+        EmptyChunks(),
+        EmptyLexical(),
+        llm,
+        IdentityReranker(),
+        retrieval_k=3,
+        bm25_k=3,
+        final_k=3,
+    )
+    invalidate_retrieval_cache()
+    answerer = AnswerQuestion(retrieve, llm, "llama-test")
+    result = await answerer.execute(
+        "pregunta inventada fuera del corpus",
+        tenant_id="t-empty",
+        collections=["kb-x"],
+        retrieval_strategy="dense",
+    )
+    assert "No he encontrado información suficiente" in result["answer"]
+    assert llm.complete_calls == []
+    assert result["retrieval"]["out_of_knowledge"] is True
+    assert result["retrieval"]["generation_skipped"] is True
+    assert result["retrieval"]["timings_ms"]["generation"] == 0.0
 
 
 @pytest.mark.asyncio

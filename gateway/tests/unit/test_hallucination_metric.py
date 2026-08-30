@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from services.hallucination_metric import (
+from evaluation.hallucination import (
     decide_is_hallucination,
     faithfulness_implies_hallucination,
     looks_like_abstention,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from dotenv import load_dotenv
@@ -23,6 +24,7 @@ from rag.adapters.outbound.ollama import (
     RAG_TEMPERATURE,
 )
 from rag.application.answer import build_prompt as _build_prompt
+from rag.application.answer import related_questions_knn
 from rag.application.evaluate import (
     RetrievalEval,
     calculate_dcg,
@@ -50,7 +52,7 @@ RAG_USE_RERANKER = os.getenv("RAG_USE_RERANKER", "false").lower() in {
     "true",
     "yes",
 }
-RAG_USE_QUERY_REWRITE = os.getenv("RAG_USE_QUERY_REWRITE", "true").lower() in {
+RAG_USE_QUERY_REWRITE = os.getenv("RAG_USE_QUERY_REWRITE", "false").lower() in {
     "1",
     "true",
     "yes",
@@ -67,30 +69,51 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-DEFAULT_RETRIEVAL_K = _env_int("RAG_RETRIEVAL_K", 12)
-DEFAULT_BM25_K = _env_int("RAG_BM25_K", 12)
-DEFAULT_CANDIDATE_K = _env_int("RAG_CANDIDATE_K", 20)
-DEFAULT_FINAL_K = _env_int("RAG_FINAL_K", 8)
+DEFAULT_RETRIEVAL_K = _env_int("RAG_RETRIEVAL_K", 8)
+DEFAULT_BM25_K = _env_int("RAG_BM25_K", 8)
+DEFAULT_CANDIDATE_K = _env_int("RAG_CANDIDATE_K", 12)
+DEFAULT_FINAL_K = _env_int("RAG_FINAL_K", 3)
 DEFAULT_RRF_K = _env_int("RAG_RRF_K", 60)
 EVAL_TOP_K = _env_int("RAG_EVAL_TOP_K", 3)
 
 
-def rag_runtime_config() -> dict[str, Any]:
+def rag_runtime_config(*, embedding_model: str | None = None) -> dict[str, Any]:
     """Contrato visible: chat y evaluación deben mostrar estos valores."""
     return {
         "generation_model": DEFAULT_CHAT_MODEL,
-        "embedding_model": DEFAULT_EMBEDDING_MODEL,
+        "embedding_model": embedding_model or DEFAULT_EMBEDDING_MODEL,
         "temperature": RAG_TEMPERATURE,
         "chunk_size_chars": _env_int("RAG_CHUNK_SIZE", 1400),
         "chunk_overlap_chars": _env_int("RAG_CHUNK_OVERLAP", 120),
         "retrieval_k": DEFAULT_RETRIEVAL_K,
         "bm25_k": DEFAULT_BM25_K,
         "rrf_k": DEFAULT_RRF_K,
+        "candidate_k": DEFAULT_CANDIDATE_K,
         "final_k": DEFAULT_FINAL_K,
         "eval_top_k": EVAL_TOP_K,
+        "chat_max_tokens": RAG_CHAT_MAX_TOKENS,
+        "num_ctx": RAG_NUM_CTX,
         "use_reranker": RAG_USE_RERANKER,
         "use_query_rewrite": RAG_USE_QUERY_REWRITE,
-        "note": "Híbrido denso+BM25+RRF. El chat usa final_k; la evaluación IR usa eval_top_k=3.",
+        "note": (
+            "Chat rápido: final_k + RAG_CHAT_MAX_TOKENS + hybrid_rrf/dense. "
+            "La evaluación IR usa eval_top_k=3."
+        ),
+    }
+
+
+def chat_service_ks(
+    retrieval_k: int | None = None,
+    final_k: int | None = None,
+) -> dict[str, int]:
+    """k del chat sin inflar artificialmente BM25/candidatos."""
+    rk = max(1, int(retrieval_k if retrieval_k is not None else DEFAULT_RETRIEVAL_K))
+    fk = max(1, int(final_k if final_k is not None else DEFAULT_FINAL_K))
+    return {
+        "retrieval_k": rk,
+        "bm25_k": max(1, min(DEFAULT_BM25_K, rk)),
+        "candidate_k": max(fk, min(DEFAULT_CANDIDATE_K, max(rk, fk * 2))),
+        "final_k": fk,
     }
 
 
@@ -156,6 +179,22 @@ class EvaluationResultItem(BaseModel):
     flag_different_info: bool
     flag_out_of_knowledge: bool
     retrieval_latency_ms: float | None
+
+
+def _coerce_related_chunk(item: Any) -> RetrievedChunk:
+    if isinstance(item, RetrievedChunk):
+        return item
+    if isinstance(item, Result):
+        return from_result(item)
+    if isinstance(item, dict):
+        return RetrievedChunk(
+            page_content=item.get("page_content") or "",
+            metadata=dict(item.get("metadata") or {}),
+        )
+    return RetrievedChunk(
+        page_content=getattr(item, "page_content", "") or "",
+        metadata=dict(getattr(item, "metadata", None) or {}),
+    )
 
 
 class RAGService:
@@ -303,6 +342,25 @@ class RAGService:
             question, [from_result(c) for c in chunks], max_questions or 5
         )
 
+    async def find_related_questions(
+        self,
+        question: str,
+        chunks: list[Result] | list,
+        *,
+        tenant_id: str = "global",
+        collections: list[str] | None = None,
+        max_questions: int | None = None,
+    ) -> list[str]:
+        used = [_coerce_related_chunk(item) for item in chunks or []]
+        return await related_questions_knn(
+            self._container.retrieve,
+            question,
+            used,
+            tenant_id=tenant_id,
+            collections=collections,
+            max_questions=max_questions or 5,
+        )
+
     async def simple_chat(
         self, question: str, history: list | None = None, temperature: float | None = None
     ):
@@ -331,6 +389,7 @@ class RAGService:
         use_query_rewrite: bool | None = None,
         retrieval_strategy: str | None = None,
         temperature: float | None = None,
+        on_token: Callable[[str], Awaitable[None] | None] | None = None,
     ):
         do_rerank = RAG_USE_RERANKER if use_reranking is None else bool(use_reranking)
         allow_rewrite = (
@@ -338,9 +397,12 @@ class RAGService:
             if use_query_rewrite is None
             else bool(use_query_rewrite)
         )
-        strategy = retrieval_strategy or (
-            "hybrid_expansion_rrf_rerank" if do_rerank else "hybrid_expansion_rrf"
-        )
+        if retrieval_strategy is None:
+            from services.agentic_rag_service import chat_retrieval_strategy
+
+            strategy = chat_retrieval_strategy(use_reranking=do_rerank)
+        else:
+            strategy = retrieval_strategy
         result = await self._container.answer.execute(
             question,
             tenant_id=tenant_id,
@@ -351,6 +413,7 @@ class RAGService:
             use_query_rewrite=allow_rewrite,
             retrieval_strategy=strategy,
             temperature=temperature,
+            on_token=on_token,
         )
         return self._public_answer(result)
 
@@ -420,6 +483,65 @@ class RAGService:
                 "options": {"num_ctx": RAG_NUM_CTX, "num_predict": tokens},
             },
         )
+
+    async def _stream_completion(
+        self,
+        model: str,
+        messages: list[dict],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        on_token: Callable[[str], Awaitable[None] | None] | None = None,
+    ) -> str:
+        """Genera con stream=True y notifica cada delta (Ollama/OpenAI-compatible)."""
+        temp = RAG_TEMPERATURE if temperature is None else float(temperature)
+        tokens = RAG_MAX_TOKENS if max_tokens is None else int(max_tokens)
+        queue: asyncio.Queue[tuple[str, Any]] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
+
+        def _run() -> None:
+            try:
+                stream = self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    temperature=temp,
+                    max_tokens=tokens,
+                    stream=True,
+                    extra_body={
+                        "keep_alive": RAG_KEEP_ALIVE,
+                        "options": {"num_ctx": RAG_NUM_CTX, "num_predict": tokens},
+                    },
+                )
+                for chunk in stream:
+                    choice = chunk.choices[0] if chunk.choices else None
+                    delta = (
+                        (choice.delta.content or "")
+                        if choice and choice.delta
+                        else ""
+                    )
+                    if delta:
+                        loop.call_soon_threadsafe(queue.put_nowait, ("token", delta))
+                loop.call_soon_threadsafe(queue.put_nowait, ("done", None))
+            except Exception as exc:  # noqa: BLE001 — se re-lanza en el awaiter
+                loop.call_soon_threadsafe(queue.put_nowait, ("error", exc))
+
+        worker = asyncio.create_task(asyncio.to_thread(_run))
+        parts: list[str] = []
+        while True:
+            kind, payload = await queue.get()
+            if kind == "token":
+                parts.append(str(payload))
+                if on_token is not None:
+                    maybe = on_token(str(payload))
+                    if maybe is not None and hasattr(maybe, "__await__"):
+                        await maybe  # type: ignore[misc]
+            elif kind == "done":
+                break
+            elif kind == "error":
+                await worker
+                raise payload
+        await worker
+        return "".join(parts)
 
     async def _create_parse_completion(
         self, model: str, messages: list[dict], response_format

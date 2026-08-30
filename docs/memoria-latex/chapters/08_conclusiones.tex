@@ -1,9 +1,9 @@
 % -*- coding: utf-8 -*-
 \chapter{Conclusiones}
 
-El presente Trabajo de Fin de Máster se planteó con la finalidad de evaluar, medir y validar la capacidad de la arquitectura Retrieval-Augmented Generation (RAG) para \textbf{mitigar} las alucinaciones factuales en LLMs aplicados a documentación agrícola (PAC y POSEI), en el alcance de un \textbf{prototipo funcional contenedorizado}. Tras el protocolo experimental sobre el banco de oro ($N=35$, siete categorías) se cubren los objetivos específicos del Capítulo~2 en ese alcance de MVP: estado del arte, diseño hexagonal, implementación FastAPI/React, citación de fuentes, evaluación con corrida congelada y documentación. No se afirma un dataset de 150 pruebas ni una auditoría RAGAS oficial.
+El presente Trabajo de Fin de Máster se planteó para \textbf{medir} si un \textbf{RAG textual modular} (híbrido denso + BM25 + RRF) mitiga alucinaciones factuales en documentación agrícola (PAC/POSEI) frente al mismo LLM sin recuperación. El vehículo es un prototipo contenedorizado. Tras el banco de oro ($N=35$) se cubren los objetivos acotados del Capítulo~2. No se afirma un dataset de 150 pruebas, una corrida RAGAS oficial, GraphRAG ni certificación normativa.
 
-En relación con la ingestión y estructuración del corpus de demostración, se consolidó un conjunto acotado de documentos oficiales PAC/POSEI y fichas fitosanitarias (del orden de 20 ficheros en la demo local, no 1760). La extracción de PDF, con OCR cuando el parser lo aplica, permite indexar texto; no se evalúa un modelo de visión.
+El corpus de evaluación es \texttt{asesor-canarias}: 29 ficheros Markdown (14 de marco y 15 de cultivo), destilados de consolidados POSEI 2025--2026 y de fichas de sanidad vegetal, indexados en 1289 fragmentos. La página PDF exacta en la cita depende del parser.
 
 Respecto al diseño e implementación, se desplegó una tubería de recuperación híbrida (similitud densa + BM25 + RRF). El Cross-Encoder está implementado pero desactivado por defecto en la demo (\texttt{RAG\_USE\_RERANKER=false}). El enriquecimiento de fragmentos con documento de origen permite mostrar fuentes en el chat; la página exacta depende de los metadatos del parser.
 

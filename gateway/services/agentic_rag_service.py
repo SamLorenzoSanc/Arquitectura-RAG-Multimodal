@@ -19,6 +19,7 @@ from sqlalchemy import select, text
 from models.document import Document
 from models.knowledge_base import KnowledgeBase
 from rag.adapters.outbound.scope import is_uuid, organization_tenant_ids
+from rag.application.prompts import OUT_OF_KNOWLEDGE_ANSWER
 from services.agent_graph import (
     AGENT_FAST,
     GRADE_PROMPT,
@@ -28,6 +29,7 @@ from services.agent_graph import (
     heuristic_grade,
     needs_document_grade,
     parse_binary_grade,
+    should_fast_abstain,
 )
 from services.agent_sql import (
     AgentSqlError,
@@ -36,6 +38,7 @@ from services.agent_sql import (
     sql_schema_card,
     validate_agent_select,
 )
+from services.chat_progress import ProgressCallback, emit as emit_progress
 from services.database import AsyncSessionLocal
 from services.rag_service import (
     OLLAMA_API_KEY,
@@ -147,10 +150,31 @@ LOOKUP_HINTS = (
 )
 
 TOOL_CHUNK_CHARS = max(
-    400, int(os.getenv("RAG_AGENT_CHUNK_CHARS", "800" if AGENT_FAST else "1400"))
+    400, int(os.getenv("RAG_AGENT_CHUNK_CHARS", "600" if AGENT_FAST else "1400"))
 )
-TOOL_CHUNK_N = max(3, int(os.getenv("RAG_AGENT_CHUNK_N", "4" if AGENT_FAST else "8")))
+TOOL_CHUNK_N = max(2, int(os.getenv("RAG_AGENT_CHUNK_N", "3" if AGENT_FAST else "8")))
 MAX_AGENT_TOOLS = 3
+
+SYNTH_PLAN = (
+    "Eres AgroPS en modo Plan (estilo Cursor Plan).\n"
+    "1) Escribe un plan breve y accionable (pasos, herramientas, evidencia a buscar).\n"
+    "2) Después responde la pregunta usando SOLO el contexto.\n"
+    "Formato Markdown obligatorio:\n"
+    "## Plan\n"
+    "1. …\n"
+    "## Respuesta\n"
+    "…\n"
+    "Si falta evidencia, dilo en la Respuesta sin inventar cifras.\n\n"
+    "Contexto de herramientas:\n{tool_context}"
+)
+
+SYNTH_DEBUG = (
+    "Eres AgroPS en modo Debug.\n"
+    "Responde con evidencia del contexto. Al final añade un bloque "
+    "`## Diagnóstico` con: intención, herramientas usadas, n_chunks y "
+    "si hubo reescritura. Sé técnico y breve.\n\n"
+    "Contexto:\n{tool_context}"
+)
 KNOWN_TOOLS = frozenset(
     {
         "search_knowledge_base",
@@ -379,9 +403,26 @@ def _format_chunk_line(index: int, chunk: Any) -> str:
 
 
 def chat_retrieval_strategy(*, use_reranking: bool) -> str:
+    """Estrategia de retrieve del chat.
+
+    Prioridad:
+    1. RAG_CHAT_DENSE_ONLY=true → solo denso (más rápido).
+    2. RAG_CHAT_FAST_RETRIEVAL=true → hybrid_rrf sin expansión léxica.
+    3. Si no → hybrid_expansion_rrf (más recall, más lento).
+    """
+    dense_only = os.getenv("RAG_CHAT_DENSE_ONLY", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if dense_only:
+        return "dense"
+    fast = os.getenv("RAG_CHAT_FAST_RETRIEVAL", "true" if AGENT_FAST else "false")
+    fast = fast.strip().lower() in {"1", "true", "yes", "on"}
     if use_reranking:
-        return "hybrid_expansion_rrf_rerank"
-    return "hybrid_expansion_rrf"
+        return "hybrid_rrf_rerank" if fast else "hybrid_expansion_rrf_rerank"
+    return "hybrid_rrf" if fast else "hybrid_expansion_rrf"
 
 
 class AgenticRAGService:
@@ -389,10 +430,18 @@ class AgenticRAGService:
 
     ARCHITECTURE = "agentic_langgraph_rag"
 
-    def __init__(self, rag: RAGService | None = None):
+    def __init__(
+        self,
+        rag: RAGService | None = None,
+        on_progress: ProgressCallback | None = None,
+    ):
         self.rag = rag or RAGService()
         self.client = OpenAI(base_url=OLLAMA_BASE_URL, api_key=OLLAMA_API_KEY)
         self._graph = None
+        self._on_progress = on_progress
+
+    async def _emit(self, event_type: str, **data: Any) -> None:
+        await emit_progress(self._on_progress, event_type, **data)
 
     def plan_tools(self, question: str) -> list[dict[str, Any]]:
         intent = classify_intent(question)
@@ -507,8 +556,12 @@ class AgenticRAGService:
             return fallback
         return parsed
 
-    def _synth_prompt(self, intent: Intent, tool_context: str) -> str:
-        if AGENT_FAST:
+    def _synth_prompt(self, intent: Intent, tool_context: str, *, agent_mode: str = "agent") -> str:
+        if agent_mode == "plan":
+            return SYNTH_PLAN.format(tool_context=tool_context)
+        if agent_mode == "debug":
+            return SYNTH_DEBUG.format(tool_context=tool_context)
+        if AGENT_FAST and agent_mode == "agent":
             return SYNTH_FAST.format(tool_context=tool_context)
         extra = SYNTH_BY_INTENT.get(intent, SYNTH_BY_INTENT["lookup"])
         return f"{SYNTH_COMMON.format(tool_context=tool_context)}\n{extra}"
@@ -884,6 +937,13 @@ class AgenticRAGService:
             tool = step["tool"]
             args = step.get("args") if isinstance(step.get("args"), dict) else {}
             t_tool = time.time()
+            await self._emit(
+                "tool_start",
+                tool=tool,
+                reason=step.get("reason") or "",
+                intent=step.get("intent") or intent,
+                message=f"Ejecutando {tool}…",
+            )
             if tool == "list_indexed_documents":
                 out = await self._tool_list_documents(tenant_id, collections)
             elif tool == "search_regulations":
@@ -939,17 +999,24 @@ class AgenticRAGService:
             latency = (time.time() - t_tool) * 1000
             summary = out.get("summary", "")
             tool_blocks.append(f"### {tool}\n{summary}")
-            trace.append(
-                {
-                    "tool": tool,
-                    "reason": step.get("reason"),
-                    "intent": step.get("intent") or intent,
-                    "ok": bool(out.get("ok")),
-                    "latency_ms": round(latency, 1),
-                    "summary": summary[:800],
-                    "n_chunks": out.get("n_chunks") or 0,
-                    "planner": step.get("planner") or "heuristic",
-                }
+            step_trace = {
+                "tool": tool,
+                "reason": step.get("reason"),
+                "intent": step.get("intent") or intent,
+                "ok": bool(out.get("ok")),
+                "latency_ms": round(latency, 1),
+                "summary": summary[:800],
+                "n_chunks": out.get("n_chunks") or 0,
+                "planner": step.get("planner") or "heuristic",
+            }
+            trace.append(step_trace)
+            await self._emit(
+                "tool_end",
+                **step_trace,
+                message=(
+                    f"{tool} · {step_trace['n_chunks']} fragmentos · "
+                    f"{step_trace['latency_ms']} ms"
+                ),
             )
         return {
             "trace": trace,
@@ -961,7 +1028,17 @@ class AgenticRAGService:
 
     async def graph_generate_query_or_respond(self, state: dict[str, Any]) -> dict[str, Any]:
         question = state.get("active_question") or state["question"]
+        await self._emit(
+            "status",
+            phase="plan",
+            message="Clasificando intención y planificando herramientas…",
+        )
         intent = classify_intent(question)
+        await self._emit(
+            "intent",
+            intent=intent,
+            message=f"Intención detectada: {intent}",
+        )
         plan = await self._plan_with_llm(
             question, model=state["model"], temperature=state.get("temperature")
         )
@@ -977,6 +1054,24 @@ class AgenticRAGService:
                     "planner": "rewrite_loop",
                 }
             ]
+        await self._emit(
+            "plan",
+            intent=intent,
+            tools=[step.get("tool") for step in plan],
+            steps=[
+                {
+                    "tool": step.get("tool"),
+                    "reason": step.get("reason"),
+                    "planner": step.get("planner"),
+                }
+                for step in plan
+            ],
+            message=(
+                "Sin herramientas (respuesta directa)"
+                if not plan
+                else f"Plan: {', '.join(str(s.get('tool')) for s in plan)}"
+            ),
+        )
         return {"intent": intent, "plan": plan, "active_question": question}
 
     async def graph_retrieve(self, state: dict[str, Any]) -> dict[str, Any]:
@@ -991,7 +1086,11 @@ class AgenticRAGService:
             conversation_id=state.get("conversation_id"),
             intent=state.get("intent") or "lookup",
             use_reranking=state.get("use_reranking"),
-            use_query_rewrite=False if AGENT_FAST else state.get("use_query_rewrite"),
+            use_query_rewrite=(
+                False
+                if (AGENT_FAST and not state.get("debug"))
+                else state.get("use_query_rewrite")
+            ),
             temperature=state.get("temperature"),
             prior_trace=state.get("trace"),
         )
@@ -999,9 +1098,10 @@ class AgenticRAGService:
         context = "\n\n".join(executed["tool_blocks"])
         t_grade = time.time()
         should_grade = needs_document_grade(state.get("plan"))
-        if should_grade and not AGENT_FAST:
+        debug = bool(state.get("debug"))
+        if should_grade and (not AGENT_FAST or debug):
             grade = await self._grade_documents(state["question"], context)
-            grade_planner = "langgraph"
+            grade_planner = "langgraph" if not debug else "debug"
         else:
             grade = heuristic_grade(len(executed.get("chunks") or []), context)
             grade_planner = "heuristic"
@@ -1018,10 +1118,22 @@ class AgenticRAGService:
                     "planner": grade_planner,
                 }
             )
+            await self._emit(
+                "grade",
+                grade=grade,
+                planner=grade_planner,
+                n_chunks=len(executed.get("chunks") or []),
+                message=f"Evaluación de relevancia: {grade}",
+            )
         return {**executed, "grade": grade}
 
     async def graph_rewrite_question(self, state: dict[str, Any]) -> dict[str, Any]:
         current = state.get("active_question") or state["question"]
+        await self._emit(
+            "status",
+            phase="rewrite",
+            message="Reescribiendo la pregunta tras grade negativo…",
+        )
         t0 = time.time()
         improved = await self._rewrite_question(current)
         trace = list(state.get("trace") or [])
@@ -1037,6 +1149,11 @@ class AgenticRAGService:
                 "planner": "langgraph",
             }
         )
+        await self._emit(
+            "rewrite",
+            query=improved,
+            message=f"Pregunta reescrita: {improved[:160]}",
+        )
         return {
             "active_question": improved,
             "rewrite_count": int(state.get("rewrite_count") or 0) + 1,
@@ -1046,33 +1163,122 @@ class AgenticRAGService:
 
     async def graph_generate_answer(self, state: dict[str, Any]) -> dict[str, Any]:
         intent = state.get("intent") or classify_intent(state["question"])
+        chunks = state.get("chunks") or []
+        if should_fast_abstain(state):
+            related = await self.rag.find_related_questions(
+                state["question"],
+                chunks,
+                tenant_id=state.get("tenant_id") or "global",
+                collections=state.get("collections"),
+            )
+            trace = list(state.get("trace") or [])
+            trace.append(
+                {
+                    "tool": "abstain_out_of_knowledge",
+                    "reason": "Sin evidencia útil tras recuperar; respuesta plantilla",
+                    "intent": intent,
+                    "ok": True,
+                    "latency_ms": 0.0,
+                    "summary": "generation_skipped",
+                    "n_chunks": len(chunks),
+                    "planner": "fast_abstain",
+                }
+            )
+            await self._emit(
+                "abstain",
+                message="Sin evidencia en el corpus · respuesta inmediata",
+            )
+            await self._emit("token", delta=OUT_OF_KNOWLEDGE_ANSWER)
+            return {
+                "answer": OUT_OF_KNOWLEDGE_ANSWER,
+                "related_questions": related,
+                "gen_ms": 0.0,
+                "intent": intent,
+                "abstained": True,
+                "trace": trace,
+            }
         tool_context = (
             "\n\n".join(state.get("tool_blocks") or []) or "Sin herramientas."
         )
-        system = self._synth_prompt(intent, tool_context[:4500])
+        agent_mode = str(state.get("agent_mode") or "agent")
+        system = self._synth_prompt(intent, tool_context[:4500], agent_mode=agent_mode)
         messages = [{"role": "system", "content": system}]
-        history_n = 2 if AGENT_FAST else 6
+        history_n = 2 if (AGENT_FAST and agent_mode != "debug") else 6
         for msg in (state.get("history") or [])[-history_n:]:
             role = msg.get("role")
             content = msg.get("content")
             if role in ("user", "assistant") and content:
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": state["question"]})
-        t_gen = time.time()
-        response = await self.rag._create_completion(
-            state["model"],
-            messages,
-            temperature=state.get("temperature"),
-            max_tokens=RAG_CHAT_MAX_TOKENS if AGENT_FAST else None,
+        await self._emit(
+            "status",
+            phase="generate",
+            message=(
+                "Modo Plan: diseñando enfoque y respuesta…"
+                if agent_mode == "plan"
+                else "Modo Debug: generando con traza…"
+                if agent_mode == "debug"
+                else "Generando respuesta con el modelo…"
+            ),
         )
-        answer = response.choices[0].message.content or ""
-        chunks = state.get("chunks") or []
-        related = self.rag.generate_related_questions(state["question"], chunks)
+        t_gen = time.time()
+
+        async def _on_token(delta: str) -> None:
+            await self._emit("token", delta=delta)
+
+        max_tokens = None
+        if AGENT_FAST and agent_mode == "agent":
+            max_tokens = RAG_CHAT_MAX_TOKENS
+        elif agent_mode == "plan":
+            max_tokens = max(RAG_CHAT_MAX_TOKENS, 384)
+        try:
+            answer = await self.rag._stream_completion(
+                state["model"],
+                messages,
+                temperature=state.get("temperature"),
+                max_tokens=max_tokens,
+                on_token=_on_token if self._on_progress else None,
+            )
+        except Exception:
+            # Fallback sin stream si Ollama no soporta stream en este entorno.
+            response = await self.rag._create_completion(
+                state["model"],
+                messages,
+                temperature=state.get("temperature"),
+                max_tokens=max_tokens,
+            )
+            answer = response.choices[0].message.content or ""
+            if self._on_progress and answer:
+                await self._emit("token", delta=answer)
+
+        if agent_mode == "debug":
+            trace = state.get("trace") or []
+            tools = ", ".join(str(t.get("tool")) for t in trace) or "ninguna"
+            diag = (
+                f"\n\n## Diagnóstico\n"
+                f"- intent: `{intent}`\n"
+                f"- tools: {tools}\n"
+                f"- chunks: {len(chunks)}\n"
+                f"- grade: `{state.get('grade') or 'n/a'}`\n"
+                f"- rewritten: `{state.get('active_question') or state['question']}`\n"
+            )
+            if diag.strip() not in (answer or ""):
+                answer = (answer or "") + diag
+                if self._on_progress:
+                    await self._emit("token", delta=diag)
+
+        related = await self.rag.find_related_questions(
+            state["question"],
+            chunks,
+            tenant_id=state.get("tenant_id") or "global",
+            collections=state.get("collections"),
+        )
         return {
             "answer": answer,
             "related_questions": related,
             "gen_ms": (time.time() - t_gen) * 1000,
             "intent": intent,
+            "abstained": False,
         }
 
     def _result_from_graph_state(
@@ -1094,6 +1300,7 @@ class AgenticRAGService:
         strategy = chat_retrieval_strategy(
             use_reranking=RAG_USE_RERANKER if use_reranking is None else bool(use_reranking)
         )
+        abstained = bool(state.get("abstained"))
         agent_meta = {
             "architecture": self.ARCHITECTURE,
             "label": (
@@ -1108,6 +1315,8 @@ class AgenticRAGService:
             "rewritten_query": state.get("active_question") or question,
             "agent_trace": trace,
             "organization": organization_name,
+            "out_of_knowledge": abstained,
+            "generation_skipped": abstained,
             "timings_ms": {
                 "generation": round(float(state.get("gen_ms") or 0), 1),
                 "total": round(total_ms, 1),
@@ -1147,6 +1356,42 @@ class AgenticRAGService:
             "latency_ms": round(total_ms, 1),
         }
 
+    async def _answer_direct(
+        self,
+        initial: dict[str, Any],
+        *,
+        t0: float,
+        use_reranking: bool | None,
+        organization_name: str,
+        question: str,
+    ) -> dict[str, Any]:
+        """Camino rápido sin LangGraph: misma lógica, menos overhead de orquestación."""
+        from services.agent_graph import MAX_REWRITES, route_after_retrieve
+
+        state: dict[str, Any] = dict(initial)
+        state.update(await self.graph_generate_query_or_respond(state))
+        if state.get("plan"):
+            state.update(await self.graph_retrieve(state))
+            while True:
+                next_step = route_after_retrieve(state)
+                if next_step == "generate_answer":
+                    break
+                state.update(await self.graph_rewrite_question(state))
+                state.update(await self.graph_generate_query_or_respond(state))
+                if not state.get("plan"):
+                    break
+                state.update(await self.graph_retrieve(state))
+                if int(state.get("rewrite_count") or 0) >= MAX_REWRITES:
+                    break
+        state.update(await self.graph_generate_answer(state))
+        return self._result_from_graph_state(
+            state,
+            t0=t0,
+            use_reranking=use_reranking,
+            organization_name=organization_name,
+            question=question,
+        )
+
     async def answer(
         self,
         question: str,
@@ -1162,8 +1407,27 @@ class AgenticRAGService:
         use_reranking: bool | None = None,
         use_query_rewrite: bool | None = None,
         temperature: float | None = None,
+        on_progress: ProgressCallback | None = None,
+        agent_mode: str | None = None,
     ) -> dict[str, Any]:
+        if on_progress is not None:
+            self._on_progress = on_progress
         t0 = time.time()
+        mode = (agent_mode or "agent").strip().lower()
+        if mode not in {"agent", "plan", "debug", "multitask"}:
+            mode = "agent"
+        debug = mode == "debug"
+        await self._emit(
+            "status",
+            phase="start",
+            message=(
+                "Modo Plan: diseñando el enfoque…"
+                if mode == "plan"
+                else "Modo Debug: traza completa…"
+                if debug
+                else "Iniciando Agentic RAG…"
+            ),
+        )
         active_model = model or self.rag.model
         initial = {
             "question": question,
@@ -1177,22 +1441,40 @@ class AgenticRAGService:
             "user_id": str(user_id) if user_id else None,
             "organization_id": str(organization_id) if organization_id else None,
             "use_reranking": use_reranking,
-            "use_query_rewrite": use_query_rewrite,
+            "use_query_rewrite": True if debug else use_query_rewrite,
             "temperature": temperature,
             "rewrite_count": 0,
             "trace": [],
             "plan": [],
             "tool_blocks": [],
             "chunks": [],
+            "agent_mode": mode,
+            "debug": debug,
         }
-        final = await self._graph_compiled().ainvoke(initial)
-        return self._result_from_graph_state(
-            final,
-            t0=t0,
-            use_reranking=use_reranking,
-            organization_name=organization_name,
-            question=question,
-        )
+        # Debug: grafo completo (grade/rewrite). Plan/Agent rápidos: camino directo.
+        if AGENT_FAST and not debug:
+            result = await self._answer_direct(
+                initial,
+                t0=t0,
+                use_reranking=use_reranking,
+                organization_name=organization_name,
+                question=question,
+            )
+        else:
+            final = await self._graph_compiled().ainvoke(initial)
+            result = self._result_from_graph_state(
+                final,
+                t0=t0,
+                use_reranking=use_reranking,
+                organization_name=organization_name,
+                question=question,
+            )
+        result["agent_mode"] = mode
+        if result.get("retrieval") is not None:
+            result["retrieval"]["agent_mode"] = mode
+        if result.get("retrieval_details") is not None:
+            result["retrieval_details"]["agent_mode"] = mode
+        return result
 
 
 async def run_hybrid_answer(
@@ -1207,10 +1489,29 @@ async def run_hybrid_answer(
     use_query_rewrite: bool | None = None,
     retrieval_strategy: str | None = None,
     temperature: float | None = None,
+    on_progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     t0 = time.time()
+    await emit_progress(
+        on_progress,
+        "status",
+        phase="retrieve",
+        message="Recuperando contexto (híbrido denso + BM25 + RRF)…",
+    )
     do_rerank = RAG_USE_RERANKER if use_reranking is None else bool(use_reranking)
     strategy = retrieval_strategy or chat_retrieval_strategy(use_reranking=do_rerank)
+
+    async def _on_token(delta: str) -> None:
+        await emit_progress(on_progress, "token", delta=delta)
+
+    if on_progress:
+        await emit_progress(
+            on_progress,
+            "status",
+            phase="generate",
+            message="Generando respuesta con el modelo…",
+        )
+
     result = await rag.answer(
         question=question,
         history=history,
@@ -1221,16 +1522,22 @@ async def run_hybrid_answer(
         use_query_rewrite=use_query_rewrite,
         retrieval_strategy=strategy,
         temperature=temperature,
+        on_token=_on_token if on_progress else None,
     )
+    answer = result.get("answer") or ""
     latency = (time.time() - t0) * 1000
     details = result.get("retrieval_details") or {}
-    details["architecture"] = "hybrid_expansion_rrf"
-    details["label"] = "Hybrid RAG (Dense + BM25 + RRF + expansión léxica)"
+    details["architecture"] = strategy
+    details["label"] = (
+        "Hybrid RAG (Dense + BM25 + RRF"
+        + (" + expansión léxica" if "expansion" in strategy else "")
+        + ")"
+    )
     result["retrieval_details"] = details
     if result.get("retrieval") is not None:
-        result["retrieval"]["architecture"] = "hybrid_expansion_rrf"
+        result["retrieval"]["architecture"] = strategy
         result["retrieval"]["strategy"] = strategy
-    result["architecture"] = "hybrid_expansion_rrf"
+    result["architecture"] = strategy
     result["latency_ms"] = round(latency, 1)
     result["agent_trace"] = None
     return result

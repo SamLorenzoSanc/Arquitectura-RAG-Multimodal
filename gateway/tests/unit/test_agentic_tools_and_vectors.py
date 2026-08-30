@@ -1,6 +1,6 @@
 import pytest
 
-from catalog.adapters.inbound.documents import _chunk_overlap
+from catalog.http import _chunk_overlap
 from rag.adapters.outbound.pgvector import STORAGE_VECTOR_DIM, prepare_query_vectors
 from services.agentic_rag_service import (
     AgenticRAGService,
@@ -54,9 +54,24 @@ def test_lookup_questions_do_not_force_diagnosis_tool():
     assert tools == ["search_knowledge_base"]
 
 
-def test_chat_retrieval_strategy_is_full_hybrid():
+def test_chat_retrieval_strategy_defaults_to_fast_hybrid(monkeypatch):
+    monkeypatch.delenv("RAG_CHAT_DENSE_ONLY", raising=False)
+    monkeypatch.setenv("RAG_CHAT_FAST_RETRIEVAL", "true")
+    assert chat_retrieval_strategy(use_reranking=False) == "hybrid_rrf"
+    assert chat_retrieval_strategy(use_reranking=True) == "hybrid_rrf_rerank"
+
+
+def test_chat_retrieval_strategy_can_enable_expansion(monkeypatch):
+    monkeypatch.delenv("RAG_CHAT_DENSE_ONLY", raising=False)
+    monkeypatch.setenv("RAG_CHAT_FAST_RETRIEVAL", "false")
     assert chat_retrieval_strategy(use_reranking=False) == "hybrid_expansion_rrf"
     assert chat_retrieval_strategy(use_reranking=True) == "hybrid_expansion_rrf_rerank"
+
+
+def test_chat_retrieval_strategy_dense_only(monkeypatch):
+    monkeypatch.setenv("RAG_CHAT_DENSE_ONLY", "true")
+    assert chat_retrieval_strategy(use_reranking=False) == "dense"
+    assert chat_retrieval_strategy(use_reranking=True) == "dense"
 
 
 def test_parse_agent_plan_reads_sql_and_memory_tools():

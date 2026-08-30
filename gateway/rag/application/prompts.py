@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+# Respuesta inmediata cuando no hay evidencia (sin llamar al LLM).
+OUT_OF_KNOWLEDGE_ANSWER = (
+    "No he encontrado información suficiente en los documentos indexados "
+    "de tu organización para responder con seguridad a esa pregunta. "
+    "Si el dato debería estar en el corpus, prueba a reformular o sube "
+    "el documento correspondiente."
+)
+
 SYSTEM_PROMPT = """
     Eres AgroPS, el asistente de campo para agricultores de Canarias.
     Responde SIEMPRE en español y atiende la pregunta real del usuario.

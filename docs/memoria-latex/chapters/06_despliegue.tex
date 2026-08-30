@@ -15,7 +15,7 @@ La figura~\ref{fig:diagrama-despliegue} resume ese flujo de extremo a extremo. L
 \label{fig:diagrama-despliegue}
 \end{figure}
 
-Cuando se hace un \emph{push} al repositorio en GitHub, se dispara el workflow \texttt{deploy-ionos.yml}. La acción construye las imágenes propias a partir de los Dockerfiles del gateway y del frontend, y las sube a Docker Hub con etiquetas \texttt{:sha} y \texttt{:latest} (\texttt{\$\{DOCKERHUB\_USER\}/agrops-api} y \texttt{\$\{DOCKERHUB\_USER\}/agrops-frontend}). A continuación, el mismo flujo sincroniza el Compose de producción y las migraciones SQL al VPS, hace \texttt{docker compose pull} y levanta los contenedores.
+Cuando se hace un \emph{push} al repositorio en GitHub, se dispara el workflow \texttt{deploy-ionos.yml}. La acción construye las imágenes propias a partir de los Dockerfiles del gateway y del frontend, y las sube a Docker Hub con etiquetas \texttt{:sha} y \texttt{:latest} (\texttt{samuelzo/agrops-api} y \texttt{samuelzo/agrops-frontend}). A continuación, el mismo flujo sincroniza el Compose de producción y las migraciones SQL al VPS, hace \texttt{docker compose pull} y levanta los contenedores.
 
 La orquestación multi-contenedor se gestiona con Docker Compose. El fichero \texttt{docker-compose.prod.yaml} declara los servicios del prototipo; en local, \texttt{docker-compose.yaml} permite además construir las imágenes en el anfitrión (\texttt{docker compose up --build}) sin pasar por el registro. PostgreSQL y Ollama se toman de registries oficiales (\texttt{pgvector/pgvector:pg18} y \texttt{ollama/ollama}); solo las piezas de aplicación propias se publican en Docker Hub.
 
